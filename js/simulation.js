@@ -197,10 +197,127 @@ const SimulationEngine = (function() {
     };
   }
 
+  const API_BASE_URL = (typeof window !== 'undefined' && window.location.port === '3000') 
+    ? '/api' 
+    : 'http://localhost:3000/api';
+
+  async function simulatePlanAsync(approaches, greenAllocation, config) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/simulate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approaches, greenAllocation, config })
+      });
+      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      const data = await res.json();
+      return data.simulation || simulatePlan(approaches, greenAllocation, config);
+    } catch (err) {
+      console.warn('Backend simulation API unavailable, falling back to client engine:', err.message);
+      return simulatePlan(approaches, greenAllocation, config);
+    }
+  }
+
+  async function comparePlansAsync(approaches, currentGreens, candidateGreens, config) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/simulate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approaches, greenAllocation: currentGreens, candidateGreens, config })
+      });
+      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+      const data = await res.json();
+      return data.isImproved !== undefined ? data : comparePlans(approaches, currentGreens, candidateGreens, config);
+    } catch (err) {
+      console.warn('Backend compare API unavailable, falling back to client engine:', err.message);
+      return comparePlans(approaches, currentGreens, candidateGreens, config);
+    }
+  }
+
   return {
     simulatePlan,
-    comparePlans
+    comparePlans,
+    simulatePlanAsync,
+    comparePlansAsync
   };
 })();
 if (typeof window !== 'undefined') { window.SimulationEngine = SimulationEngine; }
+
 if (typeof module !== 'undefined' && module.exports) { module.exports = SimulationEngine; }
+
+/**
+ * Basic deterministic queuing model for synthetic intersection data.
+ * Calculates average queue length and vehicle delay.
+ */
+SimulationEngine.calculateQueueMetrics = function(syntheticData, cycleLength, greenTime) {
+  const flowVehHr = syntheticData.vehicles_per_minute * 60; 
+  const numLanes = syntheticData.lanes;
+  const satFlow = 1800 * numLanes; // Assume 1800 veh/hr per lane capacity
+  
+  const lambda = flowVehHr / 3600; // Arrival rate (veh/sec)
+  const mu = satFlow / 3600; // Service rate (veh/sec)
+  
+  const redTime = Math.max(0, cycleLength - greenTime);
+  const capacityVehHr = satFlow * (greenTime / cycleLength);
+  const vcRatio = capacityVehHr > 0 ? flowVehHr / capacityVehHr : 99;
+  
+  let maxQueue = lambda * redTime;
+  let timeToClear = mu > lambda ? maxQueue / (mu - lambda) : Infinity;
+  let totalDelay = 0;
+  
+  if (mu > lambda && timeToClear <= greenTime) {
+    // Queue clears completely during green phase
+    totalDelay = (0.5 * maxQueue * redTime) + (0.5 * maxQueue * timeToClear);
+  } else {
+    // Queue doesn't clear (oversaturated)
+    let queueEnd = Math.max(0, maxQueue + (lambda - mu) * greenTime);
+    totalDelay = (0.5 * maxQueue * redTime) + (greenTime * (maxQueue + queueEnd) / 2);
+    maxQueue = Math.max(maxQueue, queueEnd);
+  }
+  
+  const totalArrivals = lambda * cycleLength;
+  const avgDelay = totalArrivals > 0 ? totalDelay / totalArrivals : 0;
+  const avgQueue = totalDelay / cycleLength;
+
+  return {
+    flow_veh_hr: flowVehHr,
+    capacity_veh_hr: Math.round(capacityVehHr),
+    vc_ratio: parseFloat(vcRatio.toFixed(2)),
+    max_queue_length: Math.round(maxQueue),
+    avg_queue_length: parseFloat(avgQueue.toFixed(2)),
+    avg_delay_sec: parseFloat(avgDelay.toFixed(2))
+  };
+};
+
+/**
+ * Evaluates the impact of adjusted signal timings vs current timings.
+ */
+SimulationEngine.evaluateTimingAdjustments = function(syntheticData, currentTimings, adjustedTimings) {
+  const before = SimulationEngine.calculateQueueMetrics(
+    syntheticData, 
+    currentTimings.cycleLength, 
+    currentTimings.greenSplit
+  );
+  
+  const after = SimulationEngine.calculateQueueMetrics(
+    syntheticData, 
+    adjustedTimings.cycleLength, 
+    adjustedTimings.greenSplit
+  );
+  
+  const delayReduction = before.avg_delay_sec - after.avg_delay_sec;
+  const delayReductionPct = before.avg_delay_sec > 0 
+    ? (delayReduction / before.avg_delay_sec) * 100 
+    : 0;
+    
+  return {
+    intersection_id: syntheticData.intersection_id,
+    time_of_day: syntheticData.time_of_day,
+    before_metrics: before,
+    after_metrics: after,
+    improvement_estimates: {
+      delay_reduction_sec: parseFloat(delayReduction.toFixed(2)),
+      delay_reduction_pct: parseFloat(delayReductionPct.toFixed(2)),
+      queue_reduction: parseFloat((before.avg_queue_length - after.avg_queue_length).toFixed(2))
+    }
+  };
+};

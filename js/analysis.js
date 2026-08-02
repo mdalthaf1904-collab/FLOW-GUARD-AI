@@ -1828,3 +1828,64 @@ const AnalysisEngine = (function() {
 if (typeof window !== 'undefined') { window.AnalysisEngine = AnalysisEngine; }
 if (typeof module !== 'undefined' && module.exports) { module.exports = AnalysisEngine; }
 
+/**
+ * Parses synthetic historical data and identifies peak congestion hours
+ * based on volume-to-capacity (v/c) ratios.
+ */
+AnalysisEngine.identifyPeakCongestionHours = function(historicalData) {
+  // Capacity assumption: roughly 15 vehicles per minute per lane (900 vphpl)
+  const BASE_CAPACITY_PER_LANE_VPM = 15;
+  
+  const hourlyAggregates = {};
+  
+  historicalData.forEach(record => {
+    // Capacity adjustment based on incident
+    let capacityModifier = 1.0;
+    if (record.incident_event === 'accident') capacityModifier = 0.5;
+    else if (record.incident_event === 'roadwork') capacityModifier = 0.7;
+    
+    const capacity = record.lanes * BASE_CAPACITY_PER_LANE_VPM * capacityModifier;
+    const vcRatio = record.vehicles_per_minute / capacity;
+    
+    const hour = record.time_of_day.split(':')[0]; // e.g., '07'
+    const key = `${record.intersection_id}_${record.date}_${hour}`;
+    
+    if (!hourlyAggregates[key]) {
+      hourlyAggregates[key] = {
+        intersection_id: record.intersection_id,
+        date: record.date,
+        hour: hour,
+        total_vc: 0,
+        count: 0,
+        max_vc: 0,
+        incidents: new Set()
+      };
+    }
+    
+    hourlyAggregates[key].total_vc += vcRatio;
+    hourlyAggregates[key].count += 1;
+    if (vcRatio > hourlyAggregates[key].max_vc) {
+      hourlyAggregates[key].max_vc = vcRatio;
+    }
+    if (record.incident_event !== 'none') {
+      hourlyAggregates[key].incidents.add(record.incident_event);
+    }
+  });
+  
+  // Convert to array and calculate average v/c
+  const hourlyResults = Object.values(hourlyAggregates).map(agg => ({
+    intersection_id: agg.intersection_id,
+    date: agg.date,
+    hour: agg.hour,
+    max_vc: parseFloat(agg.max_vc.toFixed(2)),
+    avg_vc: parseFloat((agg.total_vc / agg.count).toFixed(2)),
+    incidents: Array.from(agg.incidents)
+  }));
+  
+  // Sort by highest max v/c ratio
+  hourlyResults.sort((a, b) => b.max_vc - a.max_vc);
+  
+  // Filter for peak congestion (e.g. max v/c > 0.85)
+  return hourlyResults.filter(result => result.max_vc > 0.85);
+};
+

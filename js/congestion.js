@@ -1,5 +1,5 @@
 /**
- * FlowGuard AI — Milestone 5: Congestion Intelligence Engine
+ * FlowGuard AI \u2014 Milestone 5: Congestion Intelligence Engine
  * Rule-Based LOS, Severity, Diagnostics & Recommendation Engine
  *
  * IMPORTANT: This is an offline engineering decision-support prototype.
@@ -14,7 +14,7 @@ const CongestionEngine = (function () {
   'use strict';
 
   // =========================================================================
-  // SECTION 1 — CONFIGURABLE THRESHOLD OBJECTS (Single Sources of Truth)
+  // SECTION 1 \u2014 CONFIGURABLE THRESHOLD OBJECTS (Single Sources of Truth)
   // =========================================================================
 
   /**
@@ -118,13 +118,13 @@ const CongestionEngine = (function () {
   };
 
   // =========================================================================
-  // SECTION 2 — CORE CLASSIFICATION FUNCTIONS
+  // SECTION 2 \u2014 CORE CLASSIFICATION FUNCTIONS
   // =========================================================================
 
   /**
    * classifyCongestion(vcRatio)
    * Returns the congestion severity record for a given v/c ratio.
-   * Uses CONGESTION_THRESHOLDS — single configuration object.
+   * Uses CONGESTION_THRESHOLDS \u2014 single configuration object.
    */
   function classifyCongestion(vcRatio) {
     const vc = parseFloat(vcRatio) || 0;
@@ -163,13 +163,13 @@ const CongestionEngine = (function () {
   }
 
   // =========================================================================
-  // SECTION 3 — INTERSECTION-LEVEL CALCULATIONS
+  // SECTION 3 \u2014 INTERSECTION-LEVEL CALCULATIONS
   // =========================================================================
 
   /**
    * calculateIntersectionDelay(activeKeys, simResult)
    * Demand-weighted average intersection delay.
-   * Formula: Σ(q_i × d_i) / Σ(q_i)
+   * Formula: \u03a3(q_i \u00d7 d_i) / \u03a3(q_i)
    * Does NOT simply average approach delays.
    */
   function calculateIntersectionDelay(activeKeys, simResult) {
@@ -233,13 +233,13 @@ const CongestionEngine = (function () {
   }
 
   // =========================================================================
-  // SECTION 4 — RULE-BASED DIAGNOSTIC ENGINE
+  // SECTION 4 \u2014 RULE-BASED DIAGNOSTIC ENGINE
   // =========================================================================
 
   /**
    * runBottleneckDiagnostics(key, approachData, currentSim, proposedSim, activeKeys)
    * Engineering rule-based diagnosis for a single approach.
-   * Returns { diagnosis, explanation } — NOT machine learning.
+   * Returns { diagnosis, explanation } \u2014 NOT machine learning.
    */
   function runBottleneckDiagnostics(key, approachData, currentSim, proposedSim, activeKeys) {
     const curr = currentSim.approaches[key];
@@ -310,7 +310,7 @@ const CongestionEngine = (function () {
   }
 
   // =========================================================================
-  // SECTION 5 — RECOMMENDATION ENGINE
+  // SECTION 5 \u2014 RECOMMENDATION ENGINE
   // =========================================================================
 
   /**
@@ -395,13 +395,13 @@ const CongestionEngine = (function () {
   }
 
   // =========================================================================
-  // SECTION 6 — FAIRNESS / DELAY SPREAD CHECK
+  // SECTION 6 \u2014 FAIRNESS / DELAY SPREAD CHECK
   // =========================================================================
 
   /**
    * runFairnessCheck(activeKeys, currentSim, proposedSim)
    * Computes delay spread and flags excessive disparity.
-   * Advisory only — does NOT automatically reject the plan.
+   * Advisory only \u2014 does NOT automatically reject the plan.
    */
   function runFairnessCheck(activeKeys, currentSim, proposedSim) {
     if (!proposedSim) return null;
@@ -441,7 +441,7 @@ const CongestionEngine = (function () {
   }
 
   // =========================================================================
-  // SECTION 7 — ENGINEERING WARNINGS
+  // SECTION 7 \u2014 ENGINEERING WARNINGS
   // =========================================================================
 
   /**
@@ -471,7 +471,7 @@ const CongestionEngine = (function () {
       }
 
       if (prop && prop.avgWaitTime > (curr.avgWaitTime || 0) * 1.10 && (curr.avgWaitTime || 0) > 5) {
-        warnings.push({ type: 'WORSENED', message: `Proposed timing increases delay on ${curr.name || k}: ${(curr.avgWaitTime || 0).toFixed(1)} → ${prop.avgWaitTime.toFixed(1)} s/veh.` });
+        warnings.push({ type: 'WORSENED', message: `Proposed timing increases delay on ${curr.name || k}: ${(curr.avgWaitTime || 0).toFixed(1)} \u2192 ${prop.avgWaitTime.toFixed(1)} s/veh.` });
       }
     });
 
@@ -480,14 +480,14 @@ const CongestionEngine = (function () {
     const maxD = Math.max(...demands);
     const minD = demands.filter(d => d > 0).length > 0 ? Math.min(...demands.filter(d => d > 0)) : 0;
     if (minD > 0 && maxD / minD > 5) {
-      warnings.push({ type: 'IMBALANCE', message: `High demand imbalance detected: max approach demand is ${(maxD / minD).toFixed(1)}× the minimum active approach demand.` });
+      warnings.push({ type: 'IMBALANCE', message: `High demand imbalance detected: max approach demand is ${(maxD / minD).toFixed(1)}\u00d7 the minimum active approach demand.` });
     }
 
     return warnings;
   }
 
   // =========================================================================
-  // SECTION 8 — BEFORE vs AFTER COMPARISON
+  // SECTION 8 \u2014 BEFORE vs AFTER COMPARISON
   // =========================================================================
 
   /**
@@ -514,7 +514,7 @@ const CongestionEngine = (function () {
       ? Math.round(((currentSim.overallMaxQueue - proposedSim.overallMaxQueue) / currentSim.overallMaxQueue) * 1000) / 10
       : 0;
 
-    // Trade-off analysis — per approach
+    // Trade-off analysis \u2014 per approach
     const tradeoffs = activeKeys.map(k => {
       const curr = currentSim.approaches[k];
       const prop = proposedSim.approaches[k];
@@ -567,17 +567,159 @@ const CongestionEngine = (function () {
   }
 
   // =========================================================================
-  // SECTION 9 — PROTOTYPE CONGESTION SCORE
+  // SECTION 8.5 \u2014 CANDIDATE PLAN VALIDATION LAYER
+  // =========================================================================
+
+  /**
+   * PROTOTYPE DECISION THRESHOLDS (Configurable Constants)
+   * Explicit decision thresholds for candidate signal plan recommendation safety.
+   */
+  const PROTOTYPE_DECISION_THRESHOLDS = {
+    MIN_NETWORK_IMPROVEMENT_PCT: 1.0,    // Net delay reduction must be >= 1.0%
+    WORSENED_DELAY_INCREASE_SEC: 15.0,   // Delay increase > 15s is noticeable worsening
+    WORSENED_DELAY_INCREASE_PCT: 20.0,   // Delay increase > 20% is noticeable worsening
+    SEVERE_DELAY_INCREASE_SEC: 45.0,     // Delay increase > 45s is severe worsening
+    SPREAD_DISPARITY_INCREASE_SEC: 20.0  // Delay spread increase > 20s triggers equity concern
+  };
+
+  /**
+   * validateCandidatePlan(activeKeys, currentSim, proposedSim, analysisData)
+   *
+   * Central Validation Layer that evaluates Candidate Signal Plans.
+   * Evaluates BOTH Network Performance and Per-Approach Performance.
+   */
+  function validateCandidatePlan(activeKeys, currentSim, proposedSim, analysisData) {
+    if (!currentSim || !proposedSim) {
+      return {
+        status: 'NOT RECOMMENDED',
+        summaryText: 'Simulation data unavailable.',
+        acceptabilityReason: 'Retaining baseline timing due to missing simulation results.'
+      };
+    }
+
+    const currOverall = currentSim.overallAvgWaitTime || 0;
+    const propOverall = proposedSim.overallAvgWaitTime || 0;
+    const overallDiff = propOverall - currOverall;
+    const overallPct  = currOverall > 0 ? Math.round(((currOverall - propOverall) / currOverall) * 1000) / 10 : 0;
+    const queueDiff   = (proposedSim.overallMaxQueue || 0) - (currentSim.overallMaxQueue || 0);
+
+    const improved = [];
+    const unchanged = [];
+    const worsened = [];
+    const severelyWorsened = [];
+
+    activeKeys.forEach(k => {
+      const cApp = currentSim.approaches[k] || {};
+      const pApp = proposedSim.approaches[k] || {};
+      const cDelay = cApp.avgWaitTime || 0;
+      const pDelay = pApp.avgWaitTime || 0;
+      const delta = pDelay - cDelay;
+      const pct = cDelay > 0 ? (delta / cDelay) * 100 : 0;
+      const appName = cApp.name || (analysisData && analysisData.approaches && analysisData.approaches[k] ? analysisData.approaches[k].name : k);
+
+      const record = {
+        key: k,
+        name: appName,
+        currentDelay: Math.round(cDelay * 10) / 10,
+        proposedDelay: Math.round(pDelay * 10) / 10,
+        delta: Math.round(delta * 10) / 10,
+        deltaPct: Math.round(pct * 10) / 10,
+        currentQueue: cApp.maxQueueLength || 0,
+        proposedQueue: pApp.maxQueueLength || 0,
+        currentVC: cApp.vcRatio || 0,
+        proposedVC: pApp.vcRatio || 0
+      };
+
+      if (delta <= -1.0) {
+        improved.push(record);
+      } else if (delta >= PROTOTYPE_DECISION_THRESHOLDS.SEVERE_DELAY_INCREASE_SEC || (cDelay > 10 && pct >= 50.0 && pDelay > 45.0) || (pApp.vcRatio > 1.0 && cApp.vcRatio <= 1.0)) {
+        severelyWorsened.push(record);
+        worsened.push(record);
+      } else if ((delta >= PROTOTYPE_DECISION_THRESHOLDS.WORSENED_DELAY_INCREASE_SEC && pct >= PROTOTYPE_DECISION_THRESHOLDS.WORSENED_DELAY_INCREASE_PCT) || (delta >= 10.0 && pct >= 30.0 && pDelay > 45.0)) {
+        worsened.push(record);
+      } else {
+        unchanged.push(record);
+      }
+    });
+
+    // Check if any approach suffers severe oversaturation or queue breakdown
+    let hasOversaturation = false;
+    activeKeys.forEach(k => {
+      const cApp = currentSim.approaches[k] || {};
+      const pApp = proposedSim.approaches[k] || {};
+      if (cApp.vcRatio > 1.0 || pApp.vcRatio > 1.0) {
+        hasOversaturation = true;
+      }
+    });
+
+    // Determine status
+    let status = 'NOT RECOMMENDED';
+    if (overallPct >= PROTOTYPE_DECISION_THRESHOLDS.MIN_NETWORK_IMPROVEMENT_PCT) {
+      if (worsened.length === 0) {
+        status = 'RECOMMENDED';
+      } else if (severelyWorsened.length > 1 && overallPct < 5.0) {
+        status = 'NOT RECOMMENDED';
+      } else {
+        status = 'CONDITIONAL';
+      }
+    } else {
+      // Net delay improvement < 1.0%
+      if (hasOversaturation || severelyWorsened.length > 0) {
+        status = 'NOT RECOMMENDED';
+      } else {
+        status = 'BASELINE RETAINED';
+      }
+    }
+
+    let summaryText = '';
+    let acceptabilityReason = '';
+
+    if (status === 'RECOMMENDED') {
+      summaryText = `RECOMMENDED PLAN — Overall simulated network delay decreases by ${overallPct}% (${Math.abs(overallDiff).toFixed(1)}s/veh) without creating unacceptable delay deterioration on any active approach.`;
+      acceptabilityReason = `Overall average delay improves by ${overallPct}% and all active approaches operate within acceptable equity bounds.`;
+    } else if (status === 'CONDITIONAL') {
+      const names = worsened.map(w => `${w.name} (+${w.delta}s delay)`).join(', ');
+      summaryText = `CONDITIONAL PLAN — Overall network delay decreases by ${overallPct}%; however, trade-offs remain on: ${names}. Advisory: Green redistribution provides partial benefits; consider reviewing overall cycle length (e.g. 120s → 140s) or lane configurations for oversaturated approaches.`;
+      acceptabilityReason = `Overall average delay improves by ${overallPct}%, but ${worsened.length} approach(es) experience delay trade-offs (${names}).`;
+    } else if (status === 'BASELINE RETAINED') {
+      summaryText = `BASELINE RETAINED — Existing baseline signal timing performs adequately under current demand. Candidate green redistribution provides no meaningful network delay reduction (${overallPct}% change).`;
+      acceptabilityReason = `Existing baseline timing is already performing adequately (all v/c \u2264 1.0). Reallocating green time yields no overall delay improvement; retaining baseline is recommended.`;
+    } else {
+      summaryText = `NOT RECOMMENDED — Candidate green redistribution alone cannot provide acceptable approach-level performance under current demand and cycle constraints. Baseline timing should be retained. Advisory: Review intersection geometry or overall cycle budget.`;
+      acceptabilityReason = `Overall network delay fails to improve sufficiently or causes unmanageable approach deterioration (${overallPct}% change). Reallocating green time under current constraints is not recommended.`;
+    }
+
+    return {
+      status,
+      isRecommended: status === 'RECOMMENDED',
+      isConditional: status === 'CONDITIONAL',
+      isBaselineRetained: status === 'BASELINE RETAINED',
+      isNotRecommended: status === 'NOT RECOMMENDED',
+      overallDelayChangePercent: overallPct,
+      overallDelayDiff: Math.round(overallDiff * 10) / 10,
+      totalQueueChange: queueDiff,
+      improvedApproaches: improved,
+      unchangedApproaches: unchanged,
+      worsenedApproaches: worsened,
+      severelyWorsenedApproaches: severelyWorsened,
+      summaryText,
+      acceptabilityReason,
+      thresholds: PROTOTYPE_DECISION_THRESHOLDS
+    };
+  }
+
+  // =========================================================================
+  // SECTION 9 \u2014 PROTOTYPE CONGESTION SCORE
   // =========================================================================
 
   /**
    * calculateCongestionScore(vcRatio, delay, queue)
    *
-   * PROTOTYPE CONGESTION SCORE (0–100) — Advisory only.
+   * PROTOTYPE CONGESTION SCORE (0\u2013100) \u2014 Advisory only.
    * Formula (documented):
-   *   score = 0.50 × clamp(vc / 1.50, 0, 1) × 100
-   *         + 0.30 × clamp(delay / 120, 0, 1) × 100
-   *         + 0.20 × clamp(queue / 150, 0, 1) × 100
+   *   score = 0.50 \u00d7 clamp(vc / 1.50, 0, 1) \u00d7 100
+   *         + 0.30 \u00d7 clamp(delay / 120, 0, 1) \u00d7 100
+   *         + 0.20 \u00d7 clamp(queue / 150, 0, 1) \u00d7 100
    *
    * Weights: v/c (50%), delay (30%), queue (20%).
    * Reference max values: vc=1.5, delay=120s, queue=150 vehicles.
@@ -599,7 +741,7 @@ const CongestionEngine = (function () {
   }
 
   // =========================================================================
-  // SECTION 10 — TIME-OF-DAY CONGESTION PROFILE
+  // SECTION 10 \u2014 TIME-OF-DAY CONGESTION PROFILE
   // =========================================================================
 
   /**
@@ -699,7 +841,7 @@ const CongestionEngine = (function () {
   }
 
   // =========================================================================
-  // SECTION 11 — MASTER buildAnalysisResult()
+  // SECTION 11 \u2014 MASTER buildAnalysisResult()
   // =========================================================================
 
   /**
@@ -751,6 +893,8 @@ const CongestionEngine = (function () {
         queueRisk,
         // Classification
         severity,
+        category: severity.label,
+        badgeClass: severity.badgeClass,
         isOversaturated: vc > 1.0,
         // Diagnostics
         diagnosis: diagResult.diagnosis,
@@ -824,11 +968,15 @@ const CongestionEngine = (function () {
     LOS_THRESHOLDS,
     QUEUE_RISK_THRESHOLDS,
     TIME_OF_DAY_PROFILES,
+    PROTOTYPE_DECISION_THRESHOLDS,
 
     // Classification functions
     classifyCongestion,
     calculateLOS,
     classifyQueueRisk,
+
+    // Candidate Plan Validation Layer
+    validateCandidatePlan,
 
     // Calculation functions
     calculateIntersectionDelay,
@@ -853,7 +1001,55 @@ const CongestionEngine = (function () {
     // Time-of-day profile
     buildTimeOfDayProfile,
 
-    // Master builder — primary public function
+    // Master builder \u2014 primary public function
     buildAnalysisResult
   };
 })();
+if (typeof window !== 'undefined') { window.CongestionEngine = CongestionEngine; }
+if (typeof module !== 'undefined' && module.exports) { module.exports = CongestionEngine; }
+
+/**
+ * Generate synthetic historical traffic data
+ * Output: Array of objects representing 15-minute intervals for intersections.
+ */
+CongestionEngine.generateSyntheticHistoricalData = function(numIntersections = 3, numDays = 1) {
+  const data = [];
+  const incidents = ['none', 'none', 'none', 'none', 'none', 'none', 'roadwork', 'accident'];
+  
+  for (let d = 0; d < numDays; d++) {
+    for (let i = 1; i <= numIntersections; i++) {
+      for (let h = 0; h < 24; h++) {
+        for (let m = 0; m < 60; m += 15) {
+          const time_of_day = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+          let vpm = Math.floor(Math.random() * 15) + 5; // Base vpm 5 to 19
+          
+          // Morning peak (7-9 AM) and Evening peak (17-19 PM)
+          if ((h >= 7 && h <= 9) || (h >= 17 && h <= 19)) {
+            vpm = Math.floor(vpm * (2.0 + Math.random()));
+          }
+          
+          const incident_event = incidents[Math.floor(Math.random() * incidents.length)];
+          if (incident_event !== 'none') {
+            vpm = Math.floor(vpm * (1.5 + Math.random())); // Spike due to bottleneck
+          }
+          
+          data.push({
+            intersection_id: `INT-${i}`,
+            date: `Day-${d+1}`,
+            time_of_day: time_of_day,
+            vehicles_per_minute: vpm,
+            lanes: Math.floor(Math.random() * 3) + 2, // 2 to 4 lanes
+            speed_limit: [30, 40, 50][Math.floor(Math.random() * 3)],
+            turning_ratios: {
+              left: parseFloat((Math.random() * 0.3).toFixed(2)),
+              straight: parseFloat((Math.random() * 0.5 + 0.4).toFixed(2)),
+              right: parseFloat((Math.random() * 0.2).toFixed(2))
+            },
+            incident_event: incident_event
+          });
+        }
+      }
+    }
+  }
+  return data;
+};

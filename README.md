@@ -106,3 +106,36 @@ python -m http.server 8081
 ```
 
 Access at: **`http://localhost:8081`**
+
+---
+
+## 📐 Mathematical Formulas & Validation
+
+### 1. Deterministic Queuing ($D/D/1$)
+The deterministic queuing model evaluates the approach based on uniform arrival rates ($\lambda$) and discharge rates ($\mu$):
+- **Arrival Rate ($\lambda$)**: $\lambda = \frac{V}{3600}$ (vehicles per second)
+- **Service Rate ($\mu$)**: $\mu = \frac{S}{3600}$ (vehicles per second during green)
+- **Queue Length ($Q(t)$)**: $Q(t) = \int_0^t (\lambda(\tau) - \mu(\tau)) d\tau$
+- **Total Delay ($D$)**: $D = \int_0^T Q(t) dt$
+
+### 2. PCU Factors (Passenger Car Units)
+FlowGuard AI standardizes heterogeneous traffic using Indian standard equivalents:
+- **Two-Wheelers**: $0.5$ PCU
+- **Cars / Light Motor Vehicles**: $1.0$ PCU
+- **Heavy Commercial Vehicles (Bus/Truck)**: $3.0$ PCU
+
+### 3. Volume-to-Capacity Ratio ($v/c$)
+- $v/c = \frac{V}{C}$ where $C$ is the approach capacity per hour.
+- **Threshold**: Bottlenecks are dynamically flagged when $v/c > 0.85$.
+
+---
+
+## 🔑 API Key Configurations (Azure OpenAI)
+
+To activate the AI Rationale Engine which generates automated engineering explanations for green split adjustments:
+1. Open `js/controller.js`.
+2. Locate the `Controller.fetchLLMRationale()` method.
+3. Replace the placeholder endpoint and API key with your active Azure OpenAI Service credentials:
+   - `AZURE_OPENAI_ENDPOINT="https://<your-resource-name>.openai.azure.com/..."`
+   - `AZURE_OPENAI_API_KEY="<your-api-key>"`
+*(Note: As this is a frontend prototype, never expose production keys in public repositories.)*

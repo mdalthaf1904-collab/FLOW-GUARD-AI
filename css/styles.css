@@ -197,9 +197,9 @@ a {
 /* Hero Section (Home Page) */
 .hero-section {
   text-align: center;
-  padding: 3.5rem 1rem 3rem 1rem;
+  padding: 2.25rem 1rem 1.75rem 1rem;
   max-width: 860px;
-  margin: 0 auto 3rem auto;
+  margin: 0 auto 1.75rem auto;
 }
 
 .hero-title {
@@ -224,7 +224,7 @@ a {
   font-size: 1.05rem;
   color: var(--text-muted);
   line-height: 1.6;
-  margin-bottom: 2.25rem;
+  margin-bottom: 1.5rem;
 }
 
 .hero-actions {
@@ -330,6 +330,200 @@ a {
   display: flex;
   align-items: center;
   gap: 0.35rem;
+}
+
+/* ============================================================
+   OFFLINE SYSTEM WORKFLOW — Snake Layout (Homepage)
+   ============================================================ */
+
+/* Section wrapper */
+.workflow-section {
+  margin-bottom: 1.75rem;
+}
+
+/* Both rows live inside this container */
+.workflow-snake {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Individual horizontal row:
+   4 step-cards + 3 arrow connectors = 7 children
+   Steps are equal-width (1fr); arrows are fixed (auto) */
+.workflow-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+  align-items: stretch;
+  gap: 0;
+}
+
+/* Row 2 visually reads right-to-left:
+   we reverse the logical order with direction:rtl on the
+   grid container and restore direction:ltr on each child. */
+.workflow-row--reverse {
+  grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+  direction: rtl;
+}
+.workflow-row--reverse > * {
+  direction: ltr;
+}
+
+/* A single step card */
+.wf-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.65rem 0.5rem;
+  background: rgba(30, 41, 59, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  text-align: center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  min-width: 0;
+}
+
+.wf-step:hover {
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.12);
+}
+
+/* Step number badge */
+.wf-step__num {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+}
+
+/* Step label */
+.wf-step__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Step sub-label (short description) */
+.wf-step__sub {
+  font-size: 0.64rem;
+  color: var(--text-dim);
+  line-height: 1.2;
+}
+
+/* Prototype demo step — subtle green highlight */
+.wf-step--prototype {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+.wf-step--prototype .wf-step__num {
+  color: #10b981;
+}
+.wf-step--prototype .wf-step__label {
+  color: #10b981;
+}
+.wf-step--prototype:hover {
+  border-color: rgba(16, 185, 129, 0.55);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.15);
+}
+
+/* ── Horizontal arrows between step cards ── */
+.wf-arrow-h {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.8rem;
+  position: relative;
+  overflow: visible;
+}
+
+.wf-arrow-h svg {
+  color: var(--primary);
+  opacity: 0.85;
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.25));
+}
+
+/* ── Vertical down connector between row 1 and row 2 ──
+   Uses the same 7-column grid as workflow-row so the down arrow
+   is mathematically centered in Column 7 (directly under Step 04
+   and directly above Step 05). */
+.workflow-down-connector {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+  align-items: center;
+  height: 2.25rem;
+}
+
+.workflow-down-connector .wf-arrow-down {
+  grid-column: 7;
+  justify-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  color: var(--primary);
+  opacity: 0.85;
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.25));
+}
+
+/* ── Reverse-row horizontal arrow — visually points left ── */
+.wf-arrow-h--left svg {
+  transform: scaleX(-1);
+}
+
+/* ── Mobile: full vertical stack ── */
+.workflow-mobile {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.wf-step--mobile {
+  width: 100%;
+  max-width: 340px;
+  flex-direction: row;
+  text-align: left;
+  gap: 0.75rem;
+}
+
+.wf-step--mobile .wf-step__num {
+  min-width: 2rem;
+  text-align: center;
+}
+
+.wf-arrow-v {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 1.5rem;
+  color: var(--primary);
+  opacity: 0.7;
+}
+
+/* ── Responsive breakpoints ── */
+@media (max-width: 900px) {
+  /* Hide desktop snake, show mobile stack */
+  .workflow-snake,
+  .workflow-down-connector {
+    display: none;
+  }
+  .workflow-mobile {
+    display: flex;
+  }
+}
+
+/* ── Tablet mid-range (600-900px) ── */
+@media (min-width: 600px) and (max-width: 900px) {
+  .wf-step--mobile {
+    max-width: 420px;
+  }
 }
 
 /* Cards & Components */
@@ -1263,3 +1457,225 @@ a {
 
 /* Time-of-day profile table peak row */
 .tod-peak-row td { background: rgba(239,68,68,0.08); }
+/* ----- Traffic Signal Lamp Styles ----- */
+.lamp { width: 30px; height: 30px; border-radius: 50%; background: #2d3748; margin: 4px auto; }
+.lamp-red { background: #e53e3e; }
+.lamp-yellow { background: #f59e0b; }
+.lamp-green { background: #10b981; }
+.lamp-dim { opacity: 0.25; }
+.lamp-glow { box-shadow: 0 0 8px 2px rgba(255,255,255,0.4); }
+.signal-container { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+.signal-label { font-size: 0.85rem; color: var(--text-main); text-align: center; }
+
+/* ----- Gantt-style Phase Diagram ----- */
+.phase-diagram-wrapper {
+  margin: 1.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.phase-diagram-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.phase-diagram-label {
+  width: 100px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.phase-diagram-bar {
+  flex: 1;
+  display: flex;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-card-hover);
+}
+.phase-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  transition: width 0.3s ease;
+}
+.phase-segment.green { background: #2ecc71; }
+.phase-segment.yellow { background: #f1c40f; color: #000; }
+.phase-segment.red { background: #e74c3c; }
+
+/* ==========================================================================
+   Print Styles - Engineering Field Report
+   ========================================================================== */
+@media print {
+  /* 1. Hide all interactive UI elements */
+  .navbar,
+  button,
+  .btn,
+  .no-print,
+  input[type="file"],
+  .card-header > a,
+  .time-btn,
+  .form-input {
+    display: none !important;
+  }
+  
+  body {
+    background-color: #fff !important;
+    color: #000 !important;
+  }
+  
+  .card, .table-responsive {
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+    margin-bottom: 2rem !important;
+  }
+
+  /* 2. Make Before vs. After D/D/1 tables 100% width and remove scrollbars */
+  .table-responsive {
+    overflow: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  table.data-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    border: 1px solid #000 !important;
+    page-break-inside: avoid;
+  }
+  
+  table.data-table th, table.data-table td {
+    color: #000 !important;
+    border: 1px solid #000 !important;
+  }
+
+  /* 3. Format Azure OpenAI rationale text in formal serif font */
+  .ai-rationale {
+    font-family: 'Times New Roman', Times, Georgia, serif !important;
+    font-size: 12pt !important;
+    line-height: 1.6 !important;
+    color: #000 !important;
+    margin-top: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  /* Ensure background colors for charts & Gantt diagrams print correctly */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 4. Permanently affix engineering guardrail footer */
+  body::after {
+    content: "CONFIDENTIAL: This document provides simulated offline recommendations based on deterministic arrival rates. It assumes static driver compliance and requires validation by a certified traffic engineer prior to field deployment. No real-world improvements are guaranteed.";
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    font-family: Arial, sans-serif;
+    font-size: 10pt;
+    font-weight: bold;
+    color: #000;
+    text-align: center;
+    border-top: 2px solid #000;
+    padding: 10px 20px;
+    background: #fff;
+    page-break-inside: avoid;
+    box-sizing: border-box;
+    z-index: 9999;
+  }
+  
+  /* Add bottom margin to body to prevent overlap with fixed footer */
+  body {
+    margin-bottom: 80px !important;
+  }
+}
+
+/* ==========================================================================
+   Range Slider Styles (What-If Override)
+   ========================================================================== */
+.whatif-slider-container {
+  width: 100%;
+  position: relative;
+}
+
+.range-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  outline: none;
+  transition: opacity .2s;
+  cursor: pointer;
+}
+
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--status-low);
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+  transition: transform 0.1s;
+}
+
+.range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.range-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--status-low);
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+  transition: transform 0.1s;
+}
+
+.range-slider::-moz-range-thumb:hover {
+  transform: scale(1.15);
+}
+
+/* ==========================================================================
+   Language Toggle Switch
+   ========================================================================== */
+.lang-toggle {
+  display: inline-flex;
+  background: var(--bg-card-hover);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  border: 1px solid var(--border-color);
+}
+
+.lang-toggle-btn {
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lang-toggle-btn:hover {
+  color: var(--text-main);
+}
+
+.lang-toggle-btn.active-lang {
+  background: var(--primary);
+  color: #0f172a;
+}

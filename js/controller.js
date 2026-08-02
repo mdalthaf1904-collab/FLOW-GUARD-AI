@@ -746,9 +746,10 @@ const Controller = (function () {
   ===================================================================== */
   function requestEVP(approachKey, vehicleType) {
     if (!signalState.running) {
-      _log('EVP requested but controller is not running.', 'warn');
-      return;
+      _log('Controller auto-started for EVP request.', 'info');
+      start();
     }
+
     if (signalState.inactiveKeys.includes(approachKey)) {
       _log(`EVP BLOCKED — ${APPROACH_LABELS[approachKey]} is INACTIVE.`, 'warn');
       return;
@@ -1137,3 +1138,94 @@ const Controller = (function () {
 })();
 if (typeof window !== 'undefined') { window.Controller = Controller; }
 if (typeof module !== 'undefined' && module.exports) { module.exports = Controller; }
+
+/**
+ * Offline Recommendation Engine
+ * Evaluates congestion peaks and outputs recommended green split adjustments.
+ */
+Controller.recommendGreenSplitAdjustments = function(peakHoursData) {
+  const recommendations = [];
+  
+  peakHoursData.forEach(peak => {
+    if (peak.max_vc > 0.85) {
+      // Basic deterministic rule: If an intersection shows high congestion peak,
+      // recommend extending the main phase green split by 10 seconds.
+      recommendations.push({
+        intersection_id: peak.intersection_id,
+        hour: peak.hour,
+        adjustment: '+10s green split',
+        reason: `Max v/c ratio of ${peak.max_vc} observed. Extending green split to alleviate bottleneck.`
+      });
+    }
+  });
+  
+  return recommendations;
+};
+
+/**
+ * Azure OpenAI REST API Wrapper
+ * Sends before/after metrics and the recommended split to get a 2-sentence rationale.
+ */
+Controller.fetchLLMRationale = async function(beforeMetrics, afterMetrics, recommendedSplit, endpoint, apiKey, deploymentName = 'gpt-4') {
+  const API_BASE_URL = (typeof window !== 'undefined' && window.location.port === '3000') 
+    ? '/api' 
+    : 'http://localhost:3000/api';
+
+  try {
+    // Attempt request to backend REST API route (secure secret handling)
+    const backendResponse = await fetch(`${API_BASE_URL}/recommend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ beforeMetrics, afterMetrics, recommendedSplit })
+    });
+
+    if (backendResponse.ok) {
+      const data = await backendResponse.json();
+      if (data.success && data.rationale) {
+        return data.rationale;
+      }
+    }
+  } catch (backendErr) {
+    console.warn('Express backend AI endpoint unavailable, trying direct connection if key provided:', backendErr.message);
+  }
+
+  // Fallback for direct browser call if endpoint and apiKey are manually passed
+  if (endpoint && apiKey && !endpoint.includes('your-resource-name')) {
+    const prompt = `
+      You are an AI traffic engineer assistant.
+      We are proposing a signal adjustment: "${recommendedSplit}".
+      Before adjustment: Avg Delay = ${beforeMetrics ? beforeMetrics.avg_delay_sec : 0}s, Max Queue = ${beforeMetrics ? beforeMetrics.max_queue_length : 0} vehicles.
+      After adjustment: Avg Delay = ${afterMetrics ? afterMetrics.avg_delay_sec : 0}s, Max Queue = ${afterMetrics ? afterMetrics.max_queue_length : 0} vehicles.
+      Please provide a concise, 2-sentence rationale explaining why this timing change relieves the specific bottleneck.
+    `;
+
+    try {
+      const url = `${endpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=2023-05-15`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': apiKey
+        },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 120,
+          temperature: 0.2
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Azure API error: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      if (data.choices && data.choices.length > 0) {
+        return data.choices[0].message.content.trim();
+      }
+    } catch (error) {
+      console.error("Error fetching LLM rationale:", error);
+    }
+  }
+
+  return "Reallocating green time to peak approaches reduces estimated queue accumulation and overall vehicle wait time under D/D/1 simulation.";
+};

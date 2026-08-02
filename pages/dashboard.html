@@ -37,6 +37,8 @@
       <li><a href="analysis.html" class="nav-link">Analysis</a></li>
       <li><a href="simulation.html" class="nav-link">Simulation</a></li>
       <li><a href="dashboard.html" class="nav-link active">Dashboard</a></li>
+      <li><a href="controller.html" class="nav-link">Controller</a></li>
+      <li><a href="validation.html" class="nav-link">Validation</a></li>
     </ul>
   </nav>
 
@@ -46,10 +48,10 @@
     <div class="page-header" style="display: flex; align-items: center; justify-content: space-between;">
       <div>
         <h1 class="page-title">Traffic Analytics &amp; Performance Dashboard</h1>
-        <p class="page-subtitle">Congestion LOS, critical approach analysis, time-of-day profile, and signal performance metrics.</p>
+        <p class="page-subtitle">Offline analysis results, simulation metrics, time-of-day profiles, and prototype signal recommendations.</p>
       </div>
       <div>
-        <span class="section-proto-label">PROTOTYPE</span>
+        <span class="section-proto-label">OFFLINE PROTOTYPE</span>
       </div>
     </div>
 
@@ -76,6 +78,50 @@
       </div>
     </div>
 
+    <!-- CSV Upload Configuration -->
+    <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid rgba(56,189,248,0.3);">
+      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+        <h3 style="margin: 0; color: #38bdf8; display: flex; align-items: center; gap: 0.5rem;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          Ingest Historical Traffic Data (CSV)
+        </h3>
+        <p style="margin: 0; font-size: 0.85rem; color: var(--text-dim);">Upload a CSV file containing: Time, Vehicles_Per_Minute, Lanes, and Incident.</p>
+        <div style="display: flex; gap: 1rem; align-items: center; margin-top: 1rem;">
+          <input type="file" id="csvFileInput" accept=".csv" style="flex: 1; padding: 0.5rem; border: 1px dashed var(--border-color); background: rgba(15,23,42,0.5); border-radius: 4px; color: var(--text-main);" />
+          <button id="btnProcessCsv" class="btn btn-primary" style="padding: 0.6rem 1.5rem; font-weight: 600;">Process Data</button>
+        </div>
+        <div id="csvUploadError" style="display: none; color: #ef4444; font-size: 0.85rem; margin-top: 0.5rem; font-weight: 500;"></div>
+      </div>
+    </div>
+
+    <!-- ── Interactive What-If Override ── -->
+    <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid rgba(16, 185, 129, 0.3);">
+      <h3 style="margin-top: 0; color: var(--status-low); display: flex; align-items: center; gap: 0.5rem;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 16 16 12 12 8"></polyline>
+          <line x1="8" y1="12" x2="16" y2="12"></line>
+        </svg>
+        Manual Green Split Override (Seconds)
+      </h3>
+      <p style="margin: 0; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1.25rem;">Adjust the slider to instantly re-calculate D/D/1 queuing metrics and preview timing phases.</p>
+      
+      <div class="whatif-slider-container">
+        <input type="range" id="manualGreenOverride" class="range-slider" min="10" max="90" value="40" step="1" />
+        <div class="slider-label" style="text-align: right; margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-muted);">
+          Candidate Green Split: <span id="slider-value" style="font-size: 1.1rem; font-weight: 700; color: #2ecc71; font-family: var(--font-mono);">40</span> s
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Gantt-Style Phase Diagram Placeholder ── -->
+    <div id="phase-diagram-container"></div>
+    <div id="simulation-results-container"></div>
+
     <!-- ── MILESTONE 5: Congestion Status Banner ── -->
     <div id="congestionStatusBanner" class="congestion-status-banner cs-low">
       <span id="congestionStatusText">⬤ CONGESTION STATUS: Computing...</span>
@@ -85,6 +131,41 @@
     <!-- ── MILESTONE 5: Primary Metric Cards ── -->
     <div class="dash-m5-grid" id="m5MetricGrid">
       <!-- JS populated -->
+    </div>
+
+    <!-- Pedestrian Crossing Safety Status Dashboard Card -->
+    <div class="card" id="dashPedCard" style="margin-bottom: 1.5rem; border: 1px solid rgba(56,189,248,0.3);">
+      <div class="card-header">
+        <h3 class="card-title" style="color: #38bdf8; display: flex; align-items: center; gap: 0.5rem;">
+          🚶 Pedestrian Crossing Safety Module
+        </h3>
+        <span class="badge" id="dashPedStatusBadge" style="background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3);">
+          SAFE
+        </span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 0.75rem;">
+        <div style="background: rgba(10,14,26,0.6); padding: 0.65rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+          <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; display: block;">Pedestrian Status</span>
+          <strong id="dashPedStatusText" style="font-size: 1.05rem; color: #10b981;">SAFE</strong>
+        </div>
+        <div style="background: rgba(10,14,26,0.6); padding: 0.65rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+          <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; display: block;">Required Crossing Time</span>
+          <strong id="dashPedReqTime" style="font-size: 1.05rem; color: #38bdf8; font-family: var(--font-mono);">18.7 s</strong>
+        </div>
+        <div style="background: rgba(10,14,26,0.6); padding: 0.65rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+          <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; display: block;">Min Allocated Green</span>
+          <strong id="dashPedMinAlloc" style="font-size: 1.05rem; color: #10b981; font-family: var(--font-mono);">19 s</strong>
+        </div>
+        <div style="background: rgba(10,14,26,0.6); padding: 0.65rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+          <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; display: block;">Crossing Parameters</span>
+          <strong id="dashPedParams" style="font-size: 0.85rem; color: var(--text-main);">W: 14.0m | v: 1.2m/s</strong>
+        </div>
+      </div>
+
+      <div style="font-size: 0.8rem; color: var(--text-muted); background: rgba(10,14,26,0.5); padding: 0.5rem 0.75rem; border-radius: 4px;" id="dashPedExplanation">
+        <!-- Populated by JS -->
+      </div>
     </div>
 
     <!-- Turning Movement Distribution Widget -->
@@ -104,6 +185,10 @@
       <div class="card-header">
         <h3 class="card-title">2. Congestion Approach Matrix <span class="section-proto-label" style="margin-left:0.5rem;">PROTOTYPE</span></h3>
         <span style="font-size:0.8rem;color:var(--text-muted);">Active approaches only — values from current analysis state</span>
+      </div>
+      <div style="padding: 0.5rem 1.25rem 0.75rem 1.25rem; font-size: 0.8rem; color: var(--text-dim); display: flex; align-items: center; gap: 0.4rem;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span>Congestion severity is based primarily on volume-to-capacity (v/c) ratio, while LOS is based on simulated control delay. These are separate performance indicators.</span>
       </div>
       <div class="table-responsive">
         <table class="data-table matrix-table">
@@ -258,10 +343,10 @@
     </div>
   </footer>
 
-  <script src="../js/app.js"></script>
-  <script src="../js/simulation.js"></script>
-  <script src="../js/analysis.js"></script>
-  <script src="../js/congestion.js"></script>
+  <script charset="utf-8" src="../js/app.js"></script>
+  <script charset="utf-8" src="../js/congestion.js"></script>
+  <script charset="utf-8" src="../js/simulation.js"></script>
+  <script charset="utf-8" src="../js/analysis.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       const state = FlowGuard.getState();
@@ -319,6 +404,9 @@
       if (congestionResult) {
         const cr = congestionResult;
         const dPct = cr.comparison ? cr.comparison.delayReductionPct : null;
+        const planStatus = (optData && optData.acceptanceStatus) ? optData.acceptanceStatus : 'N/A';
+        const statusColor = planStatus === 'RECOMMENDED' ? 'var(--status-low)' : (planStatus === 'CONDITIONAL' ? '#f59e0b' : 'var(--status-high)');
+
         const cards = [
           { label: 'Intersection LOS', value: cr.intersection.los.grade, sub: cr.intersection.los.description, color: losColor(cr.intersection.los.grade) },
           { label: 'Critical Approach', value: cr.intersection.criticalApproachName || '—', sub: `v/c ${cr.intersection.highestVC.toFixed(2)}`, color: '#fca5a5' },
@@ -326,16 +414,63 @@
           { label: 'Highest v/c Ratio', value: cr.intersection.highestVC.toFixed(2), sub: cr.intersection.congestionSeverity.label, color: cr.intersection.highestVC > 1 ? '#ef4444' : cr.intersection.highestVC > 0.9 ? '#f97316' : 'var(--text-main)' },
           { label: 'Maximum Queue', value: `${cr.intersection.maximumQueue} veh`, sub: 'Simulation peak', color: 'var(--status-med)' },
           { label: 'Oversaturated', value: `${cr.intersection.oversaturatedCount}`, sub: 'approach(es)', color: cr.intersection.oversaturatedCount > 0 ? '#ef4444' : 'var(--status-low)' },
-          { label: 'Total Demand', value: `${FlowGuard.formatNum(cr.intersection.totalDemand)} PCU/h`, sub: 'Active approaches', color: 'var(--primary)' },
+          { label: 'Plan Acceptability', value: planStatus, sub: optData ? (optData.waitImprovementPct >= 0 ? `-${optData.waitImprovementPct}% Net Delay` : `+${Math.abs(optData.waitImprovementPct)}% Net Delay`) : 'Candidate timing', color: statusColor },
           { label: 'Est. Delay Reduction', value: dPct !== null ? `${dPct >= 0 ? dPct : Math.abs(dPct)}%` : '—', sub: dPct !== null && dPct >= 0 ? 'Average delay reduced' : dPct !== null ? 'Average delay increased' : '', color: dPct !== null && dPct >= 0 ? 'var(--status-low)' : 'var(--status-high)' }
         ];
         m5Grid.innerHTML = cards.map(c => `
           <div class="metric-box">
             <span class="metric-label">${c.label}</span>
-            <span class="metric-value" style="color:${c.color};font-size:1.25rem;">${c.value}</span>
+            <span class="metric-value" style="color:${c.color};font-size:1.15rem;">${c.value}</span>
             <span style="font-size:0.75rem;color:var(--text-dim);">${c.sub}</span>
           </div>
         `).join('');
+      }
+
+      // ── Render Pedestrian Safety Dashboard Card ───────────────────────────
+      if (optData && optData.pedestrianSummary) {
+        const ps = optData.pedestrianSummary;
+        const bElem = document.getElementById('dashPedStatusBadge');
+        const tElem = document.getElementById('dashPedStatusText');
+        const rElem = document.getElementById('dashPedReqTime');
+        const aElem = document.getElementById('dashPedMinAlloc');
+        const pElem = document.getElementById('dashPedParams');
+        const eElem = document.getElementById('dashPedExplanation');
+
+        if (ps.enabled) {
+          if (bElem) {
+            bElem.innerText = ps.statusLabel;
+            bElem.style.background = ps.overallSafe ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
+            bElem.style.color = ps.overallSafe ? '#10b981' : '#ef4444';
+            bElem.style.borderColor = ps.overallSafe ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)';
+          }
+          if (tElem) {
+            tElem.innerText = ps.overallSafe ? 'SAFE' : 'NEEDS LONGER GREEN';
+            tElem.style.color = ps.overallSafe ? '#10b981' : '#ef4444';
+          }
+          if (rElem) rElem.innerText = `${ps.requiredCrossingTime.toFixed(1)} s`;
+          if (aElem) aElem.innerText = `${ps.requiredCrossingTimeCeil} s`;
+          if (pElem) pElem.innerText = `W: ${ps.crossingWidth.toFixed(1)}m | v: ${ps.walkingSpeed.toFixed(1)}m/s`;
+          if (eElem) {
+            eElem.innerHTML = ps.explanations && ps.explanations.length > 0
+              ? `<strong>Pedestrian Constraint:</strong> ${ps.explanations.join(' ')}`
+              : `<strong>Pedestrian Constraint:</strong> ${ps.formulaText} — Standard Concurrent Crossing active. Recommended green allocations satisfy pedestrian safety minimum bounds.`;
+          }
+        } else {
+          if (bElem) {
+            bElem.innerText = 'DISABLED';
+            bElem.style.background = 'rgba(148,163,184,0.15)';
+            bElem.style.color = '#94a3b8';
+            bElem.style.borderColor = 'rgba(148,163,184,0.3)';
+          }
+          if (tElem) {
+            tElem.innerText = 'DISABLED';
+            tElem.style.color = '#94a3b8';
+          }
+          if (rElem) rElem.innerText = 'N/A';
+          if (aElem) aElem.innerText = 'N/A';
+          if (pElem) pElem.innerText = 'Pedestrian Mode Off';
+          if (eElem) eElem.innerHTML = 'Pedestrian analysis is currently disabled. Enable Pedestrian Analysis on the Analysis page to evaluate crossing width and safety green constraints.';
+        }
       }
 
       // ── Render Congestion Approach Matrix ─────────────────────────────────
@@ -649,7 +784,80 @@
           renderSlotData(this.getAttribute('data-time'));
         });
       });
+
+      // ── CSV Data Ingestion Logic ──────────────────────────────────────────
+      const btnProcessCsv = document.getElementById('btnProcessCsv');
+      if (btnProcessCsv) {
+        btnProcessCsv.addEventListener('click', async () => {
+          const fileInput = document.getElementById('csvFileInput');
+          const errorDiv = document.getElementById('csvUploadError');
+          errorDiv.style.display = 'none';
+          
+          try {
+            const file = fileInput.files[0];
+            const trafficData = await FlowGuard.parseTrafficCSV(file);
+            console.log("Successfully ingested CSV data:", trafficData);
+            
+            // Send CSV data array to backend Express REST API
+            const backendAnalysis = await FlowGuard.analyzeTrafficAPI({ trafficData });
+            if (backendAnalysis && backendAnalysis.success) {
+              console.log("Backend Express Analysis Result:", backendAnalysis.summary);
+            }
+
+            // Find peak congestion hours based on this new data
+            const peaks = AnalysisEngine.identifyPeakCongestionHours(trafficData, 0.85);
+
+            
+            if (peaks && peaks.length > 0) {
+              const peakInfo = peaks[0];
+              // Assuming baseline timings for demo
+              const baseline = { green: 30, yellow: 3, red: 27, cycleLength: 60 };
+              const candidate = { green: 40, yellow: 3, red: 17, cycleLength: 60 };
+              
+              // Run Simulation
+              const syntheticRecord = trafficData; // using the actual array
+              const simResult = SimulationEngine.evaluateTimingAdjustments(
+                syntheticRecord, 
+                { cycleLength: 60, greenSplit: 30 }, 
+                { cycleLength: 60, greenSplit: 40 }
+              );
+
+              // Update Dashboard UI
+              document.getElementById('congestionStatusBanner').className = 'congestion-status-banner cs-high';
+              document.getElementById('congestionStatusText').innerText = `⬤ CONGESTION STATUS: PEAK IDENTIFIED (${peakInfo.time_of_day})`;
+              document.getElementById('congestionStatusDetail').innerText = `Max v/c: ${peakInfo.max_vc.toFixed(2)}`;
+
+              FlowGuard.renderSimulationDashboardResults(
+                'simulation-results-container',
+                simResult.before_metrics,
+                simResult.after_metrics
+              );
+
+              FlowGuard.renderPhaseDiagram(
+                baseline,
+                candidate,
+                'phase-diagram-container'
+              );
+              
+              // Initialize interactive slider
+              FlowGuard.initWhatIfSlider(syntheticRecord, baseline, 'simulation-results-container', 'phase-diagram-container');
+              
+              errorDiv.style.color = '#10b981';
+              errorDiv.textContent = `Success: Processed ${trafficData.length} records. Found peak at ${peakInfo.time_of_day}.`;
+              errorDiv.style.display = 'block';
+            } else {
+              errorDiv.textContent = "Data processed, but no significant congestion peaks found (>0.85 v/c).";
+              errorDiv.style.display = 'block';
+            }
+          } catch (error) {
+            errorDiv.style.color = '#ef4444';
+            errorDiv.textContent = error.message;
+            errorDiv.style.display = 'block';
+          }
+        });
+      }
     });
   </script>
+  <script src="../js/i18n.js"></script>
 </body>
 </html>

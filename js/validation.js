@@ -367,6 +367,11 @@ const ValidationEngine = (function () {
   };
 })();
 
+if (typeof window !== 'undefined') {
+  window.ValidationEngine = ValidationEngine;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = ValidationEngine;
 }
+
