@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Signal Simulation | FlowGuard AI</title>
+  <meta name="description" content="FlowGuard AI live signal simulation — data-driven intersection controller with Emergency Vehicle Priority. Offline prototype.">
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    /* ===== LIVE SIMULATION STYLES (Milestone 6.1) ===== */
+
+    /* Canvas intersection wrapper */
+    #sim-canvas-wrapper {
+      background: #0d1117;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+    #sim-canvas { display: block; width: 100%; height: auto; }
+
+    /* Signal lamp heads on simulation */
+    .sim-signal-head {
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      background: #1a1d24; border: 2px solid #2d3748; border-radius: 10px;
+      padding: 8px 6px;
+    }
+    .sim-lamp {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: #1a202c;
+      transition: background 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+    }
+    .sim-lamp.sl-red    { background: #e53e3e; }
+    .sim-lamp.sl-yellow { background: #f59e0b; }
+    .sim-lamp.sl-green  { background: #10b981; }
+    .sim-lamp.sl-dim    { opacity: 0.18; box-shadow: none !important; }
+    .sim-lamp.sl-glow   { box-shadow: 0 0 12px 3px rgba(255,255,255,0.4); }
+
+    /* Intersection 4-column layout */
+    .sim-intersection-outer {
+      display: grid;
+      grid-template-areas:
+        ".      north  ."
+        "west   cross  east"
+        ".      south  .";
+      grid-template-columns: 1fr auto 1fr;
+      gap: 10px;
+      padding: 1rem;
+      align-items: center;
+      justify-items: center;
+    }
+    .sim-approach { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .sim-approach.area-north  { grid-area: north; }
+    .sim-approach.area-east   { grid-area: east; }
+    .sim-approach.area-south  { grid-area: south; }
+    .sim-approach.area-west   { grid-area: west; }
+    .sim-cross-box {
+      grid-area: cross;
+      width: 80px; height: 80px;
+      background: rgba(56,189,248,0.06);
+      border: 2px solid rgba(56,189,248,0.2);
+      border-radius: 10px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-size: 0.6rem; font-weight: 700; color: var(--primary);
+      text-align: center; gap: 2px;
+    }
+    .sim-approach-name {
+      font-size: 0.75rem; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .sim-approach-inactive-badge {
+      font-size: 0.65rem; font-weight: 700;
+      color: #ef4444; background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 3px; padding: 1px 5px;
+      text-transform: uppercase; display: none;
+    }
+
+    /* Vehicle queue bars */
+    .sim-queue-bar-wrap {
+      width: 60px; background: rgba(15,23,42,0.6);
+      border: 1px solid var(--border-color); border-radius: 4px;
+      height: 8px; overflow: hidden;
+    }
+    .sim-queue-bar-fill {
+      height: 100%; background: var(--primary);
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+    .sim-queue-label {
+      font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dim);
+    }
+
+    /* Approach info columns */
+    .sim-approach-info-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+    }
+    @media (max-width: 900px) { .sim-approach-info-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 540px) { .sim-approach-info-grid { grid-template-columns: 1fr; } }
+
+    .sim-approach-info-card {
+      background: rgba(15,23,42,0.5);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+    }
+    .sim-approach-info-card.inactive-card {
+      opacity: 0.4; border-color: #4a5568;
+    }
+    .sim-approach-info-card.active-green {
+      border-color: rgba(16,185,129,0.5);
+      background: rgba(16,185,129,0.05);
+    }
+    .sim-approach-info-card.active-yellow {
+      border-color: rgba(245,158,11,0.5);
+      background: rgba(245,158,11,0.05);
+    }
+    .sim-approach-info-card.active-allred {
+      border-color: rgba(229,62,62,0.3);
+    }
+
+    .sim-info-road { font-size: 0.78rem; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+    .sim-info-row  { display: flex; justify-content: space-between; font-size: 0.72rem; margin: 2px 0; }
+    .sim-info-label { color: var(--text-muted); }
+    .sim-info-value { font-family: var(--font-mono); color: var(--text-main); font-weight: 600; }
+
+    /* Phase status badge (sim) */
+    .sim-phase-badge {
+      display: inline-flex; align-items: center;
+      padding: 0.25rem 0.75rem; border-radius: 9999px;
+      font-size: 0.75rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      border: 1px solid transparent;
+    }
+    .spb-green  { background: rgba(16,185,129,0.2); color: #10b981; border-color: rgba(16,185,129,0.4); }
+    .spb-yellow { background: rgba(245,158,11,0.2); color: #f59e0b; border-color: rgba(245,158,11,0.4); }
+    .spb-red    { background: rgba(229,62,62,0.2);  color: #e53e3e; border-color: rgba(229,62,62,0.4); }
+    .spb-evp    { background: rgba(167,139,250,0.2); color: #a78bfa; border-color: rgba(167,139,250,0.4); animation: pulse-spb 1s ease-in-out infinite; }
+    .spb-idle   { background: rgba(100,116,139,0.2); color: #94a3b8; border-color: rgba(100,116,139,0.3); }
+    @keyframes pulse-spb { 0%,100%{opacity:1}50%{opacity:0.5} }
+
+    /* Status panel */
+    .sim-status-panel {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem; padding: 0.75rem;
+      background: rgba(10,14,26,0.5);
+      border: 1px solid var(--border-color); border-radius: 8px;
+    }
+    @media (max-width: 640px) { .sim-status-panel { grid-template-columns: repeat(2, 1fr); } }
+    .sim-stat { display: flex; flex-direction: column; gap: 2px; }
+    .sim-stat-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+    .sim-stat-value { font-family: var(--font-mono); font-size: 0.95rem; font-weight: 700; color: var(--text-main); }
+
+    /* Control button row */
+    .sim-ctrl-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    #sim-btn-start  { background: rgba(16,185,129,0.15);  border-color: rgba(16,185,129,0.5);  color: #10b981; }
+    #sim-btn-start:hover:not(:disabled) { background: rgba(16,185,129,0.25); }
+    #sim-btn-pause  { background: rgba(245,158,11,0.12);  border-color: rgba(245,158,11,0.4);  color: #f59e0b; }
+    #sim-btn-pause:hover:not(:disabled) { background: rgba(245,158,11,0.22); }
+    #sim-btn-stop   { background: rgba(229,62,62,0.12);   border-color: rgba(229,62,62,0.4);   color: #e53e3e; }
+    #sim-btn-stop:hover:not(:disabled)  { background: rgba(229,62,62,0.22); }
+    #sim-btn-reset  { background: rgba(100,116,139,0.12); border-color: rgba(100,116,139,0.3); color: #94a3b8; }
+    #sim-btn-reset:hover:not(:disabled) { background: rgba(100,116,139,0.22); }
+    #sim-btn-demo   { background: rgba(167,139,250,0.12); border-color: rgba(167,139,250,0.4); color: #a78bfa; }
+    #sim-btn-demo:hover:not(:disabled)  { background: rgba(167,139,250,0.22); }
+
+    /* EVP sim panel */
+    .sim-evp-panel {
+      background: rgba(167,139,250,0.08); border: 1px solid rgba(167,139,250,0.3);
+      border-radius: 8px; padding: 0.75rem 1rem; display: none;
+      margin-bottom: 0.75rem;
+    }
+    .sim-evp-panel.active { display: block; }
+    .sim-evp-title { font-size: 0.82rem; font-weight: 700; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem; }
+
+    /* Timing warning */
+    .sim-timing-warning {
+      display: none; padding: 0.5rem 0.85rem; border-radius: 6px;
+      font-size: 0.8rem; font-weight: 600; margin-top: 0.4rem;
+    }
+    .stw-warn  { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); color: #f59e0b; }
+    .stw-error { background: rgba(239,68,68,0.12);  border: 1px solid rgba(239,68,68,0.3);  color: #ef4444; }
+
+    /* Data validation alert */
+    .sim-data-alert {
+      background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3);
+      border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem;
+      font-size: 0.88rem; color: #fde68a; display: none;
+    }
+
+    /* Timing plan buttons */
+    .sim-timing-btn {
+      padding: 0.35rem 0.9rem; border-radius: 6px;
+      font-size: 0.78rem; font-weight: 600;
+      border: 1px solid var(--border-color);
+      background: rgba(15,23,42,0.5); color: var(--text-muted);
+      cursor: pointer; transition: all 0.2s;
+    }
+    .sim-timing-btn.active { background: rgba(56,189,248,0.15); border-color: var(--primary); color: var(--primary); }
+    .sim-timing-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+    .sim-timing-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* EVP approach buttons */
+    .sim-evp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; }
+    @media (max-width: 640px) { .sim-evp-grid { grid-template-columns: repeat(2, 1fr); } }
+    .sim-evp-btn {
+      background: rgba(15,23,42,0.6); border: 1px solid var(--border-color);
+      border-radius: 6px; padding: 0.5rem 0.4rem;
+      color: var(--text-main); font-size: 0.75rem; font-weight: 600;
+      cursor: pointer; text-align: center;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .sim-evp-btn:hover:not(:disabled) { background: rgba(167,139,250,0.15); border-color: rgba(167,139,250,0.4); }
+    .sim-evp-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* Event log */
+    .sim-log-box {
+      background: rgba(10,14,26,0.7); border: 1px solid var(--border-color);
+      border-radius: 8px; height: 160px; overflow-y: auto;
+      padding: 0.4rem; font-family: var(--font-mono); font-size: 0.72rem;
+    }
+      background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3);
+      border-radius: 8px; padding: 0.75rem 1rem; color: #fcd34d; font-size: 0.85rem;
+      margin-bottom: 1.25rem; display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Mandatory Engineering Guardrail Banner -->
+  <div class="disclaimer-banner">
+    <span class="disclaimer-icon">⚠️ NOTICE:</span>
+    <span>FlowGuard AI is an offline traffic-analysis and signal-timing decision-support prototype. Recommendations require validation by qualified traffic engineers before field implementation.</span>
+  </div>
+
+  <!-- Navigation Header -->
+  <nav class="navbar">
+    <div class="brand-container">
+      <div class="brand-logo-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2L4 5v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V5l-8-3zm0 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm0 14.3c-2.83-.95-5.38-4.56-5.91-8.3 1.63-.58 3.65-1 5.91-1s4.28.42 5.91 1c-.53 3.74-3.08 7.35-5.91 8.3z"/>
+        </svg>
+      </div>
+      <div>
+        <span class="brand-title">FlowGuard AI</span>
+        <span class="brand-badge">Offline Prototype</span>
+      </div>
+    </div>
+
+    <ul class="nav-links">
+      <li><a href="../index.html" class="nav-link">Home</a></li>
+      <li><a href="analysis.html" class="nav-link">Analysis</a></li>
+      <li><a href="simulation.html" class="nav-link active">Simulation</a></li>
+      <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+      <li><a href="controller.html" class="nav-link">Controller</a></li>
+      <li><a href="validation.html" class="nav-link">Validation</a></li>
+    </ul>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="main-container">
+
+    <div class="page-header" style="display: flex; align-items: center; justify-content: space-between;">
+      <div>
+        <h1 class="page-title">Signal Simulation Engine (D/D/1 Queuing Theory)</h1>
+        <p class="page-subtitle">Simulate multi-cycle arrival and discharge patterns to evaluate queue accumulation and vehicle delay metrics.</p>
+      </div>
+      <div>
+        <span class="badge badge-low" id="simConfigBadge">4-Arm Cross</span>
+      </div>
+    </div>
+    <!-- ================================================================
+         MILESTONE 6.1 — PROTOTYPE SIGNAL SIMULATION
+         Uses Controller module as single source of truth.
+         Controller.js must be loaded BEFORE this inline script.
+    ================================================================ -->
+
+    <!-- Data Validation Alert -->
+    <div class="sim-data-alert" id="sim-data-alert">
+      ⚠️ <strong>TRAFFIC ANALYSIS REQUIRED</strong> — Please complete FlowGuard traffic input and analysis before starting the data-driven simulation. Navigate to <a href="analysis.html" style="color: #fde68a;">Analysis →</a>
+    </div>
+
+    <!-- Section 1: Prototype Signal Simulation -->
+    <div class="card" id="sim-live-card" style="margin-bottom: 1.25rem;">
+      <div class="card-header">
+        <h3 class="card-title">1. Signal Operation Simulation (Prototype)</h3>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <span id="sim-phase-badge" class="sim-phase-badge spb-idle">IDLE</span>
+          <span class="section-proto-label">PROTOTYPE SIMULATION</span>
+        </div>
+      </div>
+
+      <!-- Prototype disclaimer -->
+      <div style="background: rgba(99,102,241,0.07); border: 1px solid rgba(99,102,241,0.2); border-radius: 7px; padding: 0.55rem 0.9rem; font-size: 0.78rem; color: #a5b4fc; margin-bottom: 1rem;">
+        ⚙️ <strong>PROTOTYPE PARAMETERS</strong> — Yellow: 3 s &nbsp;|&nbsp; All-Red: 2 s &nbsp;|&nbsp; EVP Hold: 15 s.<br>
+        Green times are read from the FlowGuard calculated signal timing plan.<br>
+        <em>Green / Yellow / Red changes displayed on screen represent simulated signal operation using the selected timing plan and do NOT represent commands sent to a real junction.</em>
+      </div>
+
+      <!-- Active intersection info row -->
+      <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; padding: 0.6rem 0.85rem; background: rgba(15,23,42,0.4); border: 1px solid var(--border-color); border-radius: 7px; margin-bottom: 1rem; font-size: 0.8rem;">
+        <div>
+          <span style="color: var(--text-muted);">Geometry: </span>
+          <strong style="color: var(--primary);" id="sim-config-label">4-Arm Cross</strong>
+        </div>
+        <div>
+          <span style="color: var(--text-muted);">Timing Plan: </span>
+          <strong id="sim-plan-label" style="color: var(--text-main);">BASELINE</strong>
+        </div>
+        <div>
+          <span style="color: var(--text-muted);">Candidate Status: </span>
+          <strong id="sim-candidate-status" style="color: var(--text-dim);">—</strong>
+        </div>
+        <div>
+          <span style="color: var(--text-muted);">Mode: </span>
+          <strong id="sim-mode-label" style="color: var(--text-main);">NORMAL</strong>
+        </div>
+      </div>
+
+      <!-- EVP Active indicator -->
+      <div class="sim-evp-panel" id="sim-evp-panel">
+        <div class="sim-evp-title">⚡ Simulated Emergency Vehicle Priority — ACTIVE</div>
+        <div style="font-size: 0.78rem; color: #c4b5fd;">
+          Approach: <strong id="sim-evp-approach">—</strong> &nbsp;|&nbsp;
+          Vehicle: <strong id="sim-evp-vehicle">—</strong> &nbsp;|&nbsp;
+          Phase: <strong id="sim-evp-phase">—</strong>
+        </div>
+      </div>
+
+      <!-- Main simulation grid: intersection + controls side by side -->
+      <div style="display: grid; grid-template-columns: 1fr 380px; gap: 1rem; align-items: start;">
+
+        <!-- Signal Intersection View -->
+        <div>
+          <div class="sim-intersection-outer" id="sim-intersection-grid">
+
+            <!-- NORTH — Road A -->
+            <div class="sim-approach area-north" id="sim-approach-north">
+              <span class="sim-approach-name" id="sim-name-north">Road A</span>
+              <span style="font-size:0.66rem; color:var(--text-dim);">North</span>
+              <div class="sim-signal-head" id="sim-head-north">
+                <div class="sim-lamp sl-dim" id="sim-lamp-north-red" style="background:#e53e3e;"></div>
+                <div class="sim-lamp sl-dim" id="sim-lamp-north-yellow" style="background:#f59e0b;"></div>
+                <div class="sim-lamp sl-dim" id="sim-lamp-north-green" style="background:#10b981;"></div>
+              </div>
+              <span class="sim-approach-inactive-badge" id="sim-inactive-north">INACTIVE</span>
+              <!-- Queue bar -->
+              <div class="sim-queue-bar-wrap">
+                <div class="sim-queue-bar-fill" id="sim-qbar-north" style="width:0%;"></div>
+              </div>
+              <span class="sim-queue-label" id="sim-qlabel-north">Q: —</span>
+            </div>
+
+            <!-- WEST — Road D -->
+            <div class="sim-approach area-west" id="sim-approach-west">
+              <span class="sim-approach-name" id="sim-name-west">Road D</span>
+              <span style="font-size:0.66rem; color:var(--text-dim);">West</span>
+              <div class="sim-signal-head" id="sim-head-west">
+                <div class="sim-lamp sl-dim" id="sim-lamp-west-red" style="background:#e53e3e;"></div>
+                <div class="sim-lamp sl-dim" id="sim-lamp-west-yellow" style="background:#f59e0b;"></div>
+                <div class="sim-lamp sl-dim" id="sim-lamp-west-green" style="background:#10b981;"></div>
+              </div>
+              <span class="sim-approach-inactive-badge" id="sim-inactive-west">INACTIVE</span>
+              <div class="sim-queue-bar-wrap">
+                <div class="sim-queue-bar-fill" id="sim-qbar-west" style="width:0%;"></div>
+              </div>
+              <span class="sim-queue-label" id="sim-qlabel-west">Q: —</span>
+            </div>
+
+            <!-- Junction Centre -->
+            <div class="sim-cross-box" id="sim-junction-box">
+              <span id="sim-junction-phase" style="font-size:0.65rem; color:var(--primary);">✦</span>
+              <span style="font-size:0.55rem; color:var(--text-dim);">JUNCTION</span>
+              <span id="sim-junction-countdown" style="font-family:var(--font-mono); font-size:0.85rem; font-weight:700; color:var(--primary);">—</span>
+              <span style="font-size:0.5rem; color:var(--text-dim);">Cycle <span id="sim-cycle-count">0</span></span>
+            </div>
+
+            <!-- EAST — Road B -->
+            <div class="sim-approach area-east" id="sim-approach-east">
+              <span class="sim-approach-name" id="sim-name-east">Road B</span>
+              <span style="font-size:0.66rem; color:var(--text-dim);">East</span>
+              <div class="sim-signal-head" id="sim-head-east">
+                <div class="sim-lamp sl-dim" id="sim-lamp-east-red" style="background:#e53e3e;"></div>
+                <div class="sim-lamp sl-dim" id="sim-lamp-east-yellow" style="background:#f59e0b;"></div>
+                <div class="sim-lamp sl-dim" id="sim-lamp-east-green" style="background:#10b981;"></div>
+              </div>
+              <span class="sim-approach-inactive-badge" id="sim-inactive-east">INACTIVE</span>
+              <div class="sim-queue-bar-wrap">
+                <div class="sim-queue-bar-fill" id="sim-qbar-east" style="width:0%;"></div>
+              </div>
+              <span class="sim-queue-label" id="sim-qlabel-east">Q: —</span>
+            </div>
+
+            <!-- SOUTH — Road C -->
+            <div class="sim-approach area-south" id="sim-approach-south">
+              <span class="sim-approach-name" id="sim-name-south">Road C</span>
+              <span style="font-size:0.66rem; color:var(--text-dim);">South</span>
+              <div class="sim-signal-head" id="sim-head-south">
+                <div class="sim-lamp sl-dim" id="sim-lamp-south-red" style="background:#e53e3e;"></div>
+                <div class="sim-lamp sl-dim" id="sim-lamp-south-yellow" style="background:#f59e0b;"></div>
+                <div class="sim-lamp sl-dim" id="sim-lamp-south-green" style="background:#10b981;"></div>
+              </div>
+              <span class="sim-approach-inactive-badge" id="sim-inactive-south">INACTIVE</span>
+              <div class="sim-queue-bar-wrap">
+                <div class="sim-queue-bar-fill" id="sim-qbar-south" style="width:0%;"></div>
+              </div>
+              <span class="sim-queue-label" id="sim-qlabel-south">Q: —</span>
+            </div>
+
+          </div><!-- /intersection grid -->
+        </div>
+
+        <!-- Right side: Status + Controls -->
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+
+          <!-- Status panel -->
+          <div class="sim-status-panel">
+            <div class="sim-stat">
+              <span class="sim-stat-label">Current Approach</span>
+              <span class="sim-stat-value" id="sim-stat-approach" style="color:var(--primary);">—</span>
+            </div>
+            <div class="sim-stat">
+              <span class="sim-stat-label">Phase Remaining</span>
+              <span class="sim-stat-value" id="sim-stat-remaining" style="font-size:1.2rem;">—</span>
+            </div>
+            <div class="sim-stat">
+              <span class="sim-stat-label">Cycle #</span>
+              <span class="sim-stat-value" id="sim-stat-cycle">0</span>
+            </div>
+            <div class="sim-stat">
+              <span class="sim-stat-label">Green Time</span>
+              <span class="sim-stat-value" id="sim-stat-green-time">—</span>
+            </div>
+            <div class="sim-stat">
+              <span class="sim-stat-label">Timing Plan</span>
+              <span class="sim-stat-value" id="sim-stat-plan">BASELINE</span>
+            </div>
+            <div class="sim-stat">
+              <span class="sim-stat-label">Mode</span>
+              <span class="sim-stat-value" id="sim-stat-mode">NORMAL</span>
+            </div>
+          </div>
+
+          <!-- Timing plan selection -->
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.35rem;">
+              <div style="font-size: 0.73rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;">Timing Plan</div>
+              <button type="button" class="btn btn-secondary" onclick="openWhyModal()" style="font-size: 0.72rem; padding: 0.15rem 0.5rem; color: var(--primary); border-color: rgba(56,189,248,0.3);">💡 Why This Timing?</button>
+            </div>
+            <div style="display: flex; gap: 0.4rem;">
+              <button class="sim-timing-btn active" id="sim-timing-baseline" onclick="_simSelectTiming('BASELINE')">Baseline</button>
+              <button class="sim-timing-btn" id="sim-timing-candidate" onclick="_simSelectTiming('CANDIDATE')">Candidate</button>
+            </div>
+            <div class="sim-timing-warning" id="sim-timing-warning"></div>
+          </div>
+
+          <!-- Controller buttons -->
+          <div>
+            <div style="font-size: 0.73rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem;">Simulation Controls</div>
+            <div class="sim-ctrl-row">
+              <button class="btn" id="sim-btn-start" onclick="_simStart()">Start</button>
+              <button class="btn" id="sim-btn-pause" onclick="_simPauseResume()">Pause</button>
+              <button class="btn" id="sim-btn-stop"  onclick="_simStop()">Stop</button>
+              <button class="btn" id="sim-btn-reset" onclick="_simReset()">Reset</button>
+            </div>
+            <div class="sim-ctrl-row" style="margin-top: 0.4rem;">
+              <button class="btn" id="sim-btn-demo" onclick="_simDemo()">🚨 Emergency Demo</button>
+            </div>
+          </div>
+
+          <!-- EVP Panel -->
+          <div>
+            <div style="font-size: 0.73rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem;">Emergency Vehicle Priority</div>
+            <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem;">
+              <select id="sim-evp-vehicle-type" style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 5px; padding: 0.3rem 0.5rem; color: var(--text-main); font-size: 0.78rem;">
+                <option value="Ambulance">🚑 Ambulance</option>
+                <option value="Fire &amp; Rescue">🚒 Fire &amp; Rescue</option>
+                <option value="Police">🚓 Police</option>
+              </select>
+              <button class="btn" id="sim-btn-terminate-evp" onclick="_simTerminateEVP()" disabled style="font-size:0.75rem; padding: 0.3rem 0.7rem;">✋ Terminate</button>
+            </div>
+            <div class="sim-evp-grid" id="sim-evp-btn-grid">
+              <button class="sim-evp-btn" id="sim-evp-north" onclick="_simEVP('north')">Road A<br><span style="font-size:0.65rem;color:var(--text-dim);">North</span></button>
+              <button class="sim-evp-btn" id="sim-evp-east"  onclick="_simEVP('east')">Road B<br><span style="font-size:0.65rem;color:var(--text-dim);">East</span></button>
+              <button class="sim-evp-btn" id="sim-evp-south" onclick="_simEVP('south')">Road C<br><span style="font-size:0.65rem;color:var(--text-dim);">South</span></button>
+              <button class="sim-evp-btn" id="sim-evp-west"  onclick="_simEVP('west')">Road D<br><span style="font-size:0.65rem;color:var(--text-dim);">West</span></button>
+            </div>
+          </div>
+
+          <!-- Event log -->
+          <div>
+            <div style="font-size: 0.73rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem;">Event Log <span style="font-weight:400; color:var(--text-dim);">(max 20)</span></div>
+            <div class="sim-log-box" id="sim-log-box"></div>
+          </div>
+
+        </div><!-- /right -->
+      </div><!-- /main grid -->
+
+      <!-- Approach info cards (below the split layout) -->
+      <div style="margin-top: 1rem;">
+        <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.5rem;">
+          Approach Status
+          <span style="font-size: 0.7rem; font-weight: 400; color: var(--text-dim);">(from FlowGuard analysis data)</span>
+        </div>
+        <div class="sim-approach-info-grid" id="sim-approach-info-grid">
+          <!-- Generated by JS -->
+        </div>
+      </div>
+
+    </div><!-- /Live Signal Simulation card -->
+
+    <!-- ── Horizontal divider before existing static simulation ── -->
+    <div style="border-top: 2px solid var(--border-color); margin: 1.5rem 0; padding-top: 0.5rem;">
+      <h2 class="card-title" style="font-size: 1rem; color: var(--text-muted);">
+        2. Deterministic D/D/1 Queue Simulation (Before vs After Comparison)
+      </h2>
+      <p style="font-size: 0.82rem; color: var(--text-dim); margin-top: 0.3rem;">
+        Statistical multi-cycle simulation evaluating queue accumulation and delay metrics — separate from the prototype signal animation above.
+      </p>
+    </div>
+
+    <!-- Controls & Parameters -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">1. Deterministic Queue Simulation Parameters</h3>
+        <span class="badge" style="background: rgba(99,102,241,0.15); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3);">
+          Civil Engineering D/D/1 Queuing Model
+        </span>
+      </div>
+
+      <div class="grid-4" style="align-items: flex-end;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="simCycles">Simulation Duration (Cycles)</label>
+          <select id="simCycles" class="form-control">
+            <option value="5">5 Signal Cycles (10 mins)</option>
+            <option value="10" selected>10 Signal Cycles (20 mins)</option>
+            <option value="15">15 Signal Cycles (30 mins)</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">Saturation Discharge Rate (s)</label>
+          <input type="text" id="simSatFlow" class="form-control" value="1800 pcu/hr (0.5 vps)" readonly style="color: var(--text-dim);">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">Queuing Theory Model</label>
+          <input type="text" class="form-control" value="Deterministic D/D/1" readonly style="color: var(--text-dim);">
+        </div>
+
+        <div>
+          <button class="btn btn-primary" id="btnRunSim" style="width: 100%;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            RUN SIMULATION
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before vs After Comparison Cards Section -->
+    <div class="card-header" style="margin-top: 1rem;">
+      <h3 class="card-title">2. Before vs After Performance Summary</h3>
+      <span style="font-size: 0.85rem; color: var(--status-low); font-weight: 600;" id="simAcceptanceHeader">
+        Estimated improvement under simulation assumptions
+      </span>
+    </div>
+
+    <div class="comparison-grid">
+
+      <!-- CURRENT PLAN Card -->
+      <div class="plan-card current-plan">
+        <div class="plan-title">
+          <span>CURRENT PLAN</span>
+          <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 400;">Existing Allocation</span>
+        </div>
+
+        <div class="grid-2" style="margin-bottom: 1rem;">
+          <div class="metric-box">
+            <span class="metric-label">Average Delay</span>
+            <span class="metric-value" id="currentWaitTime">68.0<span class="metric-unit">sec/veh</span></span>
+          </div>
+
+          <div class="metric-box">
+            <span class="metric-label">Maximum Queue</span>
+            <span class="metric-value" id="currentMaxQueue">38<span class="metric-unit">veh</span></span>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-bottom: 1rem;">
+          <div class="metric-box">
+            <span class="metric-label">Average Queue</span>
+            <span class="metric-value" id="currentAvgQueue" style="font-size: 1.25rem;">18.4<span class="metric-unit">veh</span></span>
+          </div>
+
+          <div class="metric-box">
+            <span class="metric-label">Max Approach Delay</span>
+            <span class="metric-value" id="currentMaxAppWait" style="font-size: 1.25rem;">84.0<span class="metric-unit">sec/veh</span></span>
+          </div>
+        </div>
+
+        <div style="font-size: 0.825rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+          <span>Total Served: <strong id="currentServed" style="color: var(--text-main);">733 veh</strong></span>
+          <span>Remaining Queue: <strong id="currentRemaining" style="color: var(--text-main);">0 veh</strong></span>
+        </div>
+      </div>
+
+      <!-- CANDIDATE/PROPOSED PLAN Card -->
+      <div class="plan-card proposed-plan" id="proposedPlanCard">
+        <div class="plan-title">
+          <span id="proposedPlanTitle">CANDIDATE PLAN</span>
+          <span class="change-pill" id="waitImprovementBadge">0% Delay</span>
+        </div>
+
+        <div class="grid-2" style="margin-bottom: 1rem;">
+          <div class="metric-box">
+            <span class="metric-label">Average Delay</span>
+            <span class="metric-value" id="proposedWaitTime">68.0<span class="metric-unit">sec/veh</span></span>
+          </div>
+
+          <div class="metric-box">
+            <span class="metric-label">Maximum Queue</span>
+            <span class="metric-value" id="proposedMaxQueue">38<span class="metric-unit">veh</span></span>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-bottom: 1rem;">
+          <div class="metric-box">
+            <span class="metric-label">Average Queue</span>
+            <span class="metric-value" id="proposedAvgQueue" style="font-size: 1.25rem;">18.4<span class="metric-unit">veh</span></span>
+          </div>
+
+          <div class="metric-box">
+            <span class="metric-label">Max Approach Delay</span>
+            <span class="metric-value" id="proposedMaxAppWait" style="font-size: 1.25rem;">84.0<span class="metric-unit">sec/veh</span></span>
+          </div>
+        </div>
+
+        <div style="font-size: 0.825rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+          <span>Total Served: <strong id="proposedServed" style="color: var(--text-main);">733 veh</strong></span>
+          <span>Remaining Queue: <strong id="proposedRemaining" style="color: var(--text-main);">0 veh</strong></span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Detailed Active Approach Side-by-Side Table -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">3. Active Approach Simulation Breakdown</h3>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th rowspan="2">Active Approach</th>
+              <th rowspan="2">Demand (veh/h)</th>
+              <th colspan="3" style="text-align: center; border-bottom: 1px solid var(--border-color); background: rgba(56,189,248,0.05);">Current Signal Plan</th>
+              <th colspan="3" style="text-align: center; border-bottom: 1px solid var(--border-color); background: rgba(16,185,129,0.05);">Candidate Signal Plan</th>
+              <th rowspan="2">Delay Change</th>
+            </tr>
+            <tr>
+              <th style="background: rgba(56,189,248,0.05);">Green</th>
+              <th style="background: rgba(56,189,248,0.05);">Avg Delay</th>
+              <th style="background: rgba(56,189,248,0.05);">Max Queue</th>
+              <th style="background: rgba(16,185,129,0.05);">Green</th>
+              <th style="background: rgba(16,185,129,0.05);">Avg Delay</th>
+              <th style="background: rgba(16,185,129,0.05);">Max Queue</th>
+            </tr>
+          </thead>
+          <tbody id="simTableBody">
+            <!-- Populated by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── MILESTONE 5.5: Engineering Interpretation Card ── -->
+    <div class="card" style="margin-bottom: 2rem;" id="simInterpretationCard">
+      <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 class="card-title" style="display:flex; align-items:center; gap:0.5rem;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Engineering Interpretation & Summary
+        </h3>
+        <span class="badge badge-low" id="simVerdictBadge">ANALYZING</span>
+      </div>
+      <div id="simInterpretationBody" style="font-size: 0.9rem; line-height: 1.6; color: var(--text-main); padding-top: 0.5rem;">
+        <!-- Populated dynamically by JS from simulation results -->
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="footer">
+    <div class="footer-content">
+      <p><strong>FlowGuard AI</strong> &mdash; AI-Based Urban Traffic Congestion Analyzer & Signal Timing Recommendation</p>
+      <p>Offline Traffic-Analysis Prototype for Transportation Engineering</p>
+    </div>
+  </footer>
+
+  <script charset="utf-8" src="../js/app.js"></script>
+  <script charset="utf-8" src="../js/congestion.js"></script>
+  <script charset="utf-8" src="../js/simulation.js"></script>
+  <script charset="utf-8" src="../js/analysis.js"></script>
+  <script charset="utf-8" src="../js/controller.js"></script>
+  <script>
+    /* ================================================================
+       MILESTONE 6.1 — LIVE SIMULATION GLUE
+       Renders canonical Controller.signalState into Simulation page UI.
+       Single source of truth: Controller module (controller.js).
+    ================================================================ */
+
+    // ---- Approach metadata (matches APPROACHES in app.js) ----
+    const SIM_APPROACHES = ['north', 'east', 'south', 'west'];
+    const SIM_LABELS = { north: 'Road A', east: 'Road B', south: 'Road C', west: 'Road D' };
+    const SIM_POSITIONS = { north: 'North', east: 'East', south: 'South', west: 'West' };
+
+    // ---- Visual queue model ----
+    // Tracks accumulated/discharged vehicles for each approach
+    // driven by signal state — purely visual representation
+    const _queueModel = {};
+    SIM_APPROACHES.forEach(k => { _queueModel[k] = { visual: 0, maxViz: 10 }; });
+    let _queueInterval = null;
+    let _cycleCount = 0;
+    let _lastPhaseApproach = null; // used to detect cycle increment
+
+    // ---- Data validation ----
+    function _validateLiveData() {
+      const state = FlowGuard.getState();
+      const cfg    = state.configType || '4CROSS';
+      const active = FlowGuard.getActiveApproachKeys(cfg);
+      const missing = active.filter(k => !state.approaches[k] || !state.approaches[k].flow);
+      const hasTimings = active.some(k => {
+        const g = state.approaches[k] ? parseFloat(state.approaches[k].currentGreen) : 0;
+        return g > 0;
+      });
+      return { valid: hasTimings && missing.length === 0, state, cfg, active };
+    }
+
+    // ---- Init queue model from FlowGuard demand ----
+    // Visual scaling: demand / 100 capped at 10, min 1 if active
+    function _initQueueModel(state, activeKeys) {
+      SIM_APPROACHES.forEach(k => {
+        if (!activeKeys.includes(k)) {
+          _queueModel[k] = { visual: 0, maxViz: 0, demand: 0 };
+        } else {
+          const demand = (state.approaches[k] ? parseFloat(state.approaches[k].flow) : 0) || 0;
+          // Scaling: demand PCU/hr → visual representation (1–12 vehicles per approach)
+          // 200 PCU/hr = ~1 viz vehicle, 1200 PCU/hr = ~10 viz vehicles
+          const maxViz = Math.max(1, Math.min(12, Math.round(demand / 100)));
+          _queueModel[k] = { visual: maxViz, maxViz, demand };
+        }
+      });
+    }
+
+    // ---- Queue accumulation/discharge each tick ----
+    function _tickQueue() {
+      const cs = Controller.getState();
+      if (!cs.running || cs.paused) return;
+
+      const green  = cs.currentApproach;
+      const phase  = cs.phase;
+
+      SIM_APPROACHES.forEach(k => {
+        const qm = _queueModel[k];
+        if (!qm || qm.maxViz === 0) return;
+
+        if ((phase === 'GREEN' || phase === 'EVP_GREEN') && green === k) {
+          // GREEN → discharge (reduce visual queue)
+          if (qm.visual > 0) qm.visual = Math.max(0, qm.visual - 0.25);
+        } else {
+          // RED / YELLOW → accumulate (increase toward max)
+          if (qm.visual < qm.maxViz) qm.visual = Math.min(qm.maxViz, qm.visual + 0.08);
+        }
+      });
+
+      _renderQueueBars();
+    }
+
+    function _renderQueueBars() {
+      SIM_APPROACHES.forEach(k => {
+        const qm = _queueModel[k];
+        const bar = document.getElementById(`sim-qbar-${k}`);
+        const lbl = document.getElementById(`sim-qlabel-${k}`);
+        if (!bar || !lbl) return;
+        if (!qm || qm.maxViz === 0) {
+          bar.style.width = '0%';
+          lbl.textContent = 'Q: —';
+          return;
+        }
+        const pct = qm.maxViz > 0 ? Math.round((qm.visual / qm.maxViz) * 100) : 0;
+        bar.style.width = `${pct}%`;
+        // Colour: green when discharging, amber near max, red when full
+        bar.style.background = pct < 40 ? '#10b981' : pct < 75 ? '#f59e0b' : '#e53e3e';
+        lbl.textContent = `Q: ${Math.ceil(qm.visual)} [VISUAL]`;
+      });
+    }
+
+    // ---- Render lamps from Controller state ----
+    function _renderSimLamps() {
+      const cs = Controller.getState();
+      SIM_APPROACHES.forEach(k => {
+        const lampColor = cs.lamps[k] || 'off';
+        const isInactive = cs.inactiveKeys.includes(k);
+
+        ['red', 'yellow', 'green'].forEach(color => {
+          const el = document.getElementById(`sim-lamp-${k}-${color}`);
+          if (!el) return;
+          el.className = 'sim-lamp';
+
+          if (isInactive) {
+            el.classList.add('sl-dim');
+          } else if (lampColor === color) {
+            el.classList.add(`sl-${color}`, 'sl-glow');
+          } else {
+            el.classList.add('sl-dim');
+          }
+        });
+
+        // Inactive badge
+        const badge = document.getElementById(`sim-inactive-${k}`);
+        if (badge) badge.style.display = isInactive ? 'block' : 'none';
+
+        // Approach info card state
+        const card = document.getElementById(`sim-info-card-${k}`);
+        if (card) {
+          card.className = 'sim-approach-info-card';
+          if (isInactive) {
+            card.classList.add('inactive-card');
+          } else if (lampColor === 'green') {
+            card.classList.add('active-green');
+          } else if (lampColor === 'yellow') {
+            card.classList.add('active-yellow');
+          } else {
+            card.classList.add('active-allred');
+          }
+        }
+
+        // Signal text in info card
+        const sigEl = document.getElementById(`sim-info-signal-${k}`);
+        if (sigEl) {
+          const COLOR_NAMES = { red: 'RED', yellow: 'YELLOW', green: 'GREEN', off: '—' };
+          const COLOR_CSS   = { red: '#e53e3e', yellow: '#f59e0b', green: '#10b981', off: 'var(--text-dim)' };
+          sigEl.textContent = isInactive ? 'INACTIVE' : (COLOR_NAMES[lampColor] || '—');
+          sigEl.style.color = isInactive ? '#ef4444' : (COLOR_CSS[lampColor] || 'var(--text-dim)');
+        }
+      });
+    }
+
+    // ---- Render status panel ----
+    function _renderSimStatus() {
+      const cs = Controller.getState();
+
+      // Phase badge
+      const badge = document.getElementById('sim-phase-badge');
+      if (badge) {
+        let txt, cls;
+        if (!cs.running) { txt = 'IDLE'; cls = 'spb-idle'; }
+        else if (cs.paused) { txt = 'PAUSED'; cls = 'spb-idle'; }
+        else if (cs.evp.active) { txt = `EVP — ${cs.evp.phase || ''}`; cls = 'spb-evp'; }
+        else if (cs.phase === 'GREEN' || cs.phase === 'EVP_GREEN') { txt = 'GREEN'; cls = 'spb-green'; }
+        else if (cs.phase === 'YELLOW') { txt = 'YELLOW'; cls = 'spb-yellow'; }
+        else if (cs.phase === 'ALL_RED') { txt = 'ALL RED'; cls = 'spb-red'; }
+        else { txt = cs.phase || 'IDLE'; cls = 'spb-idle'; }
+        badge.textContent = txt;
+        badge.className = `sim-phase-badge ${cls}`;
+      }
+
+      // Cycle count — increment when approach wraps around
+      if (cs.running && !cs.paused && cs.currentApproach) {
+        if (cs.currentApproach === cs.phaseQueue[0] && _lastPhaseApproach && _lastPhaseApproach !== cs.currentApproach) {
+          _cycleCount++;
+        }
+        _lastPhaseApproach = cs.currentApproach;
+      }
+
+      // Stats
+      const approaching = cs.currentApproach;
+      const approach_label = approaching ? `${SIM_LABELS[approaching]} (${SIM_POSITIONS[approaching]})` : '—';
+      _setText('sim-stat-approach', approach_label);
+      _setText('sim-stat-cycle', _cycleCount);
+      _setText('sim-cycle-count', _cycleCount);
+      _setText('sim-stat-plan', cs.timingSource);
+      _setText('sim-plan-label', cs.timingSource);
+
+      const mode = cs.evp.active ? 'EVP PRIORITY' : (cs.running ? 'NORMAL' : 'STOPPED');
+      _setText('sim-stat-mode', mode);
+      _setText('sim-mode-label', mode);
+
+      // Remaining
+      const remaining = cs.evp.active ? cs.evp.phaseTimer : cs.phaseRemaining;
+      const remStr = cs.running && !cs.paused ? `${Math.max(0, remaining).toFixed(1)} s` : (cs.paused ? 'PAUSED' : '—');
+      _setText('sim-stat-remaining', remStr);
+      _setText('sim-junction-countdown', cs.running ? `${Math.max(0, remaining).toFixed(0)}s` : '—');
+
+      // Green time for current approach
+      const gt = approaching ? (cs.greenTimes[approaching] || '—') : '—';
+      _setText('sim-stat-green-time', approaching ? `${gt} s` : '—');
+
+      // Junction phase indicator
+      const jEl = document.getElementById('sim-junction-phase');
+      if (jEl) {
+        jEl.textContent = cs.evp.active ? '🚨' : (cs.phase === 'GREEN' || cs.phase === 'EVP_GREEN') ? '▶' : '✦';
+      }
+
+      // EVP panel
+      const evpPanel = document.getElementById('sim-evp-panel');
+      if (evpPanel) evpPanel.style.display = cs.evp.active ? 'block' : 'none';
+      if (cs.evp.active) {
+        _setText('sim-evp-approach', cs.evp.approach ? `${SIM_LABELS[cs.evp.approach]} (${SIM_POSITIONS[cs.evp.approach]})` : '—');
+        _setText('sim-evp-vehicle', cs.evp.vehicleType || '—');
+        _setText('sim-evp-phase', cs.evp.phase || '—');
+      }
+
+      // Terminate EVP button
+      const termBtn = document.getElementById('sim-btn-terminate-evp');
+      if (termBtn) termBtn.disabled = !cs.evp.active;
+
+      // Sim control buttons
+      const running = cs.running, paused = cs.paused;
+      _simSetBtn('sim-btn-start', 'Start', running && !paused);
+      _simSetBtn('sim-btn-pause', paused ? 'Resume' : 'Pause', !running);
+      _simSetBtn('sim-btn-stop',  'Stop',  !running);
+      _simSetBtn('sim-btn-reset', 'Reset', false);
+
+      // Timing buttons
+      const bBtn = document.getElementById('sim-timing-baseline');
+      const cBtn = document.getElementById('sim-timing-candidate');
+      if (bBtn) bBtn.classList.toggle('active', cs.timingSource === 'BASELINE');
+      if (cBtn) cBtn.classList.toggle('active', cs.timingSource === 'CANDIDATE');
+
+      // EVP approach buttons — disable inactive approaches
+      SIM_APPROACHES.forEach(k => {
+        const btn = document.getElementById(`sim-evp-${k}`);
+        if (btn) btn.disabled = cs.inactiveKeys.includes(k) || !cs.running;
+      });
+
+      // Candidate status
+      const candEl = document.getElementById('sim-candidate-status');
+      if (candEl && cs.candidateStatus) {
+        const LABS = { 'RECOMMENDED': '✅ RECOMMENDED', 'CONDITIONAL': '⚠️ CONDITIONAL', 'NOT RECOMMENDED': '❌ NOT RECOMMENDED' };
+        candEl.textContent = LABS[cs.candidateStatus] || cs.candidateStatus;
+        candEl.style.color = cs.candidateStatus === 'RECOMMENDED' ? '#10b981' : cs.candidateStatus === 'CONDITIONAL' ? '#f59e0b' : '#ef4444';
+      } else if (candEl) {
+        candEl.textContent = '— No analysis run yet';
+        candEl.style.color = 'var(--text-dim)';
+      }
+
+      // Event log (mirror from Controller)
+      _renderSimLog();
+    }
+
+    function _renderSimLog() {
+      const logEl = document.getElementById('sim-log-box');
+      if (!logEl) return;
+      const entries = Controller.getState().eventLog || [];
+      const CLS = { info: 'sle-info', warn: 'sle-warn', error: 'sle-warn', evp: 'sle-evp', safety: 'sle-safety' };
+      logEl.innerHTML = entries.map(e =>
+        `<div class="sim-log-entry ${CLS[e.level]||'sle-info'}"><span class="sim-log-time">${e.time}</span><span>${e.message}</span></div>`
+      ).join('');
+    }
+
+    function _setText(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = String(val);
+    }
+
+    function _simSetBtn(id, text, disabled) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (text !== null) el.textContent = text;
+      el.disabled = disabled;
+    }
+
+    // ---- Build approach info cards ----
+    function _buildApproachInfoCards(state, activeKeys) {
+      const grid = document.getElementById('sim-approach-info-grid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      SIM_APPROACHES.forEach(k => {
+        const app  = state.approaches[k] || {};
+        const rec  = state.proposedTiming && state.proposedTiming[k];
+        const isActive = activeKeys.includes(k);
+
+        const baseG    = app.currentGreen || '—';
+        const candG    = rec ? (rec.proposedGreen || '—') : '—';
+        const demand   = isActive ? (app.flow || '—') : '—';
+        const vcInfo   = '—'; // computed at analysis time, not stored raw
+        const queueViz = _queueModel[k] ? `${Math.ceil(_queueModel[k].visual)} [VISUAL]` : '—';
+
+        const div = document.createElement('div');
+        div.className = 'sim-approach-info-card' + (!isActive ? ' inactive-card' : '');
+        div.id = `sim-info-card-${k}`;
+        div.innerHTML = `
+          <div class="sim-info-road">${SIM_LABELS[k]} — ${SIM_POSITIONS[k]} ${!isActive ? '<span style="color:#ef4444;font-size:0.65rem;">[INACTIVE]</span>' : ''}</div>
+          <div class="sim-info-row"><span class="sim-info-label">Demand</span><span class="sim-info-value">${isActive ? FlowGuard.formatNum(demand) + ' PCU/h' : '—'}</span></div>
+          <div class="sim-info-row"><span class="sim-info-label">Baseline Green</span><span class="sim-info-value">${isActive ? baseG + ' s' : '—'}</span></div>
+          <div class="sim-info-row"><span class="sim-info-label">Candidate Green</span><span class="sim-info-value">${isActive && rec ? candG + ' s' : '—'}</span></div>
+          <div class="sim-info-row"><span class="sim-info-label">Signal</span><span class="sim-info-value" id="sim-info-signal-${k}" style="color:var(--text-dim);">—</span></div>
+          <div class="sim-info-row"><span class="sim-info-label">Viz Queue</span><span class="sim-info-value" id="sim-info-queue-${k}">${isActive ? queueViz : '—'}</span></div>
+        `;
+        grid.appendChild(div);
+      });
+    }
+
+    // ---- Master render loop (called on rAF) ----
+    let _simRenderLoop = null;
+    function _startRenderLoop() {
+      if (_simRenderLoop) return;
+      function loop() {
+        _renderSimLamps();
+        _renderSimStatus();
+        // Update viz queue values in info cards
+        SIM_APPROACHES.forEach(k => {
+          const el = document.getElementById(`sim-info-queue-${k}`);
+          if (el && _queueModel[k] && _queueModel[k].maxViz > 0) {
+            el.textContent = `${Math.ceil(_queueModel[k].visual)} [VISUAL]`;
+          }
+        });
+        _simRenderLoop = requestAnimationFrame(loop);
+      }
+      _simRenderLoop = requestAnimationFrame(loop);
+    }
+
+    function _stopRenderLoop() {
+      if (_simRenderLoop) { cancelAnimationFrame(_simRenderLoop); _simRenderLoop = null; }
+    }
+
+    // ---- Public control functions ----
+    function _simStart() {
+      const { valid, state, cfg, active } = _validateLiveData();
+      if (!valid) {
+        document.getElementById('sim-data-alert').style.display = 'block';
+        return;
+      }
+      document.getElementById('sim-data-alert').style.display = 'none';
+      _initQueueModel(state, active);
+      _buildApproachInfoCards(state, active);
+      _cycleCount = 0;
+      _lastPhaseApproach = null;
+      Controller.start();
+      if (!_queueInterval) _queueInterval = setInterval(_tickQueue, 250);
+      _startRenderLoop();
+    }
+
+    function _simPauseResume() {
+      const cs = Controller.getState();
+      if (cs.paused) Controller.resume();
+      else Controller.pause();
+    }
+
+    function _simStop() {
+      Controller.stop();
+      if (_queueInterval) { clearInterval(_queueInterval); _queueInterval = null; }
+    }
+
+    function _simReset() {
+      _simStop();
+      _cycleCount = 0;
+      _lastPhaseApproach = null;
+      Controller.reset();
+      const { state, active } = _validateLiveData();
+      _initQueueModel(state, active);
+      _buildApproachInfoCards(state, active);
+      _renderQueueBars();
+      _renderSimLamps();
+      _renderSimStatus();
+    }
+
+    function _simDemo() {
+      const { state, active } = _validateLiveData();
+      document.getElementById('sim-data-alert').style.display = 'none';
+      _initQueueModel(state, active);
+      _buildApproachInfoCards(state, active);
+      _cycleCount = 0;
+      _lastPhaseApproach = null;
+      Controller.runDemo();
+      if (!_queueInterval) _queueInterval = setInterval(_tickQueue, 250);
+      _startRenderLoop();
+    }
+
+    function _simEVP(approachKey) {
+      const vehicleType = document.getElementById('sim-evp-vehicle-type').value;
+      Controller.requestEVP(approachKey, vehicleType);
+    }
+
+    function _simTerminateEVP() {
+      Controller.terminateEVP();
+    }
+
+    function _simSelectTiming(source) {
+      Controller.selectTiming(source);
+      // Show warning if needed
+      const cs = Controller.getState();
+      const warnEl = document.getElementById('sim-timing-warning');
+      if (warnEl) {
+        if (source === 'CANDIDATE' && cs.candidateStatus === 'NOT RECOMMENDED') {
+          warnEl.textContent = 'NOT RECOMMENDED — Baseline retained.';
+          warnEl.className = 'sim-timing-warning stw-error';
+          warnEl.style.display = 'block';
+          setTimeout(() => { warnEl.style.display = 'none'; }, 5000);
+        } else if (source === 'CANDIDATE' && cs.candidateStatus === 'CONDITIONAL') {
+          warnEl.textContent = 'CONDITIONAL — Use with caution.';
+          warnEl.className = 'sim-timing-warning stw-warn';
+          warnEl.style.display = 'block';
+          setTimeout(() => { warnEl.style.display = 'none'; }, 5000);
+        } else {
+          warnEl.style.display = 'none';
+        }
+      }
+    }
+
+    // ================================================================
+    // EXISTING D/D/1 STATIC SIMULATION (preserved from Milestone 5/5.5)
+    // ================================================================
+    document.addEventListener('DOMContentLoaded', function() {
+      // ---- Initialise Controller (reads FlowGuard state) ----
+      Controller.init();
+      _startRenderLoop();
+
+      // ---- Populate intersection config display ----
+      const state = FlowGuard.getState();
+      const configType = state.configType || '4CROSS';
+      const activeKeys = FlowGuard.getActiveApproachKeys(configType);
+
+      document.getElementById('simConfigBadge').innerText = FlowGuard.getConfigLabel(configType);
+      const simCfgLabel = document.getElementById('sim-config-label');
+      if (simCfgLabel) simCfgLabel.textContent = FlowGuard.getConfigLabel(configType);
+
+      // ---- Validate data and warn ----
+      const { valid } = _validateLiveData();
+      if (!valid) {
+        document.getElementById('sim-data-alert').style.display = 'block';
+      }
+
+      // ---- Build initial approach info cards ----
+      _initQueueModel(state, activeKeys);
+      _buildApproachInfoCards(state, activeKeys);
+      _renderQueueBars();
+
+      // ================================================================
+      // EXISTING D/D/1 static simulation (untouched)
+      // ================================================================
+      let optData = null;
+      try {
+        optData = AnalysisEngine.optimizeSignalTimings(state.approaches, state.intersection, configType);
+      } catch (e) {
+        console.warn('AnalysisEngine error in simulation:', e);
+      }
+
+      let candidateGreens = {};
+      if (state.proposedTiming) {
+        activeKeys.forEach(k => {
+          if (state.proposedTiming[k]) {
+            candidateGreens[k] = state.proposedTiming[k].proposedGreen;
+          }
+        });
+      } else if (optData && optData.recommendation) {
+        activeKeys.forEach(k => {
+          if (optData.recommendation[k]) {
+            candidateGreens[k] = optData.recommendation[k].proposedGreen;
+          }
+        });
+      }
+
+      function executeSimulation() {
+        const numCycles = document.getElementById('simCycles').value;
+        const currentGreens = {};
+        activeKeys.forEach(k => {
+          currentGreens[k] = state.approaches[k] ? state.approaches[k].currentGreen : 30;
+        });
+
+        const config = {
+          cycleLength: state.intersection.cycleLength,
+          yellowTime: state.intersection.yellowTime,
+          allRedTime: state.intersection.allRedTime,
+          numCycles: numCycles,
+          saturationFlow: state.intersection.saturationFlow || 1800,
+          activeKeys: activeKeys
+        };
+
+        const comp = SimulationEngine.comparePlans(state.approaches, currentGreens, candidateGreens, config);
+
+        const curr = comp.current;
+        const cand = comp.candidate;
+        const metrics = comp.metrics;
+
+        document.getElementById('currentWaitTime').innerHTML = `${curr.overallAvgWaitTime}<span class="metric-unit">sec/veh</span>`;
+        document.getElementById('currentMaxQueue').innerHTML = `${curr.overallMaxQueue}<span class="metric-unit">veh</span>`;
+        document.getElementById('currentAvgQueue').innerHTML = `${curr.overallAvgQueue}<span class="metric-unit">veh</span>`;
+        document.getElementById('currentMaxAppWait').innerHTML = `${curr.maxApproachWaitTime}<span class="metric-unit">sec/veh</span>`;
+        document.getElementById('currentServed').innerText = `${curr.totalServed} veh`;
+        document.getElementById('currentRemaining').innerText = `${curr.totalRemaining} veh`;
+
+        document.getElementById('proposedWaitTime').innerHTML = `${cand.overallAvgWaitTime}<span class="metric-unit">sec/veh</span>`;
+        document.getElementById('proposedMaxQueue').innerHTML = `${cand.overallMaxQueue}<span class="metric-unit">veh</span>`;
+        document.getElementById('proposedAvgQueue').innerHTML = `${cand.overallAvgQueue}<span class="metric-unit">veh</span>`;
+        document.getElementById('proposedMaxAppWait').innerHTML = `${cand.maxApproachWaitTime}<span class="metric-unit">sec/veh</span>`;
+        document.getElementById('proposedServed').innerText = `${cand.totalServed} veh`;
+        document.getElementById('proposedRemaining').innerText = `${cand.totalRemaining} veh`;
+
+        const applyColor = (elemId, isBetter, neutralSame) => {
+          const el = document.getElementById(elemId);
+          if (!el) return;
+          if (neutralSame) { el.style.color = 'var(--text-main)'; }
+          else if (isBetter) { el.style.color = 'var(--status-low)'; }
+          else { el.style.color = 'var(--status-high)'; }
+        };
+
+        applyColor('proposedWaitTime', metrics.waitTimeDiff < 0, metrics.waitTimeDiff === 0);
+        applyColor('proposedMaxQueue', metrics.maxQueueDiff < 0, metrics.maxQueueDiff === 0);
+        applyColor('proposedAvgQueue', metrics.avgQueueDiff < 0, metrics.avgQueueDiff === 0);
+        applyColor('proposedMaxAppWait', metrics.maxApproachWaitDiff < 0, metrics.maxApproachWaitDiff === 0);
+
+        const badge = document.getElementById('waitImprovementBadge');
+        const header = document.getElementById('simAcceptanceHeader');
+        const title = document.getElementById('proposedPlanTitle');
+
+        const valRes = (typeof CongestionEngine !== 'undefined' && CongestionEngine.validateCandidatePlan)
+          ? CongestionEngine.validateCandidatePlan(activeKeys, curr, cand, { approaches: state.approaches })
+          : { status: 'NOT RECOMMENDED', summaryText: 'Simulation data unavailable.', acceptabilityReason: 'Retain baseline.' };
+
+        const recStatus = valRes.status;
+
+        if (recStatus === 'RECOMMENDED') {
+          badge.className = 'change-pill positive';
+          badge.innerText = `${metrics.waitTimePct}% Delay`;
+          header.innerText = valRes.summaryText;
+          header.style.color = 'var(--status-low)';
+          title.innerText = 'PROPOSED PLAN — RECOMMENDED';
+        } else if (recStatus === 'CONDITIONAL') {
+          badge.className = 'change-pill positive';
+          badge.innerText = `${metrics.waitTimePct}% Delay`;
+          header.innerText = valRes.summaryText;
+          header.style.color = '#f59e0b';
+          title.innerText = 'PROPOSED PLAN — CONDITIONAL';
+        } else {
+          badge.className = 'change-pill negative';
+          badge.innerText = metrics.waitTimePct > 0 ? `+${metrics.waitTimePct}% Delay` : '0% Delay';
+          header.innerText = valRes.summaryText;
+          header.style.color = 'var(--status-high)';
+          title.innerText = 'PROPOSED PLAN — NOT RECOMMENDED';
+        }
+
+        const tbody = document.getElementById('simTableBody');
+        tbody.innerHTML = '';
+
+        const improvedApps = [];
+        const worsenedApps = [];
+        const oversatApps  = [];
+
+        activeKeys.forEach(k => {
+          const app     = state.approaches[k] || { name: k, flow: 0 };
+          const currApp = curr.approaches[k] || { greenTime: 30, avgWaitTime: 0, maxQueueLength: 0 };
+          const candApp = cand.approaches[k] || { greenTime: 30, avgWaitTime: 0, maxQueueLength: 0 };
+
+          const diffWait    = candApp.avgWaitTime - currApp.avgWaitTime;
+          const diffWaitStr = diffWait <= 0 ? `${diffWait.toFixed(1)}s` : `+${diffWait.toFixed(1)}s`;
+          const diffClass   = diffWait <= 0 ? 'text-emerald' : 'text-rose';
+
+          if (diffWait <= -0.5) { improvedApps.push(`${app.name} (-${Math.abs(diffWait).toFixed(1)}s/veh)`); }
+          else if (diffWait >= 0.5) { worsenedApps.push(`${app.name} (+${diffWait.toFixed(1)}s/veh)`); }
+          if (candApp.vcRatio > 1.0 || candApp.avgWaitTime > 80) { oversatApps.push(app.name); }
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><strong>${app.name}</strong></td>
+            <td style="font-family: var(--font-mono);">${FlowGuard.formatNum(app.flow)}</td>
+            <td style="font-family: var(--font-mono); background: rgba(56,189,248,0.02);">${currApp.greenTime}s</td>
+            <td style="font-family: var(--font-mono); background: rgba(56,189,248,0.02);">${currApp.avgWaitTime}s</td>
+            <td style="font-family: var(--font-mono); background: rgba(56,189,248,0.02);">${currApp.maxQueueLength} veh</td>
+            <td style="font-family: var(--font-mono); font-weight: 700; color: var(--primary); background: rgba(16,185,129,0.02);">${candApp.greenTime}s</td>
+            <td style="font-family: var(--font-mono); font-weight: 700; background: rgba(16,185,129,0.02);" class="${diffClass}">${candApp.avgWaitTime}s</td>
+            <td style="font-family: var(--font-mono); font-weight: 700; background: rgba(16,185,129,0.02);">${candApp.maxQueueLength} veh</td>
+            <td style="font-family: var(--font-mono); font-weight: 700;" class="${diffClass}">${diffWaitStr}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        const interpBody  = document.getElementById('simInterpretationBody');
+        const verdictBadge = document.getElementById('simVerdictBadge');
+
+        const delayPctStr = metrics.waitTimeDiff < 0
+          ? `reduced by ${Math.abs(metrics.waitTimePct)}% (${metrics.waitTimeDiff.toFixed(1)} s/veh)`
+          : (metrics.waitTimeDiff > 0 ? `increased by ${metrics.waitTimePct}% (+${metrics.waitTimeDiff.toFixed(1)} s/veh)` : `unchanged (0 s/veh)`);
+        const queueDiffStr = metrics.maxQueueDiff < 0
+          ? `reduced by ${Math.abs(metrics.maxQueueDiff)} veh`
+          : (metrics.maxQueueDiff > 0 ? `increased by +${metrics.maxQueueDiff} veh` : `unchanged`);
+
+        let html = `
+          <p style="margin-bottom:0.75rem;">
+            <strong>Network Performance:</strong> Overall simulated average delay is <strong>${delayPctStr}</strong> across active approaches (${curr.overallAvgWaitTime}s &rarr; ${cand.overallAvgWaitTime}s/veh). Maximum network queue length is <strong>${queueDiffStr}</strong> (${curr.overallMaxQueue} &rarr; ${cand.overallMaxQueue} veh).
+          </p>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem; margin-bottom:0.75rem;">
+            <div style="background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.2); padding:0.75rem; border-radius:6px;">
+              <strong style="color:var(--status-low);">Approaches Improved (${improvedApps.length}):</strong>
+              <div style="font-size:0.85rem; margin-top:0.25rem;">${improvedApps.length > 0 ? improvedApps.join(', ') : 'None'}</div>
+            </div>
+            <div style="background:rgba(239,68,68,0.05); border:1px solid rgba(239,68,68,0.2); padding:0.75rem; border-radius:6px;">
+              <strong style="color:var(--status-high);">Approaches Worsened (${worsenedApps.length}):</strong>
+              <div style="font-size:0.85rem; margin-top:0.25rem;">${worsenedApps.length > 0 ? worsenedApps.join(', ') : 'None'}</div>
+            </div>
+          </div>
+        `;
+
+        if (oversatApps.length > 0) {
+          html += `<div style="background:rgba(249,115,22,0.1); border-left:4px solid var(--status-orange); padding:0.6rem 0.8rem; margin-bottom:0.75rem; font-size:0.85rem; color:#f97316;">
+            <strong>⚠ Oversaturation Warning:</strong> Approach(es) <strong>${oversatApps.join(', ')}</strong> operate at near or above capacity (v/c &gt; 1.0 or delay &gt; 80s/veh). Secondary queue management is recommended.
+          </div>`;
+        }
+
+        html += `<div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); padding:0.75rem; border-radius:6px; margin-top:0.5rem;">
+          <div style="font-weight:700; font-size:0.9rem; margin-bottom:0.25rem;">PLAN ACCEPTABILITY: <span style="color:${recStatus === 'RECOMMENDED' ? 'var(--status-low)' : (recStatus === 'CONDITIONAL' ? '#f59e0b' : 'var(--status-high)')}">${recStatus}</span></div>
+          <div style="font-size:0.85rem; color:var(--text-muted);"><strong>Reason:</strong> ${valRes.acceptabilityReason}</div>
+        </div>`;
+
+        if (recStatus === 'RECOMMENDED') {
+          verdictBadge.className = 'badge badge-low';
+          verdictBadge.innerText = 'RECOMMENDED';
+          html += `<p style="margin-top:0.75rem; margin-bottom:0; font-size:0.85rem; color:var(--status-low);"><strong>Engineering Conclusion:</strong> Candidate signal timing plan provides a net efficiency gain across all active approaches without creating unacceptable delay imbalances. Implementation is recommended.</p>`;
+        } else if (recStatus === 'CONDITIONAL') {
+          verdictBadge.className = 'badge badge-moderate';
+          verdictBadge.innerText = 'CONDITIONAL';
+          html += `<p style="margin-top:0.75rem; margin-bottom:0; font-size:0.85rem; color:#f59e0b;"><strong>Engineering Conclusion:</strong> Overall simulated network delay decreases; however, the candidate plan produces substantial deterioration on one or more approaches. Further timing adjustment is required before the plan can be recommended.</p>`;
+        } else {
+          verdictBadge.className = 'badge badge-medium';
+          verdictBadge.innerText = 'NOT RECOMMENDED';
+          html += `<p style="margin-top:0.75rem; margin-bottom:0; font-size:0.85rem; color:var(--status-high);"><strong>Engineering Conclusion:</strong> Reallocating signal timings under current demand profiles does not produce lower vehicle delay. Retaining baseline timing is recommended.</p>`;
+        }
+
+        interpBody.innerHTML = html;
+      }
+
+      executeSimulation();
+      document.getElementById('btnRunSim').addEventListener('click', executeSimulation);
+      document.getElementById('simCycles').addEventListener('change', executeSimulation);
+    });
+
+    // ════════════════════════════════════════════════════════════
+    // MILESTONE 6.2 — WHY THIS TIMING? EXPLAINABILITY MODAL
+    // ════════════════════════════════════════════════════════════
+    function openWhyModal() {
+      const modal = document.getElementById('whyModal');
+      if (!modal) return;
+      const state = FlowGuard.getState();
+      const configType = state.configType || '4CROSS';
+      let optData = state.optResults;
+      if (!optData && typeof AnalysisEngine !== 'undefined') {
+        try {
+          optData = AnalysisEngine.optimizeSignalTimings(state.approaches, state.intersection, configType);
+        } catch (e) { console.warn(e); }
+      }
+      let analysisData = null;
+      if (typeof AnalysisEngine !== 'undefined') {
+        try {
+          analysisData = AnalysisEngine.analyzeApproaches(state.approaches, state.intersection, configType);
+        } catch (e) { console.warn(e); }
+      }
+      if (optData && analysisData) {
+        renderWhyModalContent(optData, analysisData, state);
+      }
+      modal.style.display = 'flex';
+    }
+
+    function closeWhyModal() {
+      const modal = document.getElementById('whyModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function renderWhyModalContent(optData, analysisData, state) {
+      const body = document.getElementById('whyModalBody');
+      if (!body || !optData) return;
+
+      const activeKeys = analysisData.activeKeys || [];
+      const C = parseFloat(state.intersection.cycleLength) || 120;
+      const nActive = activeKeys.length;
+      const lostPerPhase = (parseFloat(state.intersection.yellowTime) || 3) + (parseFloat(state.intersection.allRedTime) || 2);
+      const totalLost = nActive * lostPerPhase;
+      const effGreen = C - totalLost;
+      const recStatus = optData.acceptanceStatus || 'NOT RECOMMENDED';
+      const statusColor = recStatus === 'RECOMMENDED' ? '#10b981' : (recStatus === 'CONDITIONAL' ? '#f59e0b' : '#ef4444');
+
+      let rowsHtml = '';
+      activeKeys.forEach(k => {
+        const app = analysisData.approaches[k] || {};
+        const rec = optData.recommendation ? optData.recommendation[k] : {};
+        const currG = rec.currentGreen || 30;
+        const initG = rec.initialGreen || currG;
+        const balG  = rec.balancedGreen || initG;
+        const propG = rec.proposedGreen || 30;
+        const diffG = propG - currG;
+        const diffStr = diffG > 0 ? `+${diffG}s` : (diffG < 0 ? `${diffG}s` : '0s');
+        const diffColor = diffG > 0 ? '#10b981' : (diffG < 0 ? '#ef4444' : 'var(--text-dim)');
+
+        const currWait = rec.currentWait || 0;
+        const propWait = rec.proposedWait || 0;
+        const delayDiff = propWait - currWait;
+        const delayStr = delayDiff < 0 ? `${delayDiff.toFixed(1)}s` : (delayDiff > 0 ? `+${delayDiff.toFixed(1)}s` : '0s');
+        const delayColor = delayDiff <= 0 ? '#10b981' : '#ef4444';
+
+        let rationale = '';
+        if (recStatus === 'NOT RECOMMENDED') {
+          rationale = 'Baseline green duration retained. Green redistribution alone cannot achieve acceptable performance under current demand and cycle constraints.';
+        } else if (initG !== balG) {
+          rationale = `Initial unconstrained allocation (${initG}s) created severe single-approach delay spikes. Reallocated in Stage 2 (${balG}s) and validated in Stage 3 (${propG}s) for balanced trade-off.`;
+        } else if (diffG > 0) {
+          rationale = `Allocated +${diffG}s additional green time. High demand (${app.flow} PCU/h) produces critical queuing that is mitigated by extending green phase.`;
+        } else if (diffG < 0) {
+          rationale = `Reduced green duration by ${Math.abs(diffG)}s. Moderate demand (${app.flow} PCU/h) allows green reallocation to higher-demand approaches while keeping v/c < 1.0.`;
+        } else {
+          rationale = 'Green duration retained at baseline value to preserve capacity balance and minimum safety bounds.';
+        }
+
+        rowsHtml += `
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <td style="padding: 0.65rem;"><strong>${app.name}</strong></td>
+            <td style="padding: 0.65rem; font-family: var(--font-mono);">${FlowGuard.formatNum(app.flow)} PCU/h</td>
+            <td style="padding: 0.65rem; font-family: var(--font-mono);">${app.lanes} IN</td>
+            <td style="padding: 0.65rem; font-family: var(--font-mono);">${currG}s</td>
+            <td style="padding: 0.65rem; font-family: var(--font-mono); color: var(--text-muted);">${initG}s</td>
+            <td style="padding: 0.65rem; font-family: var(--font-mono); color: #f59e0b;">${balG}s</td>
+            <td style="padding: 0.65rem; font-family: var(--font-mono); font-weight: 700; color: #10b981;">${propG}s</td>
+            <td style="padding: 0.65rem; font-family: var(--font-mono); font-weight: 700; color: ${diffColor};">${diffStr}</td>
+            <td style="padding: 0.65rem; font-family: var(--font-mono); color: ${delayColor};">${currWait}s &rarr; ${propWait}s (${delayStr})</td>
+            <td style="padding: 0.65rem; font-size: 0.78rem; color: var(--text-muted);">${rationale}</td>
+          </tr>
+        `;
+      });
+
+      body.innerHTML = `
+        <!-- Section 1: Cycle & Clearance Breakdown -->
+        <div style="background: rgba(15,23,42,0.6); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+          <h4 style="font-size: 0.9rem; color: var(--primary); margin: 0 0 0.5rem 0;">1. Cycle &amp; Phase Clearance Breakdown</h4>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; font-size: 0.82rem;">
+            <div style="background: rgba(10,14,26,0.6); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <span style="color: var(--text-muted); display: block; font-size: 0.7rem; text-transform: uppercase;">Total Cycle (C)</span>
+              <strong style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--text-main);">${C} s</strong>
+            </div>
+            <div style="background: rgba(10,14,26,0.6); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <span style="color: var(--text-muted); display: block; font-size: 0.7rem; text-transform: uppercase;">Active Phases (N)</span>
+              <strong style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--text-main);">${nActive} Legs</strong>
+            </div>
+            <div style="background: rgba(10,14,26,0.6); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <span style="color: var(--text-muted); display: block; font-size: 0.7rem; text-transform: uppercase;">Total Clearance (L)</span>
+              <strong style="font-family: var(--font-mono); font-size: 1.1rem; color: #f59e0b;">${totalLost} s</strong>
+              <span style="font-size: 0.68rem; color: var(--text-dim);">${nActive} &times; 5s (3s Y + 2s AR)</span>
+            </div>
+            <div style="background: rgba(10,14,26,0.6); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <span style="color: var(--text-muted); display: block; font-size: 0.7rem; text-transform: uppercase;">Effective Green (G<sub>eff</sub>)</span>
+              <strong style="font-family: var(--font-mono); font-size: 1.1rem; color: #10b981;">${effGreen} s</strong>
+              <span style="font-size: 0.68rem; color: var(--text-dim);">${C}s &minus; ${totalLost}s</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Approach Allocation & Rationale Table -->
+        <div style="background: rgba(15,23,42,0.6); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+          <h4 style="font-size: 0.9rem; color: var(--primary); margin: 0 0 0.5rem 0;">2. Three-Stage Approach Allocation &amp; Rationale</h4>
+          <div class="table-responsive">
+            <table class="data-table" style="font-size: 0.8rem; width: 100%;">
+              <thead>
+                <tr>
+                  <th>Approach</th>
+                  <th>Demand</th>
+                  <th>Lanes</th>
+                  <th>Baseline</th>
+                  <th>Stage 1</th>
+                  <th>Stage 2</th>
+                  <th>Stage 3 (Final)</th>
+                  <th>&Delta;g</th>
+                  <th>Sim. Delay</th>
+                  <th>Engineering Rationale</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section 3: How Optimization Works -->
+        <div style="background: rgba(15,23,42,0.6); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+          <h4 style="font-size: 0.9rem; color: var(--primary); margin: 0 0 0.5rem 0;">3. How FlowGuard Signal Optimization Works</h4>
+          <ol style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.6; margin: 0; padding-left: 1.2rem;">
+            <li><strong>Calculate Available Green:</strong> Deducts total phase clearance lost time (L = N &times; 5s) from cycle length C to find available effective green G<sub>eff</sub> = ${effGreen}s.</li>
+            <li><strong>Generate Feasible Candidates:</strong> Evaluates integer green-time splits satisfying minimum bounds (g<sub>min</sub> = 7s) and max bounds (g<sub>max</sub> = ${C-10}s) with &sum;g<sub>i</sub> = G<sub>eff</sub>.</li>
+            <li><strong>Simulate Performance:</strong> Runs a multi-cycle deterministic D/D/1 arrival-discharge queuing simulation for every feasible candidate split.</li>
+            <li><strong>Score Objective Function:</strong> Evaluates objective penalty J = Network Delay + 0.30 &times; Max Delay + 0.20 &times; Delay Spread + Penalties. <em>(Prototype optimization parameters)</em>.</li>
+            <li><strong>Select Optimal Candidate:</strong> Identifies the candidate allocation minimizing penalty score J.</li>
+            <li><strong>Validate Plan:</strong> Validates optimal candidate against baseline using multi-criterion equity thresholds (validateCandidatePlan).</li>
+            <li><strong>Assign Final Status:</strong> Classifies result as <strong style="color:${statusColor}">${recStatus}</strong>.</li>
+          </ol>
+        </div>
+
+        <!-- Section 4: Why Not Highest PCU = Highest Green? -->
+        <div style="background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.25); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; font-size: 0.82rem; color: #c4b5fd;">
+          <strong style="color: #a5b4fc; font-size: 0.88rem; display: block; margin-bottom: 0.35rem;">📘 Why Doesn't the Highest PCU Road Always Receive the Longest Green?</strong>
+          Signal timing in FlowGuard AI depends on modeled approach capacity (s = lanes &times; 1800) and Volume-to-Capacity ratio (v/c), rather than raw traffic volume alone. For example, a 2-lane approach with 720 PCU/h has a capacity of 3600 PCU/h at 100% green, achieving low v/c ratio with modest green fraction. Conversely, a 1-lane approach with 500 PCU/h has a capacity of only 1800 PCU/h, requiring a higher green time fraction per PCU to prevent queue accumulation. Optimization balances network delay and approach equity across all active legs.
+        </div>
+
+        <!-- Section 5: Standard Concurrent Pedestrian Crossing Architecture -->
+        <div style="background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.25); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; font-size: 0.82rem; color: #bae6fd;">
+          <strong style="color: #38bdf8; font-size: 0.88rem; display: block; margin-bottom: 0.35rem;">🚶 Standard Concurrent Pedestrian Crossing vs. Exclusive Pedestrian Phase</strong>
+          FlowGuard AI models <strong>Standard Concurrent Pedestrian Crossing</strong> per HCM/MUTCD civil engineering standards. Pedestrians cross parallel to active vehicular traffic during the corresponding approach green stage (e.g. Northbound pedestrians walk parallel to Northbound vehicular flow). The required crossing time (T<sub>ped</sub> = t<sub>start</sub> + W/v) is enforced as a minimum green bound. <strong>Exclusive Pedestrian Phase</strong> (pedestrian scramble where all vehicular movements stop simultaneously) requires dedicated signal cycle time and is documented for academic comparison, but is excluded from active phase logic to prevent unnecessary vehicular capacity degradation.
+        </div>
+
+        <!-- Section 5: Candidate Status Summary -->
+        <div style="background: rgba(15,23,42,0.6); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">
+          <h4 style="font-size: 0.9rem; color: var(--primary); margin: 0 0 0.35rem 0;">5. Validation Status: <span style="color:${statusColor}">${recStatus}</span></h4>
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0;"><strong>Reason:</strong> ${optData.validationResult ? optData.validationResult.acceptabilityReason : 'Baseline timing retained.'}</p>
+        </div>
+      `;
+    }
+  </script>
+
+  <!-- Modal Container -->
+  <div id="whyModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 9999; backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 1.5rem;">
+    <div class="card" style="max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto; border: 1px solid var(--primary); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--bg-card); z-index: 10; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);">
+        <h3 class="card-title" style="color: var(--primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+          💡 FlowGuard AI — Why This Signal Timing?
+        </h3>
+        <button type="button" class="btn btn-secondary" onclick="closeWhyModal()" style="padding: 0.25rem 0.6rem; font-size: 0.85rem;">✕ Close</button>
+      </div>
+
+      <div id="whyModalBody" style="padding-top: 0.5rem;">
+        <!-- Dynamically rendered by JS -->
+      </div>
+    </div>
+  </div>
+</body>
+</html>

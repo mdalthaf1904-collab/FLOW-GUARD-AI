@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prototype Signal Controller | FlowGuard AI</title>
+  <meta name="description" content="FlowGuard AI Prototype Signal Controller — software signal phase simulation with Emergency Vehicle Priority (EVP). Offline decision-support prototype tool.">
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    /* ===== CONTROLLER PAGE STYLES ===== */
+
+    /* Signal Head Housing */
+    .signal-head {
+      background: #1a1d24;
+      border: 2px solid #2d3748;
+      border-radius: 12px;
+      padding: 12px 10px;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      min-width: 60px;
+    }
+    .signal-head.inactive-head {
+      opacity: 0.4;
+      border-color: #4a5568;
+    }
+
+    /* Lamp override sizes — bigger than global for controller page */
+    #ctrl-lamp-area .lamp {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #1a202c;
+      margin: 2px auto;
+      transition: background 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    }
+    #ctrl-lamp-area .lamp-red    { background: #e53e3e; }
+    #ctrl-lamp-area .lamp-yellow { background: #f59e0b; }
+    #ctrl-lamp-area .lamp-green  { background: #10b981; }
+    #ctrl-lamp-area .lamp-dim    { opacity: 0.18; box-shadow: none !important; }
+    #ctrl-lamp-area .lamp-glow   { box-shadow: 0 0 14px 4px rgba(255,255,255,0.45); }
+
+    /* Approach columns */
+    .approach-column {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem;
+      background: rgba(15,23,42,0.5);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      min-width: 110px;
+      position: relative;
+    }
+    .approach-column.is-inactive {
+      border-color: rgba(74,85,104,0.5);
+      background: rgba(10,15,28,0.4);
+    }
+    .approach-name {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .inactive-badge {
+      display: none;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #ef4444;
+      background: rgba(239,68,68,0.15);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 4px;
+      padding: 1px 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* Intersection grid — 4 approaches around a centre */
+    .intersection-grid {
+      display: grid;
+      grid-template-areas:
+        ". north ."
+        "west centre east"
+        ". south .";
+      grid-template-columns: 1fr auto 1fr;
+      gap: 12px;
+      justify-items: center;
+      align-items: center;
+      padding: 1.5rem;
+      background: rgba(15,23,42,0.3);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+    }
+    .approach-north  { grid-area: north; }
+    .approach-east   { grid-area: east; }
+    .approach-south  { grid-area: south; }
+    .approach-west   { grid-area: west; }
+    .intersection-centre {
+      grid-area: centre;
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: rgba(30,41,59,0.8);
+      border: 2px dashed var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-align: center;
+      font-weight: 700;
+    }
+
+    /* Phase badge states */
+    .ctrl-phase-badge {
+      font-size: 0.8rem;
+      font-weight: 700;
+      border-radius: 20px;
+      padding: 3px 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .ctrl-phase-green  { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.4); }
+    .ctrl-phase-yellow { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.4); }
+    .ctrl-phase-allred { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.4); }
+    .ctrl-phase-evp    { background: rgba(168,85,247,0.2);  color: #c084fc; border: 1px solid rgba(168,85,247,0.5); animation: pulseEVP 1.2s infinite; }
+    .ctrl-phase-idle   { background: rgba(100,116,139,0.2); color: #94a3b8; border: 1px solid rgba(100,116,139,0.4); }
+
+    @keyframes pulseEVP {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    /* Active phase column highlight */
+    .approach-column.phase-active-green  { border-color: #10b981; background: rgba(16,185,129,0.06); box-shadow: 0 0 12px rgba(16,185,129,0.2); }
+    .approach-column.phase-active-yellow { border-color: #f59e0b; background: rgba(245,158,11,0.06); }
+    .approach-column.phase-active-evp    { border-color: #a855f7; background: rgba(168,85,247,0.08); box-shadow: 0 0 16px rgba(168,85,247,0.3); }
+
+    /* Countdown ring */
+    .countdown-display {
+      font-family: var(--font-mono);
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--primary);
+      min-width: 90px;
+      text-align: center;
+    }
+
+    /* EVP Request Panel */
+    .evp-approach-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+    .evp-approach-btn {
+      padding: 0.6rem 0.5rem;
+      border-radius: 8px;
+      border: 1px solid rgba(239,68,68,0.35);
+      background: rgba(239,68,68,0.08);
+      color: #fca5a5;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .evp-approach-btn:hover:not(:disabled) {
+      background: rgba(239,68,68,0.25);
+      border-color: #ef4444;
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+    .evp-approach-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      border-color: var(--border-color);
+      background: rgba(15,23,42,0.3);
+      color: var(--text-dim);
+    }
+    .evp-btn-road {
+      font-size: 0.68rem;
+      opacity: 0.75;
+      font-weight: 400;
+    }
+
+    /* Event Log Container */
+    .event-log-container {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+      max-height: 220px;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .log-entry {
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: flex;
+      gap: 8px;
+      line-height: 1.4;
+    }
+    .log-entry .log-time { color: var(--text-dim); flex-shrink: 0; }
+    .log-entry.log-phase { color: #38bdf8; background: rgba(56,189,248,0.06); }
+    .log-entry.log-evp   { color: #c084fc; background: rgba(168,85,247,0.1); font-weight: 700; }
+    .log-entry.log-recovery { color: #f59e0b; background: rgba(245,158,11,0.08); }
+    .log-entry.log-info  { color: var(--text-muted); }
+    .log-entry.log-warn  { color: #f87171; background: rgba(239,68,68,0.08); }
+
+    /* Control Panel Section */
+    .ctrl-button-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .vehicle-type-select {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      border-radius: 6px;
+      padding: 0.4rem 0.6rem;
+      font-size: 0.8rem;
+    }
+
+    .ctrl-status-dim { color: var(--text-dim); font-size: 0.78rem; }
+    .ctrl-status-candidate { color: #10b981; font-size: 0.78rem; font-weight: 700; }
+    .ctrl-status-baseline  { color: #38bdf8; font-size: 0.78rem; font-weight: 700; }
+
+    /* Proto disclaimer */
+    .proto-disclaimer {
+      background: rgba(99,102,241,0.08);
+      border: 1px solid rgba(99,102,241,0.25);
+      border-radius: 8px;
+      padding: 0.65rem 1rem;
+      font-size: 0.8rem;
+      color: #a5b4fc;
+      margin-bottom: 1rem;
+    }
+
+    /* Metric small */
+    .ctrl-metric {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .ctrl-metric-label { font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; }
+    .ctrl-metric-value { font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700; color: var(--text-main); }
+  </style>
+</head>
+<body>
+
+  <!-- Mandatory Engineering Guardrail Banner -->
+  <div class="disclaimer-banner">
+    <span class="disclaimer-icon">⚠️ NOTICE:</span>
+    <span>FlowGuard AI is an offline traffic-analysis and signal-timing decision-support prototype. No direct connection to real traffic signals.</span>
+  </div>
+
+  <!-- Navigation Header -->
+  <nav class="navbar">
+    <div class="brand-container">
+      <div class="brand-logo-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2L4 5v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V5l-8-3zm0 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm0 14.3c-2.83-.95-5.38-4.56-5.91-8.3 1.63-.58 3.65-1 5.91-1s4.28.42 5.91 1c-.53 3.74-3.08 7.35-5.91 8.3z"/>
+        </svg>
+      </div>
+      <div>
+        <span class="brand-title">FlowGuard AI</span>
+        <span class="brand-badge">Offline Prototype</span>
+      </div>
+    </div>
+
+    <ul class="nav-links">
+      <li><a href="../index.html" class="nav-link">Home</a></li>
+      <li><a href="analysis.html" class="nav-link">Analysis</a></li>
+      <li><a href="simulation.html" class="nav-link">Simulation</a></li>
+      <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+      <li><a href="controller.html" class="nav-link active">Controller</a></li>
+      <li><a href="validation.html" class="nav-link">Validation</a></li>
+    </ul>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="main-container">
+
+    <!-- Page Header -->
+    <div class="page-header" style="display: flex; align-items: center; justify-content: space-between;">
+      <div>
+        <h1 class="page-title">Prototype Signal Controller</h1>
+        <p class="page-subtitle">Software signal operation simulation with Emergency Vehicle Priority (EVP) — Milestone 6 prototype.</p>
+      </div>
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <span class="section-proto-label">PROTOTYPE SIMULATION</span>
+        <span class="badge badge-low" id="ctrl-config-label">4-Arm Cross</span>
+      </div>
+    </div>
+
+    <!-- Prototype Disclaimer -->
+    <div class="proto-disclaimer">
+      ⚙️ <strong>PROTOTYPE SIMULATION PARAMETERS</strong> — Yellow: 3 s &nbsp;|&nbsp; All-Red: 2 s &nbsp;|&nbsp; EVP Hold: 15 s.<br>
+      These are simulation constants only. <strong>No connection to real traffic signal infrastructure.</strong> No hardware communication is implemented.
+    </div>
+
+    <!-- Active Intersection Info Bar -->
+    <div class="card" style="padding: 0.85rem 1.25rem; margin-bottom: 1.25rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Active Intersection</span>
+          <h3 style="font-size: 1.05rem; color: var(--primary); margin-top: 2px;" id="ctrl-config-label">4-Arm Cross</h3>
+        </div>
+        <div style="display: flex; gap: 1.5rem; font-size: 0.82rem; flex-wrap: wrap;">
+          <div>
+            <span style="color: var(--text-muted);">Active Approaches: </span>
+            <strong style="color: var(--status-low);" id="ctrl-active-apps">Road A, Road B, Road C, Road D</strong>
+          </div>
+          <div>
+            <span style="color: var(--text-muted);">Inactive: </span>
+            <strong style="color: var(--text-dim);" id="ctrl-inactive-apps">None</strong>
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <span style="font-size: 0.78rem; color: var(--text-muted);">Candidate Plan:</span>
+          <span id="ctrl-candidate-status" class="ctrl-status-dim">No analysis run yet</span>
+        </div>
+        <a href="analysis.html" class="btn btn-secondary" style="padding: 0.35rem 0.8rem; font-size: 0.78rem;">Change Geometry →</a>
+      </div>
+    </div>
+
+    <!-- Main Two-Column Layout -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start;">
+
+      <!-- LEFT: Signal Intersection View -->
+      <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+
+        <!-- Intersection Lamp Display -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Signal Intersection Display</h3>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span id="ctrl-phase-display" class="ctrl-phase-badge ctrl-phase-idle">IDLE</span>
+            </div>
+          </div>
+
+          <div id="ctrl-lamp-area" class="intersection-grid">
+            <!-- NORTH (Road A) -->
+            <div class="approach-column approach-north" id="approach-col-north">
+              <span class="approach-name">Road A</span>
+              <span style="font-size:0.7rem; color:var(--text-dim);">North</span>
+              <div class="signal-head" id="signal-head-north">
+                <div class="lamp lamp-red lamp-dim"    id="lamp-north-red"></div>
+                <div class="lamp lamp-yellow lamp-dim" id="lamp-north-yellow"></div>
+                <div class="lamp lamp-green lamp-dim"  id="lamp-north-green"></div>
+              </div>
+              <span class="inactive-badge" id="inactive-label-north">INACTIVE</span>
+            </div>
+
+            <!-- WEST (Road D) -->
+            <div class="approach-column approach-west" id="approach-col-west">
+              <span class="approach-name">Road D</span>
+              <span style="font-size:0.7rem; color:var(--text-dim);">West</span>
+              <div class="signal-head" id="signal-head-west">
+                <div class="lamp lamp-red lamp-dim"    id="lamp-west-red"></div>
+                <div class="lamp lamp-yellow lamp-dim" id="lamp-west-yellow"></div>
+                <div class="lamp lamp-green lamp-dim"  id="lamp-west-green"></div>
+              </div>
+              <span class="inactive-badge" id="inactive-label-west">INACTIVE</span>
+            </div>
+
+            <!-- Centre -->
+            <div class="intersection-centre">✦<br>JUNCTION</div>
+
+            <!-- EAST (Road B) -->
+            <div class="approach-column approach-east" id="approach-col-east">
+              <span class="approach-name">Road B</span>
+              <span style="font-size:0.7rem; color:var(--text-dim);">East</span>
+              <div class="signal-head" id="signal-head-east">
+                <div class="lamp lamp-red lamp-dim"    id="lamp-east-red"></div>
+                <div class="lamp lamp-yellow lamp-dim" id="lamp-east-yellow"></div>
+                <div class="lamp lamp-green lamp-dim"  id="lamp-east-green"></div>
+              </div>
+              <span class="inactive-badge" id="inactive-label-east">INACTIVE</span>
+            </div>
+
+            <!-- SOUTH (Road C) -->
+            <div class="approach-column approach-south" id="approach-col-south">
+              <span class="approach-name">Road C</span>
+              <span style="font-size:0.7rem; color:var(--text-dim);">South</span>
+              <div class="signal-head" id="signal-head-south">
+                <div class="lamp lamp-red lamp-dim"    id="lamp-south-red"></div>
+                <div class="lamp lamp-yellow lamp-dim" id="lamp-south-yellow"></div>
+                <div class="lamp lamp-green lamp-dim"  id="lamp-south-green"></div>
+              </div>
+              <span class="inactive-badge" id="inactive-label-south">INACTIVE</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timing Plan Selection -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Timing Plan</h3>
+          </div>
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <button class="timing-btn btn-active" id="ctrl-timing-baseline" onclick="Controller.selectTiming('BASELINE')">
+              Baseline (Safe Default)
+            </button>
+            <button class="timing-btn" id="ctrl-timing-candidate" onclick="Controller.selectTiming('CANDIDATE')">
+              Candidate Plan
+            </button>
+          </div>
+          <div id="ctrl-timing-warning" class="ctrl-timing-warning"></div>
+          <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.5rem;">
+            Baseline is always the safe default. RECOMMENDED candidate activates normally. CONDITIONAL activates with warning. NOT RECOMMENDED is blocked — baseline is retained.
+          </p>
+        </div>
+
+      </div>
+
+      <!-- RIGHT: EVP Panel + Event Log -->
+      <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+
+        <!-- Post-EVP Adaptive Recovery Panel (Milestone 6.3) -->
+        <div class="card" id="ctrl-recovery-panel" style="border: 1px solid rgba(16,185,129,0.3); background: rgba(16,185,129,0.04);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <h3 class="card-title" style="color: #10b981; font-size: 0.9rem; margin: 0;">
+              🔄 Post-EVP Adaptive Recovery
+            </h3>
+            <span class="badge" id="ctrl-recovery-mode-badge" style="background: rgba(148,163,184,0.15); color: #94a3b8; font-size: 0.7rem;">
+              MODE: NORMAL
+            </span>
+          </div>
+
+          <div id="ctrl-recovery-info" style="font-size: 0.82rem; color: var(--text-muted);">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-bottom: 0.5rem;">
+              <div>
+                <span style="color: var(--text-dim); display: block; font-size: 0.7rem; text-transform: uppercase;">NEXT SELECTED</span>
+                <strong id="ctrl-rec-selected" style="color: var(--text-main); font-size: 0.95rem;">—</strong>
+              </div>
+              <div>
+                <span style="color: var(--text-dim); display: block; font-size: 0.7rem; text-transform: uppercase;">REASON</span>
+                <span id="ctrl-rec-reason" style="color: var(--primary); font-size: 0.78rem;">Standard cycle active</span>
+              </div>
+            </div>
+
+            <div id="ctrl-rec-scores-box" style="display: none; background: rgba(10,14,26,0.6); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.75rem;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                <span>Queue (50%): <strong id="ctrl-score-q" style="color:#38bdf8;">0.00</strong></span>
+                <span>Waiting (30%): <strong id="ctrl-score-w" style="color:#f59e0b;">0.00</strong></span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span>Pressure (20%): <strong id="ctrl-score-p" style="color:#a78bfa;">0.00</strong></span>
+                <span>Total Priority: <strong id="ctrl-score-total" style="color:#10b981;">0.00</strong></span>
+              </div>
+            </div>
+
+            <div style="margin-top: 0.5rem; text-align: right;">
+              <button type="button" class="btn btn-secondary" onclick="_toggleWhyRecoveryModal()" style="padding: 0.25rem 0.6rem; font-size: 0.72rem;">
+                💡 Why Next Selection?
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- EVP Active Status Panel (hidden until EVP fires) -->
+        <div class="evp-panel" id="ctrl-evp-panel">
+          <div class="evp-title">⚡ Emergency Vehicle Priority — ACTIVE</div>
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <div class="ctrl-metric">
+              <span class="ctrl-metric-label">EVP Sub-Phase</span>
+              <span class="ctrl-metric-value" id="ctrl-evp-phase" style="color:#a78bfa;">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- EVP Request Panel -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Simulated Emergency Vehicle Priority (Manual Input)</h3>
+            <span class="section-proto-label">MANUALLY SIMULATED</span>
+          </div>
+
+          <div style="background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.2); border-radius: 8px; padding: 0.65rem 0.9rem; font-size: 0.8rem; color: #fca5a5; margin-bottom: 0.85rem;">
+            ⚠️ Emergency requests are manually generated for prototype evaluation. No automatic emergency-vehicle detection or real-world signal preemption is currently implemented.
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0.75rem;">
+            <label class="form-label" for="evp-vehicle-type">Vehicle Type</label>
+            <select id="evp-vehicle-type" class="vehicle-type-select">
+              <option value="Ambulance">🚑 Ambulance</option>
+              <option value="Fire &amp; Rescue">🚒 Fire &amp; Rescue</option>
+              <option value="Police">🚓 Police</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom: 0.5rem; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;">
+            Request Priority for Approach:
+          </div>
+          <div class="evp-approach-grid">
+            <button class="evp-approach-btn" id="evp-btn-north" onclick="_ctrlEVP('north')">
+              <strong>Road A</strong>
+              <span class="evp-btn-road">North Approach</span>
+            </button>
+            <button class="evp-approach-btn" id="evp-btn-east" onclick="_ctrlEVP('east')">
+              <strong>Road B</strong>
+              <span class="evp-btn-road">East Approach</span>
+            </button>
+            <button class="evp-approach-btn" id="evp-btn-south" onclick="_ctrlEVP('south')">
+              <strong>Road C</strong>
+              <span class="evp-btn-road">South Approach</span>
+            </button>
+            <button class="evp-approach-btn" id="evp-btn-west" onclick="_ctrlEVP('west')">
+              <strong>Road D</strong>
+              <span class="evp-btn-road">West Approach</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Event Log -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Event Log</h3>
+            <span style="font-size: 0.75rem; color: var(--text-dim);">Max 20 entries · newest first</span>
+          </div>
+          <div class="event-log-container" id="ctrl-event-log">
+            <div class="log-entry log-info"><span class="log-time">--:--:--</span><span>Controller initialising…</span></div>
+          </div>
+        </div>
+
+        <!-- Export State (for future ESP32) -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Signal State Export</h3>
+            <span class="section-proto-label">ESP32 FUTURE SCOPE</span>
+          </div>
+          <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">
+            Future work may connect FlowGuard's simulated signal-state output to a miniature ESP32-based traffic-light model for demonstration. No physical hardware connection is currently active.
+          </p>
+          <button class="btn btn-secondary" onclick="_ctrlExportState()" style="width: 100%;">
+            📋 Copy Signal State to Console
+          </button>
+          <pre id="ctrl-state-preview" style="font-size:0.72rem; color:var(--text-dim); margin-top:0.5rem; white-space: pre-wrap; overflow: hidden; max-height: 120px;"></pre>
+        </div>
+
+      </div>
+    </div><!-- /grid -->
+
+  </main><!-- /main -->
+
+  <!-- Scripts -->
+  <script src="../js/app.js"></script>
+  <script src="../js/controller.js"></script>
+  <script>
+    // ================================================================
+    // Page glue — connect HTML controls to Controller module
+    // ================================================================
+
+    function _ctrlPauseResume() {
+      const state = Controller.getState();
+      if (state.paused) Controller.resume();
+      else Controller.pause();
+    }
+
+    function _ctrlEVP(approachKey) {
+      const vehicleType = document.getElementById('evp-vehicle-type').value;
+      Controller.requestEVP(approachKey, vehicleType);
+    }
+
+    function _ctrlExportState() {
+      const state = Controller.exportSignalState();
+      console.log('[FlowGuard] Exported Signal State:', state);
+      const preEl = document.getElementById('ctrl-state-preview');
+      if (preEl) preEl.textContent = JSON.stringify(state, null, 2);
+    }
+
+    function _toggleWhyRecoveryModal() {
+      const cs = Controller.getState();
+      const sel = cs.recovery ? cs.recovery.currentSelection : null;
+      if (!sel) {
+        alert("Post-EVP Adaptive Recovery is currently INACTIVE (Mode: NORMAL).\n\nWhen an Emergency Vehicle Priority (EVP) finishes, FlowGuard AI dynamically evaluates waiting approaches based on Queue Score (50%), Waiting Score (30%), and Pressure Score (20%).");
+        return;
+      }
+      const appLabels = { north: 'Road A (North)', east: 'Road B (East)', south: 'Road C (South)', west: 'Road D (West)' };
+      const name = appLabels[sel.key] || sel.key;
+      alert(
+        `💡 WHY ${name.toUpperCase()} NEXT?\n\n` +
+        `Selection Rationale:\n${sel.reason}\n\n` +
+        `Normalized Priority Score Breakdown:\n` +
+        `• Queue Score (50% weight): ${sel.queueScore} (Raw: ${sel.rawQueue} veh)\n` +
+        `• Waiting Score (30% weight): ${sel.waitingScore} (Raw: ${sel.rawWaiting}s waiting)\n` +
+        `• Traffic Pressure (20% weight): ${sel.pressureScore} (Raw v/c: ${sel.rawPressure})\n\n` +
+        `Total Priority Score: ${sel.score}`
+      );
+    }
+
+    // Update EVP approach buttons based on active/inactive approaches
+    function _updateEvpButtons() {
+      const ctrlState = Controller.getState();
+      ['north', 'east', 'south', 'west'].forEach(k => {
+        const btn = document.getElementById(`evp-btn-${k}`);
+        if (!btn) return;
+        const isInactive = ctrlState.inactiveKeys.includes(k);
+        btn.disabled = isInactive;
+        if (isInactive) {
+          btn.title = 'INACTIVE approach — cannot receive EVP';
+          btn.style.opacity = '0.35';
+        } else {
+          btn.title = '';
+          btn.style.opacity = '1';
+        }
+      });
+    }
+
+    // Initialise on page load
+    document.addEventListener('DOMContentLoaded', function () {
+      Controller.init();
+      _updateEvpButtons();
+    });
+  </script>
+</body>
+</html>

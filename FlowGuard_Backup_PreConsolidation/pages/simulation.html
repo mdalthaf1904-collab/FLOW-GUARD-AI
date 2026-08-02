@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Before vs After Signal Simulation | FlowGuard AI</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Engineering Guardrail Disclaimer Banner -->
+  <div class="disclaimer-banner">
+    <span class="disclaimer-icon">⚠️ NOTICE:</span>
+    <span>FlowGuard AI is an offline traffic-analysis and signal-timing decision-support prototype. Recommendations require validation by qualified traffic engineers before field implementation.</span>
+  </div>
+
+  <!-- Navigation Header -->
+  <nav class="navbar">
+    <div class="brand-container">
+      <div class="brand-logo-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2L4 5v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V5l-8-3zm0 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm0 14.3c-2.83-.95-5.38-4.56-5.91-8.3 1.63-.58 3.65-1 5.91-1s4.28.42 5.91 1c-.53 3.74-3.08 7.35-5.91 8.3z"/>
+        </svg>
+      </div>
+      <div>
+        <span class="brand-title">FlowGuard AI</span>
+        <span class="brand-badge">Offline Prototype</span>
+      </div>
+    </div>
+
+    <ul class="nav-links">
+      <li><a href="../index.html" class="nav-link">Home</a></li>
+      <li><a href="analysis.html" class="nav-link">Analysis</a></li>
+      <li><a href="simulation.html" class="nav-link active">Simulation</a></li>
+      <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+    </ul>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="main-container">
+
+    <div class="page-header" style="display: flex; align-items: center; justify-content: space-between;">
+      <div>
+        <h1 class="page-title">Signal Simulation Engine (D/D/1 Queuing Theory)</h1>
+        <p class="page-subtitle">Simulate multi-cycle arrival and discharge patterns to evaluate queue accumulation and vehicle delay metrics.</p>
+      </div>
+      <div>
+        <span class="badge badge-low" id="simConfigBadge">4-Arm Cross</span>
+      </div>
+    </div>
+
+    <!-- Controls & Parameters -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">1. Deterministic Queue Simulation Parameters</h3>
+        <span class="badge" style="background: rgba(99,102,241,0.15); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3);">
+          Civil Engineering D/D/1 Queuing Model
+        </span>
+      </div>
+
+      <div class="grid-4" style="align-items: flex-end;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="simCycles">Simulation Duration (Cycles)</label>
+          <select id="simCycles" class="form-control">
+            <option value="5">5 Signal Cycles (10 mins)</option>
+            <option value="10" selected>10 Signal Cycles (20 mins)</option>
+            <option value="15">15 Signal Cycles (30 mins)</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">Saturation Discharge Rate (s)</label>
+          <input type="text" id="simSatFlow" class="form-control" value="1800 pcu/hr (0.5 vps)" readonly style="color: var(--text-dim);">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">Queuing Theory Model</label>
+          <input type="text" class="form-control" value="Deterministic D/D/1" readonly style="color: var(--text-dim);">
+        </div>
+
+        <div>
+          <button class="btn btn-primary" id="btnRunSim" style="width: 100%;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            RUN SIMULATION
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before vs After Comparison Cards Section -->
+    <div class="card-header" style="margin-top: 1rem;">
+      <h3 class="card-title">2. Before vs After Performance Summary</h3>
+      <span style="font-size: 0.85rem; color: var(--status-low); font-weight: 600;" id="simAcceptanceHeader">
+        Estimated improvement under simulation assumptions
+      </span>
+    </div>
+
+    <div class="comparison-grid">
+
+      <!-- CURRENT PLAN Card -->
+      <div class="plan-card current-plan">
+        <div class="plan-title">
+          <span>CURRENT PLAN</span>
+          <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 400;">Existing Allocation</span>
+        </div>
+
+        <div class="grid-2" style="margin-bottom: 1rem;">
+          <div class="metric-box">
+            <span class="metric-label">Average Delay</span>
+            <span class="metric-value" id="currentWaitTime">68.0<span class="metric-unit">sec/veh</span></span>
+          </div>
+
+          <div class="metric-box">
+            <span class="metric-label">Maximum Queue</span>
+            <span class="metric-value" id="currentMaxQueue">38<span class="metric-unit">veh</span></span>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-bottom: 1rem;">
+          <div class="metric-box">
+            <span class="metric-label">Average Queue</span>
+            <span class="metric-value" id="currentAvgQueue" style="font-size: 1.25rem;">18.4<span class="metric-unit">veh</span></span>
+          </div>
+
+          <div class="metric-box">
+            <span class="metric-label">Max Approach Delay</span>
+            <span class="metric-value" id="currentMaxAppWait" style="font-size: 1.25rem;">84.0<span class="metric-unit">sec/veh</span></span>
+          </div>
+        </div>
+
+        <div style="font-size: 0.825rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+          <span>Total Served: <strong id="currentServed" style="color: var(--text-main);">733 veh</strong></span>
+          <span>Remaining Queue: <strong id="currentRemaining" style="color: var(--text-main);">0 veh</strong></span>
+        </div>
+      </div>
+
+      <!-- CANDIDATE/PROPOSED PLAN Card -->
+      <div class="plan-card proposed-plan" id="proposedPlanCard">
+        <div class="plan-title">
+          <span id="proposedPlanTitle">CANDIDATE PLAN</span>
+          <span class="change-pill" id="waitImprovementBadge">0% Delay</span>
+        </div>
+
+        <div class="grid-2" style="margin-bottom: 1rem;">
+          <div class="metric-box">
+            <span class="metric-label">Average Delay</span>
+            <span class="metric-value" id="proposedWaitTime">68.0<span class="metric-unit">sec/veh</span></span>
+          </div>
+
+          <div class="metric-box">
+            <span class="metric-label">Maximum Queue</span>
+            <span class="metric-value" id="proposedMaxQueue">38<span class="metric-unit">veh</span></span>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-bottom: 1rem;">
+          <div class="metric-box">
+            <span class="metric-label">Average Queue</span>
+            <span class="metric-value" id="proposedAvgQueue" style="font-size: 1.25rem;">18.4<span class="metric-unit">veh</span></span>
+          </div>
+
+          <div class="metric-box">
+            <span class="metric-label">Max Approach Delay</span>
+            <span class="metric-value" id="proposedMaxAppWait" style="font-size: 1.25rem;">84.0<span class="metric-unit">sec/veh</span></span>
+          </div>
+        </div>
+
+        <div style="font-size: 0.825rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+          <span>Total Served: <strong id="proposedServed" style="color: var(--text-main);">733 veh</strong></span>
+          <span>Remaining Queue: <strong id="proposedRemaining" style="color: var(--text-main);">0 veh</strong></span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Detailed Active Approach Side-by-Side Table -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">3. Active Approach Simulation Breakdown</h3>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th rowspan="2">Active Approach</th>
+              <th rowspan="2">Demand (veh/h)</th>
+              <th colspan="3" style="text-align: center; border-bottom: 1px solid var(--border-color); background: rgba(56,189,248,0.05);">Current Signal Plan</th>
+              <th colspan="3" style="text-align: center; border-bottom: 1px solid var(--border-color); background: rgba(16,185,129,0.05);">Candidate Signal Plan</th>
+              <th rowspan="2">Delay Change</th>
+            </tr>
+            <tr>
+              <th style="background: rgba(56,189,248,0.05);">Green</th>
+              <th style="background: rgba(56,189,248,0.05);">Avg Delay</th>
+              <th style="background: rgba(56,189,248,0.05);">Max Queue</th>
+              <th style="background: rgba(16,185,129,0.05);">Green</th>
+              <th style="background: rgba(16,185,129,0.05);">Avg Delay</th>
+              <th style="background: rgba(16,185,129,0.05);">Max Queue</th>
+            </tr>
+          </thead>
+          <tbody id="simTableBody">
+            <!-- Populated by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="footer">
+    <div class="footer-content">
+      <p><strong>FlowGuard AI</strong> &mdash; AI-Based Urban Traffic Congestion Analyzer & Signal Timing Recommendation</p>
+      <p>Offline Traffic-Analysis Prototype for Transportation Engineering</p>
+    </div>
+  </footer>
+
+  <script src="../js/app.js"></script>
+  <script src="../js/simulation.js"></script>
+  <script src="../js/analysis.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const state = FlowGuard.getState();
+      const configType = state.configType || '4CROSS';
+      const activeKeys = FlowGuard.getActiveApproachKeys(configType);
+
+      document.getElementById('simConfigBadge').innerText = FlowGuard.getConfigLabel(configType);
+
+      let candidateGreens = {};
+      if (state.proposedTiming) {
+        activeKeys.forEach(k => {
+          if (state.proposedTiming[k]) {
+            candidateGreens[k] = state.proposedTiming[k].proposedGreen;
+          }
+        });
+      } else {
+        const opt = AnalysisEngine.optimizeSignalTimings(state.approaches, state.intersection, configType);
+        activeKeys.forEach(k => {
+          if (opt.recommendation[k]) {
+            candidateGreens[k] = opt.recommendation[k].proposedGreen;
+          }
+        });
+      }
+
+      function executeSimulation() {
+        const numCycles = document.getElementById('simCycles').value;
+        const currentGreens = {};
+        activeKeys.forEach(k => {
+          currentGreens[k] = state.approaches[k] ? state.approaches[k].currentGreen : 30;
+        });
+
+        const config = {
+          cycleLength: state.intersection.cycleLength,
+          yellowTime: state.intersection.yellowTime,
+          allRedTime: state.intersection.allRedTime,
+          numCycles: numCycles,
+          saturationFlow: state.intersection.saturationFlow || 1800,
+          activeKeys: activeKeys
+        };
+
+        const comp = SimulationEngine.comparePlans(state.approaches, currentGreens, candidateGreens, config);
+
+        const curr = comp.current;
+        const cand = comp.candidate;
+        const metrics = comp.metrics;
+
+        document.getElementById('currentWaitTime').innerHTML = `${curr.overallAvgWaitTime}<span class="metric-unit">sec/veh</span>`;
+        document.getElementById('currentMaxQueue').innerHTML = `${curr.overallMaxQueue}<span class="metric-unit">veh</span>`;
+        document.getElementById('currentAvgQueue').innerHTML = `${curr.overallAvgQueue}<span class="metric-unit">veh</span>`;
+        document.getElementById('currentMaxAppWait').innerHTML = `${curr.maxApproachWaitTime}<span class="metric-unit">sec/veh</span>`;
+        document.getElementById('currentServed').innerText = `${curr.totalServed} veh`;
+        document.getElementById('currentRemaining').innerText = `${curr.totalRemaining} veh`;
+
+        document.getElementById('proposedWaitTime').innerHTML = `${cand.overallAvgWaitTime}<span class="metric-unit">sec/veh</span>`;
+        document.getElementById('proposedMaxQueue').innerHTML = `${cand.overallMaxQueue}<span class="metric-unit">veh</span>`;
+        document.getElementById('proposedAvgQueue').innerHTML = `${cand.overallAvgQueue}<span class="metric-unit">veh</span>`;
+        document.getElementById('proposedMaxAppWait').innerHTML = `${cand.maxApproachWaitTime}<span class="metric-unit">sec/veh</span>`;
+        document.getElementById('proposedServed').innerText = `${cand.totalServed} veh`;
+        document.getElementById('proposedRemaining').innerText = `${cand.totalRemaining} veh`;
+
+        const applyColor = (elemId, isBetter, neutralSame) => {
+          const el = document.getElementById(elemId);
+          if (!el) return;
+          if (neutralSame) {
+            el.style.color = 'var(--text-main)';
+          } else if (isBetter) {
+            el.style.color = 'var(--status-low)';
+          } else {
+            el.style.color = 'var(--status-high)';
+          }
+        };
+
+        applyColor('proposedWaitTime', metrics.waitTimeDiff < 0, metrics.waitTimeDiff === 0);
+        applyColor('proposedMaxQueue', metrics.maxQueueDiff < 0, metrics.maxQueueDiff === 0);
+        applyColor('proposedAvgQueue', metrics.avgQueueDiff < 0, metrics.avgQueueDiff === 0);
+        applyColor('proposedMaxAppWait', metrics.maxApproachWaitDiff < 0, metrics.maxApproachWaitDiff === 0);
+
+        const badge = document.getElementById('waitImprovementBadge');
+        const header = document.getElementById('simAcceptanceHeader');
+        const title = document.getElementById('proposedPlanTitle');
+
+        if (comp.isImproved) {
+          badge.className = 'change-pill positive';
+          badge.innerText = `${metrics.waitTimePct}% Delay`;
+          header.innerText = 'RECOMMENDED PLAN — Simulated overall delay is reduced.';
+          header.style.color = 'var(--status-low)';
+          title.innerText = 'PROPOSED PLAN (RECOMMENDED)';
+        } else {
+          badge.className = 'change-pill negative';
+          badge.innerText = metrics.waitTimePct > 0 ? `+${metrics.waitTimePct}% Delay` : '0% Delay';
+          header.innerText = 'NO IMPROVING PLAN FOUND UNDER CURRENT ASSUMPTIONS — Current plan retained.';
+          header.style.color = 'var(--status-med)';
+          title.innerText = 'CANDIDATE PLAN (NOT RECOMMENDED)';
+        }
+
+        const tbody = document.getElementById('simTableBody');
+        tbody.innerHTML = '';
+
+        activeKeys.forEach(k => {
+          const app = state.approaches[k] || { name: k, flow: 0 };
+          const currApp = curr.approaches[k] || { greenTime: 30, avgWaitTime: 0, maxQueueLength: 0 };
+          const candApp = cand.approaches[k] || { greenTime: 30, avgWaitTime: 0, maxQueueLength: 0 };
+
+          const diffWait = candApp.avgWaitTime - currApp.avgWaitTime;
+          const diffWaitStr = diffWait <= 0 ? `${diffWait.toFixed(1)}s` : `+${diffWait.toFixed(1)}s`;
+          const diffClass = diffWait <= 0 ? 'text-emerald' : 'text-rose';
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><strong>${app.name}</strong></td>
+            <td style="font-family: var(--font-mono);">${FlowGuard.formatNum(app.flow)}</td>
+            
+            <td style="font-family: var(--font-mono); background: rgba(56,189,248,0.02);">${currApp.greenTime}s</td>
+            <td style="font-family: var(--font-mono); background: rgba(56,189,248,0.02);">${currApp.avgWaitTime}s</td>
+            <td style="font-family: var(--font-mono); background: rgba(56,189,248,0.02);">${currApp.maxQueueLength} veh</td>
+
+            <td style="font-family: var(--font-mono); font-weight: 700; color: var(--primary); background: rgba(16,185,129,0.02);">${candApp.greenTime}s</td>
+            <td style="font-family: var(--font-mono); font-weight: 700; background: rgba(16,185,129,0.02);" class="${diffClass}">${candApp.avgWaitTime}s</td>
+            <td style="font-family: var(--font-mono); font-weight: 700; background: rgba(16,185,129,0.02);">${candApp.maxQueueLength} veh</td>
+
+            <td style="font-family: var(--font-mono); font-weight: 700;" class="${diffClass}">${diffWaitStr}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      executeSimulation();
+
+      document.getElementById('btnRunSim').addEventListener('click', executeSimulation);
+      document.getElementById('simCycles').addEventListener('change', executeSimulation);
+    });
+  </script>
+</body>
+</html>

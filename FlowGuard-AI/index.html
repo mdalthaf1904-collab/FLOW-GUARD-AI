@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="FlowGuard AI — Offline traffic signal analysis, recommendation, and simulation system. Analyzes manually entered traffic data, evaluates performance, generates candidate signal timings, and provides decision-support recommendations.">
+  <title>FlowGuard AI | Offline Urban Traffic Signal Analysis & Simulation</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Mandatory Engineering Guardrail Banner -->
+  <div class="disclaimer-banner" id="disclaimerBanner">
+    <span class="disclaimer-icon">⚠️ NOTICE:</span>
+    <span>FlowGuard AI is an offline traffic-analysis and signal-timing decision-support prototype. Recommendations require validation by qualified traffic engineers before field implementation. No direct connection to real traffic signals.</span>
+  </div>
+
+  <!-- Navigation Header -->
+  <nav class="navbar">
+    <div class="brand-container">
+      <div class="brand-logo-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2L4 5v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V5l-8-3zm0 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm0 14.3c-2.83-.95-5.38-4.56-5.91-8.3 1.63-.58 3.65-1 5.91-1s4.28.42 5.91 1c-.53 3.74-3.08 7.35-5.91 8.3z"/>
+        </svg>
+      </div>
+      <div>
+        <span class="brand-title">FlowGuard AI</span>
+        <span class="brand-badge">Offline Prototype</span>
+      </div>
+    </div>
+
+    <ul class="nav-links">
+      <li><a href="index.html" class="nav-link active">Home</a></li>
+      <li><a href="pages/analysis.html" class="nav-link">Analysis</a></li>
+      <li><a href="pages/simulation.html" class="nav-link">Simulation</a></li>
+      <li><a href="pages/dashboard.html" class="nav-link">Dashboard</a></li>
+      <li><a href="pages/controller.html" class="nav-link">Controller</a></li>
+      <li><a href="pages/validation.html" class="nav-link">Validation</a></li>
+    </ul>
+  </nav>
+
+  <!-- Main Content Container -->
+  <main class="main-container">
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <h1 class="hero-title">FlowGuard AI</h1>
+      <h2 class="hero-subtitle">Offline Traffic Signal Analysis, Recommendation & Simulation System</h2>
+      <p class="hero-description" style="max-width: 850px; margin: 0 auto 1.5rem auto;">
+        FlowGuard AI is an offline traffic signal analysis, recommendation, and simulation system. It analyzes manually entered traffic data, evaluates existing signal performance, generates candidate signal timings, compares current and proposed plans through simulation, and provides decision-support recommendations.<br>
+        <strong style="color: var(--status-low); display: inline-block; margin-top: 0.5rem;">Note: FlowGuard AI does not directly control real-world traffic signals.</strong>
+      </p>
+
+      <div class="hero-actions">
+        <a href="pages/analysis.html" class="btn btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          Analyze Intersection
+        </a>
+        <a href="pages/dashboard.html" class="btn btn-secondary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          View Dashboard
+        </a>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════════════════════
+         OFFLINE SYSTEM WORKFLOW — Snake Layout
+         ════════════════════════════════════════════ -->
+    <section class="card workflow-section" aria-label="Offline system workflow pipeline">
+      <div class="card-header" style="margin-bottom: 1rem;">
+        <h3 class="card-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          Offline System Workflow
+        </h3>
+        <span class="brand-badge">Decision Support Pipeline</span>
+      </div>
+
+      <!-- ── DESKTOP SNAKE LAYOUT (≥ 901 px) ── -->
+      <div class="workflow-snake" role="list">
+
+        <!-- ROW 1: Steps 01 → 04, left to right -->
+        <div class="workflow-row">
+
+          <!-- 01 INPUT -->
+          <div class="wf-step" role="listitem">
+            <span class="wf-step__num">01</span>
+            <span class="wf-step__label">Manual Traffic<br>Input</span>
+            <span class="wf-step__sub">Vehicle counts &amp; PCU</span>
+          </div>
+
+          <!-- → -->
+          <div class="wf-arrow-h" aria-hidden="true">
+            <svg width="22" height="14" viewBox="0 0 22 14" fill="none">
+              <line x1="0" y1="7" x2="17" y2="7" stroke="currentColor" stroke-width="2"/>
+              <polyline points="12,2 19,7 12,12" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+          </div>
+
+          <!-- 02 ANALYSIS -->
+          <div class="wf-step" role="listitem">
+            <span class="wf-step__num">02</span>
+            <span class="wf-step__label">Traffic<br>Analysis</span>
+            <span class="wf-step__sub">V/C &amp; congestion</span>
+          </div>
+
+          <!-- → -->
+          <div class="wf-arrow-h" aria-hidden="true">
+            <svg width="22" height="14" viewBox="0 0 22 14" fill="none">
+              <line x1="0" y1="7" x2="17" y2="7" stroke="currentColor" stroke-width="2"/>
+              <polyline points="12,2 19,7 12,12" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+          </div>
+
+          <!-- 03 OPTIMIZATION -->
+          <div class="wf-step" role="listitem">
+            <span class="wf-step__num">03</span>
+            <span class="wf-step__label">Signal Timing<br>Optimization</span>
+            <span class="wf-step__sub">3-stage refinement</span>
+          </div>
+
+          <!-- → -->
+          <div class="wf-arrow-h" aria-hidden="true">
+            <svg width="22" height="14" viewBox="0 0 22 14" fill="none">
+              <line x1="0" y1="7" x2="17" y2="7" stroke="currentColor" stroke-width="2"/>
+              <polyline points="12,2 19,7 12,12" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+          </div>
+
+          <!-- 04 SIMULATION -->
+          <div class="wf-step" role="listitem">
+            <span class="wf-step__num">04</span>
+            <span class="wf-step__label">D/D/1<br>Simulation</span>
+            <span class="wf-step__sub">Queue &amp; delay model</span>
+          </div>
+
+        </div><!-- /.workflow-row row-1 -->
+
+      </div><!-- /.workflow-snake (paused — down connector next) -->
+
+      <!-- ── DOWN CONNECTOR (curves right column down to row 2) ── -->
+      <div class="workflow-down-connector" aria-hidden="true">
+        <div class="wf-arrow-down">
+          <!-- Vertical bar -->
+          <svg width="2" height="14" viewBox="0 0 2 14">
+            <line x1="1" y1="0" x2="1" y2="14" stroke="#38bdf8" stroke-width="2"/>
+          </svg>
+          <!-- Arrowhead pointing down -->
+          <svg width="14" height="9" viewBox="0 0 14 9" fill="none">
+            <polyline points="2,0 7,7 12,0" stroke="#38bdf8" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- ROW 2 lives outside .workflow-snake so the down connector sits between them -->
+      <div class="workflow-snake" role="list">
+
+        <!-- ROW 2: Steps 05 → 08, right to left (reversed direction) -->
+        <div class="workflow-row workflow-row--reverse">
+
+          <!-- 05 COMPARISON -->
+          <div class="wf-step" role="listitem">
+            <span class="wf-step__num">05</span>
+            <span class="wf-step__label">Current vs<br>Candidate</span>
+            <span class="wf-step__sub">Before &amp; after delta</span>
+          </div>
+
+          <!-- ← -->
+          <div class="wf-arrow-h wf-arrow-h--left" aria-hidden="true">
+            <svg width="22" height="14" viewBox="0 0 22 14" fill="none">
+              <line x1="0" y1="7" x2="17" y2="7" stroke="currentColor" stroke-width="2"/>
+              <polyline points="12,2 19,7 12,12" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+          </div>
+
+          <!-- 06 VALIDATION -->
+          <div class="wf-step" role="listitem">
+            <span class="wf-step__num">06</span>
+            <span class="wf-step__label">Engineering<br>Validation</span>
+            <span class="wf-step__sub">8-scenario test suite</span>
+          </div>
+
+          <!-- ← -->
+          <div class="wf-arrow-h wf-arrow-h--left" aria-hidden="true">
+            <svg width="22" height="14" viewBox="0 0 22 14" fill="none">
+              <line x1="0" y1="7" x2="17" y2="7" stroke="currentColor" stroke-width="2"/>
+              <polyline points="12,2 19,7 12,12" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+          </div>
+
+          <!-- 07 RECOMMENDATION -->
+          <div class="wf-step" role="listitem">
+            <span class="wf-step__num">07</span>
+            <span class="wf-step__label">Decision<br>Recommendation</span>
+            <span class="wf-step__sub">Recommended / Conditional</span>
+          </div>
+
+          <!-- ← -->
+          <div class="wf-arrow-h wf-arrow-h--left" aria-hidden="true">
+            <svg width="22" height="14" viewBox="0 0 22 14" fill="none">
+              <line x1="0" y1="7" x2="17" y2="7" stroke="currentColor" stroke-width="2"/>
+              <polyline points="12,2 19,7 12,12" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+          </div>
+
+          <!-- 08 PROTOTYPE DEMO -->
+          <div class="wf-step wf-step--prototype" role="listitem">
+            <span class="wf-step__num">08</span>
+            <span class="wf-step__label">Prototype<br>Signal Demo</span>
+            <span class="wf-step__sub">Software-only controller</span>
+          </div>
+
+        </div><!-- /.workflow-row row-2 -->
+
+      </div><!-- /.workflow-snake row-2 -->
+
+      <!-- ── MOBILE / TABLET VERTICAL STACK (≤ 900 px) ── -->
+      <ol class="workflow-mobile" aria-label="Workflow steps">
+
+        <li class="wf-step wf-step--mobile">
+          <span class="wf-step__num">01</span>
+          <div><span class="wf-step__label">Manual Traffic Input</span><br><span class="wf-step__sub">Vehicle counts &amp; PCU conversion</span></div>
+        </li>
+        <div class="wf-arrow-v" aria-hidden="true">
+          <svg width="12" height="18" viewBox="0 0 12 18" fill="none">
+            <line x1="6" y1="0" x2="6" y2="13" stroke="#38bdf8" stroke-width="2"/>
+            <polyline points="1,9 6,15 11,9" stroke="#38bdf8" stroke-width="2" fill="none"/>
+          </svg>
+        </div>
+
+        <li class="wf-step wf-step--mobile">
+          <span class="wf-step__num">02</span>
+          <div><span class="wf-step__label">Traffic Analysis</span><br><span class="wf-step__sub">V/C ratio &amp; congestion detection</span></div>
+        </li>
+        <div class="wf-arrow-v" aria-hidden="true">
+          <svg width="12" height="18" viewBox="0 0 12 18" fill="none">
+            <line x1="6" y1="0" x2="6" y2="13" stroke="#38bdf8" stroke-width="2"/>
+            <polyline points="1,9 6,15 11,9" stroke="#38bdf8" stroke-width="2" fill="none"/>
+          </svg>
+        </div>
+
+        <li class="wf-step wf-step--mobile">
+          <span class="wf-step__num">03</span>
+          <div><span class="wf-step__label">Signal Timing Optimization</span><br><span class="wf-step__sub">3-stage simulation-validated refinement</span></div>
+        </li>
+        <div class="wf-arrow-v" aria-hidden="true">
+          <svg width="12" height="18" viewBox="0 0 12 18" fill="none">
+            <line x1="6" y1="0" x2="6" y2="13" stroke="#38bdf8" stroke-width="2"/>
+            <polyline points="1,9 6,15 11,9" stroke="#38bdf8" stroke-width="2" fill="none"/>
+          </svg>
+        </div>
+
+        <li class="wf-step wf-step--mobile">
+          <span class="wf-step__num">04</span>
+          <div><span class="wf-step__label">D/D/1 Simulation</span><br><span class="wf-step__sub">Queue accumulation &amp; delay model</span></div>
+        </li>
+        <div class="wf-arrow-v" aria-hidden="true">
+          <svg width="12" height="18" viewBox="0 0 12 18" fill="none">
+            <line x1="6" y1="0" x2="6" y2="13" stroke="#38bdf8" stroke-width="2"/>
+            <polyline points="1,9 6,15 11,9" stroke="#38bdf8" stroke-width="2" fill="none"/>
+          </svg>
+        </div>
+
+        <li class="wf-step wf-step--mobile">
+          <span class="wf-step__num">05</span>
+          <div><span class="wf-step__label">Current vs Candidate</span><br><span class="wf-step__sub">Before &amp; after performance delta</span></div>
+        </li>
+        <div class="wf-arrow-v" aria-hidden="true">
+          <svg width="12" height="18" viewBox="0 0 12 18" fill="none">
+            <line x1="6" y1="0" x2="6" y2="13" stroke="#38bdf8" stroke-width="2"/>
+            <polyline points="1,9 6,15 11,9" stroke="#38bdf8" stroke-width="2" fill="none"/>
+          </svg>
+        </div>
+
+        <li class="wf-step wf-step--mobile">
+          <span class="wf-step__num">06</span>
+          <div><span class="wf-step__label">Engineering Validation</span><br><span class="wf-step__sub">8-scenario deterministic test suite</span></div>
+        </li>
+        <div class="wf-arrow-v" aria-hidden="true">
+          <svg width="12" height="18" viewBox="0 0 12 18" fill="none">
+            <line x1="6" y1="0" x2="6" y2="13" stroke="#38bdf8" stroke-width="2"/>
+            <polyline points="1,9 6,15 11,9" stroke="#38bdf8" stroke-width="2" fill="none"/>
+          </svg>
+        </div>
+
+        <li class="wf-step wf-step--mobile">
+          <span class="wf-step__num">07</span>
+          <div><span class="wf-step__label">Decision Recommendation</span><br><span class="wf-step__sub">Recommended / Conditional / Baseline Retained</span></div>
+        </li>
+        <div class="wf-arrow-v" aria-hidden="true">
+          <svg width="12" height="18" viewBox="0 0 12 18" fill="none">
+            <line x1="6" y1="0" x2="6" y2="13" stroke="#38bdf8" stroke-width="2"/>
+            <polyline points="1,9 6,15 11,9" stroke="#38bdf8" stroke-width="2" fill="none"/>
+          </svg>
+        </div>
+
+        <li class="wf-step wf-step--mobile wf-step--prototype">
+          <span class="wf-step__num">08</span>
+          <div><span class="wf-step__label">Prototype Signal Demo</span><br><span class="wf-step__sub">Software-only controller &amp; EVP prototype</span></div>
+        </li>
+
+      </ol><!-- /.workflow-mobile -->
+
+    </section><!-- /.workflow-section -->
+
+    <!-- Four Feature Cards Grid -->
+    <section>
+      <div class="features-grid">
+
+        <!-- Card 1: Congestion Analysis -->
+        <div class="feature-card">
+          <div class="feature-icon">🔍</div>
+          <h3 class="feature-title">1. Congestion Analysis</h3>
+          <p class="feature-text">
+            Analyze manually entered approach volume counts and identify high-demand bottlenecks across configurable 3-arm and 4-arm intersection geometries.
+          </p>
+          <a href="pages/analysis.html" class="feature-link">
+            Launch Analysis &rarr;
+          </a>
+        </div>
+
+        <!-- Card 2: Signal Timing Recommendation -->
+        <div class="feature-card">
+          <div class="feature-icon">⏱️</div>
+          <h3 class="feature-title">2. Signal Timing Optimization</h3>
+          <p class="feature-text">
+            Evaluate bounded iterative green-time splits to minimize system vehicle delay while enforcing minimum and maximum green safety bounds.
+          </p>
+          <a href="pages/analysis.html#recommendation" class="feature-link">
+            View Recommendations &rarr;
+          </a>
+        </div>
+
+        <!-- Card 3: Before vs After Simulation -->
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3 class="feature-title">3. Before vs After Simulation</h3>
+          <p class="feature-text">
+            Simulate baseline vs candidate timing plans using a deterministic D/D/1 arrival-discharge model to evaluate predicted queue and delay reductions.
+          </p>
+          <a href="pages/simulation.html" class="feature-link">
+            Run Simulation &rarr;
+          </a>
+        </div>
+
+        <!-- Card 4: Prototype Signal Controller -->
+        <div class="feature-card">
+          <div class="feature-icon">🚦</div>
+          <h3 class="feature-title">4. Prototype Signal Controller</h3>
+          <p class="feature-text">
+            Demonstrate software signal phase transitions, simulated Emergency Vehicle Priority (EVP), and post-EVP adaptive recovery algorithms in real time.
+          </p>
+          <a href="pages/controller.html" class="feature-link">
+            Open Prototype Controller &rarr;
+          </a>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Decision Support Overview Box -->
+    <section class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <h3 class="card-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          Civil Engineering Decision-Support Architecture
+        </h3>
+      </div>
+      <div style="font-size: 0.95rem; color: var(--text-muted); line-height: 1.6;">
+        <p style="margin-bottom: 0.75rem;">
+          FlowGuard AI operates strictly as an <strong>offline decision-support prototype</strong> for traffic engineers and municipal planners. It translates approach volume counts (q<sub>i</sub>, veh/hr) into capacity metrics and evaluates bounded green-time splits to minimize overall intersection queue accumulation.
+        </p>
+        <p style="margin-bottom: 0.75rem;">
+          <strong>Simulated Assessment:</strong> All performance gains (e.g. queue length reduction and wait time savings) are strictly <em>estimated improvements under simulation assumptions</em> using deterministic D/D/1 queuing theory. Simulation results do not guarantee field performance.
+        </p>
+        <p style="margin: 0; font-size: 0.85rem; color: var(--text-dim);">
+          ⚖️ <em>FlowGuard AI is an academic prototype intended for offline traffic analysis, simulation, and decision support. Simulation results depend on the entered data and simplified model assumptions and are not a substitute for field validation or approved traffic-signal design procedures.</em>
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-content">
+      <p><strong>FlowGuard AI</strong> &mdash; Offline Traffic Signal Analysis, Recommendation & Simulation System</p>
+      <p>Civil Engineering / Transportation Engineering Prototype | Offline Decision-Support Tool (No physical signal connection)</p>
+    </div>
+  </footer>
+
+  <script charset="utf-8" src="js/app.js"></script>
+</body>
+</html>
+
