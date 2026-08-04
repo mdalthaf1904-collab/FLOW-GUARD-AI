@@ -1304,6 +1304,17 @@
           errorDiv.style.display = 'block';
         }
 
+        // Auto-expand all WHY? Diagnostic Explanation blocks & smooth scroll to calculation results
+        setTimeout(() => {
+          document.querySelectorAll('.expandable-why-body').forEach(el => el.classList.add('open'));
+          document.querySelectorAll('.expandable-why-toggle').forEach(el => el.classList.add('open'));
+
+          const targetCard = document.getElementById('csvDataResultsPanel') || document.getElementById('turningMovementSection');
+          if (targetCard) {
+            targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 150);
+
         return trafficData;
       }
 
