@@ -153,6 +153,9 @@
         <div id="csvUploadError" style="display: none; font-size: 0.82rem; margin-top: 0.75rem; font-weight: 500; padding: 0.5rem 0.75rem; border-radius: 4px; background: rgba(15,23,42,0.9);"></div>
       </div>
 
+      <!-- Container for Dynamic Master Engineering Dashboard -->
+      <div id="dashboard-results"></div>
+
       <!-- Historical CSV Dataset Results & Diagnostic Explanations Panel -->
       <div id="csvDataResultsPanel" style="display: none; margin-top: 1.25rem; padding: 1.25rem; background: rgba(15, 23, 42, 0.85); border-radius: var(--radius-md); border: 1px solid rgba(56, 189, 248, 0.4);">
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 1rem;">
@@ -1292,12 +1295,16 @@
 
         // Auto-expand all WHY? Diagnostic Explanation blocks & smooth scroll to calculation results
         setTimeout(() => {
-          document.querySelectorAll('.expandable-why-body').forEach(el => el.classList.add('open'));
-          document.querySelectorAll('.expandable-why-toggle').forEach(el => el.classList.add('open'));
+          if (typeof renderEngineeringDashboard === 'function') {
+            renderEngineeringDashboard(trafficData, 'dashboard-results');
+          } else {
+            document.querySelectorAll('.expandable-why-body').forEach(el => el.classList.add('open'));
+            document.querySelectorAll('.expandable-why-toggle').forEach(el => el.classList.add('open'));
 
-          const targetCard = document.getElementById('csvDataResultsPanel') || document.getElementById('turningMovementSection');
-          if (targetCard) {
-            targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const targetCard = document.getElementById('csvDataResultsPanel') || document.getElementById('turningMovementSection');
+            if (targetCard) {
+              targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
           }
         }, 150);
 
