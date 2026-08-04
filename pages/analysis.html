@@ -75,7 +75,7 @@
         <span class="badge badge-low" id="activeConfigBadge">4-Arm Cross</span>
       </div>
 
-      <div class="grid-2" style="row-gap: 1.25rem; column-gap: 1.5rem;">
+      <div class="grid-3" style="column-gap: 1.5rem; row-gap: 1rem; align-items: center;">
         <div class="form-group" style="margin-bottom: 0;">
           <label class="form-label" for="configTypeSelector">Road Geometry</label>
           <select id="configTypeSelector" class="form-control" style="font-family: var(--font-family); font-weight: 600;">
@@ -101,20 +101,6 @@
           <select id="dayTypeSelector" class="form-control" style="font-family: var(--font-family); font-weight: 600; color: #38bdf8;">
             <option value="WEEKDAY" selected>Weekday (Normal Peak Factor 1.0)</option>
             <option value="WEEKEND">Weekend (Off-Peak Factor 0.85)</option>
-          </select>
-        </div>
-
-        <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" for="timeOfDaySelector">Time-of-Day Selection</label>
-          <select id="timeOfDaySelector" class="form-control" style="font-family: var(--font-family); font-weight: 600; color: #2ecc71;">
-            <option value="07:00">7:00 AM (Morning Rush Peak)</option>
-            <option value="08:00" selected>8:00 AM (Morning Commute Peak)</option>
-            <option value="09:00">9:00 AM (Late Morning)</option>
-            <option value="12:00">12:00 PM (Mid-Day Off-Peak)</option>
-            <option value="15:00">3:00 PM (Afternoon School Peak)</option>
-            <option value="17:00">5:00 PM (Evening Rush Peak)</option>
-            <option value="18:00">6:00 PM (Evening Commute Peak)</option>
-            <option value="20:00">8:00 PM (Night Off-Peak)</option>
           </select>
         </div>
       </div>
