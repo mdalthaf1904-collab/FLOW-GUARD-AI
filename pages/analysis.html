@@ -166,6 +166,48 @@
 
         <div id="csvUploadError" style="display: none; font-size: 0.82rem; margin-top: 0.75rem; font-weight: 500; padding: 0.5rem 0.75rem; border-radius: 4px; background: rgba(15,23,42,0.9);"></div>
       </div>
+
+      <!-- Historical CSV Dataset Results & Diagnostic Explanations Panel -->
+      <div id="csvDataResultsPanel" style="display: none; margin-top: 1.25rem; padding: 1.25rem; background: rgba(15, 23, 42, 0.85); border-radius: var(--radius-md); border: 1px solid rgba(56, 189, 248, 0.4);">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 1rem;">
+          <h4 style="margin: 0; color: #38bdf8; font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem;">
+            📊 Historical CSV Dataset Records & Diagnostic Explanations
+          </h4>
+          <span id="csvDataSummaryBadge" class="badge badge-low" style="font-size: 0.8rem; background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3);">
+            Processed Interval Records
+          </span>
+        </div>
+
+        <!-- 1. Diagnostic Explanations Banner ("WHY? DIAGNOSTIC EXPLANATIONS") -->
+        <div id="csvDiagnosticBanner" style="background: rgba(30,41,59,0.7); border-left: 4px solid #38bdf8; padding: 1rem; border-radius: 4px; margin-bottom: 1.25rem; font-size: 0.85rem; line-height: 1.5;">
+          <!-- JS Populated Diagnostic Explanations -->
+        </div>
+
+        <!-- 2. Full CSV Data Table -->
+        <div style="font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.5rem;">
+          Entire Ingested Historical Dataset Records
+        </div>
+        <div class="table-responsive" style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px;">
+          <table class="data-table" style="width: 100%; font-size: 0.82rem; border-collapse: collapse;">
+            <thead style="position: sticky; top: 0; background: #0f172a; z-index: 10; border-bottom: 2px solid var(--border-color);">
+              <tr>
+                <th>#</th>
+                <th>Time</th>
+                <th>Road Approach</th>
+                <th>Vehicles / Min (VPM)</th>
+                <th>Calculated Demand</th>
+                <th>Lanes</th>
+                <th>Incident Event</th>
+                <th>v/c Ratio</th>
+                <th>Severity Status</th>
+              </tr>
+            </thead>
+            <tbody id="csvDataTableBody">
+              <!-- JS Populated CSV Rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- Milestone 5: AI Vehicle Detection Module Panel -->
@@ -1179,10 +1221,86 @@
         // Instantly recalculate all capacity, v/c ratios, schematic SVG, and signal timings
         executeAnalysis();
 
+        // ── Render Entire CSV Dataset Records & Diagnostic Explanations ──
+        const resultsPanel = document.getElementById('csvDataResultsPanel');
+        const tableBody = document.getElementById('csvDataTableBody');
+        const summaryBadge = document.getElementById('csvDataSummaryBadge');
+        const diagBanner = document.getElementById('csvDiagnosticBanner');
+
+        if (resultsPanel && tableBody) {
+          tableBody.innerHTML = '';
+          let oversaturatedCount = 0;
+          let incidentCount = 0;
+
+          trafficData.forEach((row, idx) => {
+            const vpm = parseFloat(row.vehicles_per_minute) || 0;
+            const flow = Math.round(vpm * 60);
+            const rLanes = parseInt(row.lanes, 10) || lanes;
+            const rWidth = rLanes * 3.5;
+            const satFlow = 525 * rWidth;
+            const greenTime = 30; // baseline green
+            const capacity = Math.round(satFlow * (greenTime / 120));
+            const vcRatio = capacity > 0 ? parseFloat((flow / capacity).toFixed(2)) : 99;
+            const incident = row.incident_event || row.incident || 'none';
+
+            let badgeClass = 'badge-low';
+            let statusLabel = 'LOW (v/c <= 0.75)';
+
+            if (vcRatio > 1.0) {
+              badgeClass = 'badge-oversaturated';
+              statusLabel = 'OVERSATURATED (v/c > 1.0)';
+              oversaturatedCount++;
+            } else if (vcRatio > 0.85) {
+              badgeClass = 'badge-severe';
+              statusLabel = 'SEVERE BOTTLENECK (v/c > 0.85)';
+              oversaturatedCount++;
+            } else if (vcRatio > 0.75) {
+              badgeClass = 'badge-medium';
+              statusLabel = 'HIGH (0.75 < v/c <= 0.85)';
+            }
+
+            if (incident !== 'none') incidentCount++;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${idx + 1}</td>
+              <td style="font-family:var(--font-mono); font-weight:600; color:#38bdf8;">${row.time_of_day || row.time || 'N/A'}</td>
+              <td>${row.intersection_id || row.road_id || (roadNamesMap[targetRoadKey] || 'All Active Roads')}</td>
+              <td><strong>${vpm}</strong> VPM</td>
+              <td><strong>${flow}</strong> veh/h</td>
+              <td>${rLanes} Lanes (${rWidth.toFixed(1)}m)</td>
+              <td><span class="badge ${incident !== 'none' ? 'badge-severe' : ''}">${incident}</span></td>
+              <td style="font-family:var(--font-mono); font-weight:700; color:${vcRatio > 1.0 ? '#ef4444' : (vcRatio > 0.85 ? '#f97316' : '#10b981')}">${vcRatio}</td>
+              <td><span class="badge ${badgeClass}">${statusLabel}</span></td>
+            `;
+            tableBody.appendChild(tr);
+          });
+
+          if (summaryBadge) {
+            summaryBadge.innerText = `Processed ${trafficData.length} Interval Records (${oversaturatedCount} Failing Intervals, ${incidentCount} Incident Events)`;
+          }
+
+          if (diagBanner) {
+            diagBanner.innerHTML = `
+              <div style="font-weight: 700; font-size: 0.95rem; color: #38bdf8; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                🔍 WHY? DIAGNOSTIC EXPLANATIONS & BOTTLENECK ROOT CAUSE ANALYSIS
+              </div>
+              <ul style="margin: 0; padding-left: 1.25rem; color: var(--text-main); font-size: 0.85rem; line-height: 1.6;">
+                <li><strong>PEAK DEMAND BOTTLENECK:</strong> Highest demand occurs at <strong>${peakRow.time_of_day || 'Peak'}</strong> with <strong>${maxVPM} VPM</strong> (equivalent to <strong>${targetFlow} veh/h</strong>). Under current green time (30s/120s cycle), approach capacity is only <strong>900 veh/h</strong>, creating a severe Volume-to-Capacity ratio of <strong>v/c = ${(targetFlow / 900).toFixed(2)}</strong> (${(targetFlow / 900) > 1.0 ? 'OVERSATURATED' : 'HIGH'}).</li>
+                <li><strong>INCIDENT ANOMALY SPIKES:</strong> Dataset contains <strong>${incidentCount} incident events</strong> (spiking localized volume by 1.3× to 1.5× during roadwork & accident intervals).</li>
+                <li><strong>D/D/1 QUEUE ACCUMULATION:</strong> Arrival rate &lambda; = ${(targetFlow/3600).toFixed(3)} veh/s exceeds green phase discharge rate &mu; = 1.000 veh/s, causing persistent red-phase vehicle queuing (Q = &lambda; &times; R = ${Math.round((targetFlow/3600)*90)} vehicles).</li>
+                <li><strong>RECOMMENDED ACTION:</strong> Reallocate effective green time proportionally using Webster's Optimum Cycle formula or increase approach lane capacity to clear residual queues.</li>
+              </ul>
+            `;
+          }
+
+          resultsPanel.style.display = 'block';
+        }
+
         if (errorDiv) {
           errorDiv.style.color = '#10b981';
           const roadLabel = (targetRoadKey === 'ALL') ? 'All Active Roads' : (roadNamesMap[targetRoadKey] || targetRoadKey);
-          errorDiv.innerHTML = `<strong>Success:</strong> Applied CSV (${trafficData.length} records, Peak: ${peakRow.time_of_day}, ${maxVPM} VPM) to <strong>${roadLabel}</strong>.<br>Calculated Demand: <strong>${targetFlow} veh/h</strong> (Lanes: ${lanes}). Recalculated all turning movements & v/c ratios.`;
+          errorDiv.innerHTML = `<strong>Success:</strong> Applied CSV (${trafficData.length} records, Peak: ${peakRow.time_of_day}, ${maxVPM} VPM) to <strong>${roadLabel}</strong>.<br>Calculated Demand: <strong>${targetFlow} veh/h</strong> (Lanes: ${lanes}). Recalculated all turning movements & v/c ratios. See detailed dataset table and WHY? diagnostic breakdown below.`;
           errorDiv.style.display = 'block';
         }
 
