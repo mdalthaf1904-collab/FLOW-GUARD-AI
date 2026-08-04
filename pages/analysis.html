@@ -1167,6 +1167,9 @@
         const trafficData = await FlowGuard.parseTrafficCSV(file);
         if (!trafficData || trafficData.length === 0) throw new Error("No valid data rows in CSV file.");
 
+        // Save CSV records to persistent sessionStorage
+        FlowGuard.saveCSVRecords(trafficData);
+
         let maxVPM = 0;
         let totalVPM = 0;
         let peakRow = trafficData[0];
@@ -1187,6 +1190,7 @@
         const activeKeys = FlowGuard.getActiveApproachKeys(configSelector.value);
         const targetKeys = (targetRoadKey === 'ALL') ? activeKeys : [targetRoadKey];
 
+        // Bug 3 Fix: Strictly isolate data mapping to target approach road(s) only
         targetKeys.forEach(rKey => {
           const laneElem = document.getElementById(`lanes_${rKey}`);
           if (laneElem) laneElem.value = lanes;
@@ -1209,6 +1213,16 @@
 
         // Instantly recalculate all capacity, v/c ratios, schematic SVG, and signal timings
         executeAnalysis();
+
+        // Save current approach state with uploaded flags
+        const currentState = getFormData();
+        targetKeys.forEach(rKey => {
+          if (currentState.approaches && currentState.approaches[rKey]) {
+            currentState.approaches[rKey].uploaded = true;
+            currentState.approaches[rKey].fromCSV = true;
+          }
+        });
+        FlowGuard.saveState(currentState);
 
         // ── Render Entire CSV Dataset Records & Diagnostic Explanations ──
         const resultsPanel = document.getElementById('csvDataResultsPanel');
@@ -1293,19 +1307,13 @@
           errorDiv.style.display = 'block';
         }
 
-        // Auto-expand all WHY? Diagnostic Explanation blocks & smooth scroll to calculation results
+        // Auto-expand all WHY? Diagnostic Explanation blocks & render master engineering dashboard
         setTimeout(() => {
           if (typeof renderEngineeringDashboard === 'function') {
-            renderEngineeringDashboard(trafficData, 'dashboard-results');
-          } else {
-            document.querySelectorAll('.expandable-why-body').forEach(el => el.classList.add('open'));
-            document.querySelectorAll('.expandable-why-toggle').forEach(el => el.classList.add('open'));
-
-            const targetCard = document.getElementById('csvDataResultsPanel') || document.getElementById('turningMovementSection');
-            if (targetCard) {
-              targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            renderEngineeringDashboard(currentState.approaches, 'dashboard-results');
           }
+          document.querySelectorAll('.expandable-why-body').forEach(el => el.classList.add('open'));
+          document.querySelectorAll('.expandable-why-toggle').forEach(el => el.classList.add('open'));
         }, 150);
 
         return trafficData;
@@ -2208,11 +2216,32 @@ ${a.diagExplanation}`;
         });
       });
 
+      // Bug 1 & 2 Fixes: Automatic state restoration on tab navigation & robust mode switching
       populateForm(state);
       executeAnalysis();
 
-      configSelector.addEventListener('change', executeAnalysis);
-      modeSelector.addEventListener('change', executeAnalysis);
+      const storedRecords = FlowGuard.getCSVRecords();
+      if (storedRecords && storedRecords.length > 0) {
+        if (typeof renderEngineeringDashboard === 'function') {
+          renderEngineeringDashboard(state.approaches, 'dashboard-results');
+        }
+      }
+
+      configSelector.addEventListener('change', () => {
+        executeAnalysis();
+        const records = FlowGuard.getCSVRecords();
+        if (records && typeof renderEngineeringDashboard === 'function') {
+          renderEngineeringDashboard(FlowGuard.getState().approaches, 'dashboard-results');
+        }
+      });
+
+      modeSelector.addEventListener('change', () => {
+        executeAnalysis();
+        const records = FlowGuard.getCSVRecords();
+        if (records && typeof renderEngineeringDashboard === 'function') {
+          renderEngineeringDashboard(FlowGuard.getState().approaches, 'dashboard-results');
+        }
+      });
       
       keys.forEach(k => {
         document.getElementById(`lanes_${k}`).addEventListener('change', executeAnalysis);

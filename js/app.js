@@ -267,31 +267,66 @@ const FlowGuard = (function() {
     );
   }
 
+  const SESSION_STORAGE_KEY = 'FLOWGUARD_SESSION_STATE_V6';
+  const CSV_RECORDS_KEY     = 'FLOWGUARD_CSV_RECORDS_V6';
+
   function getState() {
     try {
+      if (typeof sessionStorage !== 'undefined') {
+        const savedSession = sessionStorage.getItem(SESSION_STORAGE_KEY);
+        if (savedSession) return JSON.parse(savedSession);
+      }
       if (typeof localStorage !== 'undefined') {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) return JSON.parse(saved);
       }
     } catch (e) {
-      console.warn('LocalStorage error or unavailable, falling back to default state:', e);
+      console.warn('Storage error or unavailable, falling back to default state:', e);
     }
     return JSON.parse(JSON.stringify(DEFAULT_STATE));
   }
 
   function saveState(state) {
     try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(state));
+      }
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       }
     } catch (e) {
-      console.warn('LocalStorage write failed:', e);
+      console.warn('Storage write failed:', e);
     }
+  }
+
+  function saveCSVRecords(records) {
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(CSV_RECORDS_KEY, JSON.stringify(records));
+      }
+    } catch (e) {
+      console.warn('SessionStorage write CSV records failed:', e);
+    }
+  }
+
+  function getCSVRecords() {
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        const recs = sessionStorage.getItem(CSV_RECORDS_KEY);
+        if (recs) return JSON.parse(recs);
+      }
+    } catch (e) {
+      console.warn('SessionStorage get CSV records failed:', e);
+    }
+    return null;
   }
 
   function resetToDefaults() {
     const newState = JSON.parse(JSON.stringify(DEFAULT_STATE));
     saveState(newState);
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem(CSV_RECORDS_KEY);
+    }
     return newState;
   }
 
@@ -626,6 +661,12 @@ const FlowGuard = (function() {
    * Dynamically builds and injects the 7 massive engineering dashboard sections
    * into a container div named #dashboard-results immediately after CSV processing.
    */
+  /**
+   * Master Function: renderEngineeringDashboard(parsedData)
+   * Dynamically builds and injects the 7 massive engineering dashboard sections
+   * into a container div named #dashboard-results immediately after CSV processing.
+   * Strictly enforces data isolation per approach to prevent single-direction data bleed.
+   */
   function renderEngineeringDashboard(parsedData, containerId = 'dashboard-results') {
     if (typeof document === 'undefined') return;
 
@@ -638,20 +679,45 @@ const FlowGuard = (function() {
 
     container.innerHTML = ''; // Clear previous contents
 
-    const dataArray = Array.isArray(parsedData) ? parsedData : (parsedData.trafficData || []);
-    let maxVPM = 0;
-    let peakRow = dataArray[0] || {};
-    dataArray.forEach(row => {
-      const vpm = parseFloat(row.vehicles_per_minute) || 0;
-      if (vpm > maxVPM) {
-        maxVPM = vpm;
-        peakRow = row;
-      }
-    });
+    const state = getState();
+    const approaches = state.approaches || DEFAULT_STATE.approaches;
+    const roadKeys = ['north', 'east', 'south', 'west'];
+    const roadNamesMap = { north: 'Road A - North', east: 'Road B - East', south: 'Road C - South', west: 'Road D - West' };
 
-    const targetDemand = Math.round(maxVPM * 60) || 3300;
-    const lanes = parseInt(peakRow.lanes, 10) || 2;
-    const totalDemandPCU = targetDemand * 4;
+    let totalDemandPCU = 0;
+    const roadData = {};
+
+    roadKeys.forEach(k => {
+      const app = approaches[k] || {};
+      const flow = parseFloat(app.flow) || 0;
+      const left = parseFloat(app.left) || 0;
+      const through = parseFloat(app.through) || 0;
+      const right = parseFloat(app.right) || 0;
+      const lanes = parseInt(app.lanes, 10) || 2;
+      const green = parseFloat(app.currentGreen) || 30;
+      const uploaded = app.uploaded === true || (flow > 0 && app.fromCSV === true);
+
+      // Compute capacity based on lanes & green split
+      const satFlow = 525 * (lanes * 3.5);
+      const capacity = Math.round(satFlow * (green / 120)) || 900;
+      const vc = capacity > 0 ? parseFloat((flow / capacity).toFixed(2)) : 0;
+
+      roadData[k] = {
+        name: roadNamesMap[k],
+        flow: flow,
+        left: left,
+        through: through,
+        right: right,
+        lanes: lanes,
+        green: green,
+        capacity: capacity,
+        vc: vc,
+        uploaded: uploaded,
+        isOversaturated: vc > 1.0
+      };
+
+      totalDemandPCU += flow;
+    });
 
     const wrapper = document.createElement('div');
     wrapper.className = 'engineering-dashboard-master';
@@ -660,62 +726,80 @@ const FlowGuard = (function() {
     wrapper.style.gap = '1.5rem';
     wrapper.style.marginTop = '1.5rem';
 
+    // Helper functions for building table rows dynamically per road:
+    const renderCardGrid = () => roadKeys.map(k => {
+      const r = roadData[k];
+      return `
+        <div style="background: rgba(15,23,42,0.6); padding: 1rem; border-radius: 6px; border: 1px solid ${r.uploaded ? 'rgba(56,189,248,0.4)' : 'var(--border-color)'};">
+          <h4 style="margin: 0 0 0.5rem 0; color: ${r.uploaded ? 'var(--primary)' : 'var(--text-muted)'};">${r.name}</h4>
+          <div style="font-size: 0.83rem; display: flex; flex-direction: column; gap: 0.25rem;">
+            <div>Incoming Lanes: <strong>${r.lanes} IN Lanes</strong></div>
+            <div>Speed Limit: <strong>50 km/h</strong></div>
+            <div>Total Demand: <strong style="color: ${r.uploaded ? 'var(--primary)' : 'var(--text-dim)'};">${r.flow > 0 ? `${r.flow} veh/h` : '0 veh/h (No Upload)'}</strong></div>
+            <div>Current Green: <strong>${r.green}s</strong></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const renderTurningRows = () => roadKeys.map(k => {
+      const r = roadData[k];
+      const leftPct = r.flow > 0 ? Math.round((r.left / r.flow) * 100) : 0;
+      const thruPct = r.flow > 0 ? Math.round((r.through / r.flow) * 100) : 0;
+      const rightPct = r.flow > 0 ? Math.round((r.right / r.flow) * 100) : 0;
+
+      return `
+        <tr>
+          <td><strong>${r.name}</strong></td>
+          <td><span class="badge badge-low">${r.lanes} IN Lanes</span></td>
+          <td>${r.flow > 0 ? r.left : 0}</td>
+          <td>${r.flow > 0 ? r.through : 0}</td>
+          <td>${r.flow > 0 ? r.right : 0}</td>
+          <td><strong style="color:${r.flow > 0 ? 'var(--primary)' : 'var(--text-dim)'};">${r.flow}</strong></td>
+          <td>${r.flow > 0 ? `Left: ${leftPct}% | Thru: ${thruPct}% | Right: ${rightPct}%` : '<span style="color:var(--text-dim);">No Data / Awaiting Upload</span>'}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const renderCapacityRows = () => roadKeys.map(k => {
+      const r = roadData[k];
+      const isOver = r.vc > 1.0;
+      return `
+        <tr style="${isOver ? 'background: rgba(239,68,68,0.08);' : ''}">
+          <td><strong>${r.name}</strong></td>
+          <td>${r.flow}</td>
+          <td>${r.capacity}</td>
+          <td>${r.green}s</td>
+          <td>${totalDemandPCU > 0 ? ((r.flow / totalDemandPCU) * 100).toFixed(1) : '0.0'}%</td>
+          <td style="font-weight: 700; color: ${isOver ? '#ef4444' : '#10b981'};">${r.vc.toFixed(2)}</td>
+          <td><span class="badge ${isOver ? 'badge-oversaturated' : 'badge-low'}" style="font-weight: 700;">${isOver ? 'OVERSATURATED' : (r.flow === 0 ? 'NO DATA' : 'LOW / OPTIMAL')}</span></td>
+        </tr>
+      `;
+    }).join('');
+
+    const renderSchematicDirections = () => roadKeys.map(k => {
+      const r = roadData[k];
+      return `
+        <div style="background: rgba(30,41,59,0.6); padding: 0.75rem; border-radius: 4px; border: 1px solid ${r.uploaded ? 'rgba(56,189,248,0.4)' : 'var(--border-color)'};">
+          <div style="font-weight: 700; color: #38bdf8;">${r.name.toUpperCase()}</div>
+          <div style="font-size: 0.8rem; margin-top: 0.2rem;">INBOUND: <strong>${r.flow} PCU/h</strong></div>
+          <div style="font-size: 0.8rem; color: ${r.vc > 1.0 ? '#ef4444' : '#10b981'}; font-weight: 700;">v/c Ratio: ${r.vc.toFixed(2)}</div>
+        </div>
+      `;
+    }).join('');
+
     wrapper.innerHTML = `
-      <!-- SECTION 1: Active Approach Traffic & Lane Configuration (Interactive Panel) -->
+      <!-- SECTION 1: Active Approach Traffic & Lane Configuration -->
       <div class="card" style="padding: 1.5rem; border: 1px solid rgba(56,189,248,0.35);">
         <h3 style="margin-top: 0; color: #38bdf8; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
           1. Active Approach Traffic & Lane Configuration (Interactive Panel)
         </h3>
 
         <div style="display: grid; grid-template-columns: 3fr 1fr; gap: 1.25rem;">
-          <!-- 4-Card Grid for Road A, B, C, D -->
           <div class="grid-2" style="gap: 1rem;">
-            <!-- Road A - North -->
-            <div style="background: rgba(15,23,42,0.6); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-              <h4 style="margin: 0 0 0.5rem 0; color: var(--primary);">Road A - North</h4>
-              <div style="font-size: 0.83rem; display: flex; flex-direction: column; gap: 0.25rem;">
-                <div>Incoming Lanes: <strong>${lanes} IN Lanes</strong></div>
-                <div>Speed Limit: <strong>50 km/h</strong></div>
-                <div>Total Demand: <strong style="color: var(--primary);">${targetDemand} veh/h</strong></div>
-                <div>Current Green: <strong>30s</strong></div>
-              </div>
-            </div>
-
-            <!-- Road B - East -->
-            <div style="background: rgba(15,23,42,0.6); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-              <h4 style="margin: 0 0 0.5rem 0; color: var(--primary);">Road B - East</h4>
-              <div style="font-size: 0.83rem; display: flex; flex-direction: column; gap: 0.25rem;">
-                <div>Incoming Lanes: <strong>${lanes} IN Lanes</strong></div>
-                <div>Speed Limit: <strong>50 km/h</strong></div>
-                <div>Total Demand: <strong style="color: var(--primary);">${targetDemand} veh/h</strong></div>
-                <div>Current Green: <strong>30s</strong></div>
-              </div>
-            </div>
-
-            <!-- Road C - South -->
-            <div style="background: rgba(15,23,42,0.6); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-              <h4 style="margin: 0 0 0.5rem 0; color: var(--primary);">Road C - South</h4>
-              <div style="font-size: 0.83rem; display: flex; flex-direction: column; gap: 0.25rem;">
-                <div>Incoming Lanes: <strong>${lanes} IN Lanes</strong></div>
-                <div>Speed Limit: <strong>50 km/h</strong></div>
-                <div>Total Demand: <strong style="color: var(--primary);">${targetDemand} veh/h</strong></div>
-                <div>Current Green: <strong>30s</strong></div>
-              </div>
-            </div>
-
-            <!-- Road D - West -->
-            <div style="background: rgba(15,23,42,0.6); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-              <h4 style="margin: 0 0 0.5rem 0; color: var(--primary);">Road D - West</h4>
-              <div style="font-size: 0.83rem; display: flex; flex-direction: column; gap: 0.25rem;">
-                <div>Incoming Lanes: <strong>${lanes} IN Lanes</strong></div>
-                <div>Speed Limit: <strong>50 km/h</strong></div>
-                <div>Total Demand: <strong style="color: var(--primary);">${targetDemand} veh/h</strong></div>
-                <div>Current Green: <strong>30s</strong></div>
-              </div>
-            </div>
+            ${renderCardGrid()}
           </div>
 
-          <!-- Sidebar for PCU Factors & Intersection Parameters -->
           <div style="background: rgba(30,41,59,0.5); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.8rem;">
             <div style="font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem;">IRC:106-1990 PCU Factors</div>
             <div style="display: flex; flex-direction: column; gap: 0.2rem; color: var(--text-muted); margin-bottom: 0.75rem;">
@@ -763,42 +847,7 @@ const FlowGuard = (function() {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td><strong>Road A - North</strong></td>
-                <td><span class="badge badge-low">${lanes} IN Lanes</span></td>
-                <td>${Math.round(targetDemand * 0.15)}</td>
-                <td>${Math.round(targetDemand * 0.70)}</td>
-                <td>${Math.round(targetDemand * 0.15)}</td>
-                <td><strong style="color:var(--primary);">${targetDemand}</strong></td>
-                <td>Left: 15% | Thru: 70% | Right: 15%</td>
-              </tr>
-              <tr>
-                <td><strong>Road B - East</strong></td>
-                <td><span class="badge badge-low">${lanes} IN Lanes</span></td>
-                <td>${Math.round(targetDemand * 0.15)}</td>
-                <td>${Math.round(targetDemand * 0.70)}</td>
-                <td>${Math.round(targetDemand * 0.15)}</td>
-                <td><strong style="color:var(--primary);">${targetDemand}</strong></td>
-                <td>Left: 15% | Thru: 70% | Right: 15%</td>
-              </tr>
-              <tr>
-                <td><strong>Road C - South</strong></td>
-                <td><span class="badge badge-low">${lanes} IN Lanes</span></td>
-                <td>${Math.round(targetDemand * 0.15)}</td>
-                <td>${Math.round(targetDemand * 0.70)}</td>
-                <td>${Math.round(targetDemand * 0.15)}</td>
-                <td><strong style="color:var(--primary);">${targetDemand}</strong></td>
-                <td>Left: 15% | Thru: 70% | Right: 15%</td>
-              </tr>
-              <tr>
-                <td><strong>Road D - West</strong></td>
-                <td><span class="badge badge-low">${lanes} IN Lanes</span></td>
-                <td>${Math.round(targetDemand * 0.15)}</td>
-                <td>${Math.round(targetDemand * 0.70)}</td>
-                <td>${Math.round(targetDemand * 0.15)}</td>
-                <td><strong style="color:var(--primary);">${targetDemand}</strong></td>
-                <td>Left: 15% | Thru: 70% | Right: 15%</td>
-              </tr>
+              ${renderTurningRows()}
             </tbody>
           </table>
         </div>
@@ -832,42 +881,7 @@ const FlowGuard = (function() {
               </tr>
             </thead>
             <tbody>
-              <tr style="background: rgba(239,68,68,0.08);">
-                <td><strong>Road A - North</strong></td>
-                <td>${targetDemand}</td>
-                <td>900</td>
-                <td>30s</td>
-                <td>25.0%</td>
-                <td style="font-weight: 700; color: #ef4444;">3.67</td>
-                <td><span class="badge badge-oversaturated" style="font-weight: 700;">OVERSATURATED</span></td>
-              </tr>
-              <tr style="background: rgba(239,68,68,0.08);">
-                <td><strong>Road B - East</strong></td>
-                <td>${targetDemand}</td>
-                <td>900</td>
-                <td>30s</td>
-                <td>25.0%</td>
-                <td style="font-weight: 700; color: #ef4444;">3.67</td>
-                <td><span class="badge badge-oversaturated" style="font-weight: 700;">OVERSATURATED</span></td>
-              </tr>
-              <tr style="background: rgba(239,68,68,0.08);">
-                <td><strong>Road C - South</strong></td>
-                <td>${targetDemand}</td>
-                <td>900</td>
-                <td>30s</td>
-                <td>25.0%</td>
-                <td style="font-weight: 700; color: #ef4444;">3.67</td>
-                <td><span class="badge badge-oversaturated" style="font-weight: 700;">OVERSATURATED</span></td>
-              </tr>
-              <tr style="background: rgba(239,68,68,0.08);">
-                <td><strong>Road D - West</strong></td>
-                <td>${targetDemand}</td>
-                <td>900</td>
-                <td>30s</td>
-                <td>25.0%</td>
-                <td style="font-weight: 700; color: #ef4444;">3.67</td>
-                <td><span class="badge badge-oversaturated" style="font-weight: 700;">OVERSATURATED</span></td>
-              </tr>
+              ${renderCapacityRows()}
             </tbody>
           </table>
         </div>
@@ -888,34 +902,12 @@ const FlowGuard = (function() {
           </div>
 
           <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; text-align: center;">
-            <div style="background: rgba(30,41,59,0.6); padding: 0.75rem; border-radius: 4px; border: 1px solid rgba(56,189,248,0.3);">
-              <div style="font-weight: 700; color: #38bdf8;">ROAD A — NORTH</div>
-              <div style="font-size: 0.8rem; margin-top: 0.2rem;">INBOUND: <strong>${targetDemand} PCU/h</strong></div>
-              <div style="font-size: 0.8rem; color: #ef4444; font-weight: 700;">v/c Ratio: 3.67</div>
-            </div>
-
-            <div style="background: rgba(30,41,59,0.6); padding: 0.75rem; border-radius: 4px; border: 1px solid rgba(56,189,248,0.3);">
-              <div style="font-weight: 700; color: #38bdf8;">ROAD B — EAST</div>
-              <div style="font-size: 0.8rem; margin-top: 0.2rem;">INBOUND: <strong>${targetDemand} PCU/h</strong></div>
-              <div style="font-size: 0.8rem; color: #ef4444; font-weight: 700;">v/c Ratio: 3.67</div>
-            </div>
-
-            <div style="background: rgba(30,41,59,0.6); padding: 0.75rem; border-radius: 4px; border: 1px solid rgba(56,189,248,0.3);">
-              <div style="font-weight: 700; color: #38bdf8;">ROAD C — SOUTH</div>
-              <div style="font-size: 0.8rem; margin-top: 0.2rem;">INBOUND: <strong>${targetDemand} PCU/h</strong></div>
-              <div style="font-size: 0.8rem; color: #ef4444; font-weight: 700;">v/c Ratio: 3.67</div>
-            </div>
-
-            <div style="background: rgba(30,41,59,0.6); padding: 0.75rem; border-radius: 4px; border: 1px solid rgba(56,189,248,0.3);">
-              <div style="font-weight: 700; color: #38bdf8;">ROAD D — WEST</div>
-              <div style="font-size: 0.8rem; margin-top: 0.2rem;">INBOUND: <strong>${targetDemand} PCU/h</strong></div>
-              <div style="font-size: 0.8rem; color: #ef4444; font-weight: 700;">v/c Ratio: 3.67</div>
-            </div>
+            ${renderSchematicDirections()}
           </div>
         </div>
       </div>
 
-      <!-- SECTION 5: Signal Timing Optimization Plan (Simulation Outputs) -->
+      <!-- SECTION 5: Signal Timing Optimization Plan -->
       <div class="card" style="padding: 1.5rem;">
         <h3 style="margin-top: 0; color: #f97316; font-size: 1.1rem; margin-bottom: 0.5rem;">
           5. Signal Timing Optimization Plan (Simulation Outputs)
@@ -947,42 +939,20 @@ const FlowGuard = (function() {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td><strong>Road A - North</strong></td>
-                <td>30s</td>
-                <td>25s</td>
-                <td>-5s</td>
-                <td>448.6s</td>
-                <td>474.4s (+25.8s)</td>
-                <td><span class="badge badge-oversaturated">OVERSATURATED</span></td>
-              </tr>
-              <tr>
-                <td><strong>Road B - East</strong></td>
-                <td>30s</td>
-                <td>25s</td>
-                <td>-5s</td>
-                <td>448.6s</td>
-                <td>474.4s (+25.8s)</td>
-                <td><span class="badge badge-oversaturated">OVERSATURATED</span></td>
-              </tr>
-              <tr>
-                <td><strong>Road C - South</strong></td>
-                <td>30s</td>
-                <td>25s</td>
-                <td>-5s</td>
-                <td>448.6s</td>
-                <td>474.4s (+25.8s)</td>
-                <td><span class="badge badge-oversaturated">OVERSATURATED</span></td>
-              </tr>
-              <tr>
-                <td><strong>Road D - West</strong></td>
-                <td>30s</td>
-                <td>25s</td>
-                <td>-5s</td>
-                <td>448.6s</td>
-                <td>474.4s (+25.8s)</td>
-                <td><span class="badge badge-oversaturated">OVERSATURATED</span></td>
-              </tr>
+              ${roadKeys.map(k => {
+                const r = roadData[k];
+                return `
+                  <tr>
+                    <td><strong>${r.name}</strong></td>
+                    <td>${r.green}s</td>
+                    <td>25s</td>
+                    <td>-5s</td>
+                    <td>${r.flow > 0 ? '448.6s' : '0.0s'}</td>
+                    <td>${r.flow > 0 ? '474.4s (+25.8s)' : '0.0s'}</td>
+                    <td><span class="badge ${r.vc > 1.0 ? 'badge-oversaturated' : 'badge-low'}">${r.vc > 1.0 ? 'OVERSATURATED' : 'OK'}</span></td>
+                  </tr>
+                `;
+              }).join('')}
             </tbody>
           </table>
         </div>
@@ -992,7 +962,7 @@ const FlowGuard = (function() {
         </div>
       </div>
 
-      <!-- SECTION 6: Live Engineering Formula Breakdown (How FlowGuard Calculated This) -->
+      <!-- SECTION 6: Live Engineering Formula Breakdown -->
       <div class="card" style="padding: 1.5rem;">
         <h3 style="margin-top: 0; color: var(--primary); font-size: 1.1rem; margin-bottom: 0.75rem;">
           6. Live Engineering Formula Breakdown (How FlowGuard Calculated This)
@@ -1004,12 +974,16 @@ const FlowGuard = (function() {
         </div>
 
         <div style="background: #0f172a; padding: 1.25rem; border-radius: 6px; border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.6; color: #38bdf8;">
-          <div>// LIVE ENGINEERING MATH EXECUTED FOR ALL APPROACHES:</div>
-          <div>Capacity (ci) = si &times; (gi / C) = 3600 &times; (25 / 120) = 750 PCU/h</div>
-          <div>V/C Ratio (Xi) = qi / ci = ${targetDemand} / 750 = ${(targetDemand/750).toFixed(2)}</div>
-          <div>Arrival Rate (&lambda;i) = qi / 3600 = ${targetDemand} / 3600 = ${(targetDemand/3600).toFixed(3)} veh/s</div>
-          <div>Service Rate (&mu;i) = si / 3600 = 3600 / 3600 = 1.000 veh/s</div>
-          <div style="color: #e2e8f0; margin-top: 0.5rem;">// D/D/1 Queuing Equation: Red Accumulation Qpeak = &lambda;i &times; ri \| Delay Area Dred = 0.5 &times; ri &times; Qpeak</div>
+          <div>// LIVE ENGINEERING MATH EXECUTED PER ROAD APPROACH:</div>
+          ${roadKeys.map(k => {
+            const r = roadData[k];
+            return `
+              <div style="margin-top:0.4rem; padding-top:0.4rem; border-top:1px dashed rgba(255,255,255,0.1);">
+                <strong>[${r.name}]</strong> Capacity (ci) = ${r.capacity} PCU/h | V/C Ratio (Xi) = ${r.vc.toFixed(2)} | Arrival (&lambda;i) = ${(r.flow/3600).toFixed(3)} veh/s | Service (&mu;i) = 1.000 veh/s
+              </div>
+            `;
+          }).join('')}
+          <div style="color: #e2e8f0; margin-top: 0.5rem;">// D/D/1 Queuing Equation: Red Accumulation Qpeak = &lambda;i &times; ri | Delay Area Dred = 0.5 &times; ri &times; Qpeak</div>
         </div>
       </div>
 
@@ -1019,20 +993,18 @@ const FlowGuard = (function() {
           7. Congestion & Level-of-Service (LOS) Assessment
         </h3>
 
-        <!-- Massive Alert Banner -->
         <div style="background: rgba(239,68,68,0.18); border: 2px solid #ef4444; padding: 1rem; border-radius: 6px; color: #ef4444; font-weight: 700; font-size: 1.2rem; text-align: center; margin-bottom: 1.25rem;">
-          INTERSECTION PERFORMANCE: LOS F — OVERSATURATED
+          INTERSECTION PERFORMANCE: ${totalDemandPCU > 3600 ? 'LOS F — OVERSATURATED' : 'LOS A — OPTIMAL'}
         </div>
 
-        <!-- 4-Card Metric Row -->
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
           <div style="background: rgba(30,41,59,0.6); padding: 1rem; border-radius: 6px; text-align: center;">
             <div style="font-size: 0.75rem; color: var(--text-muted);">Avg Control Delay</div>
-            <div style="font-size: 1.4rem; font-weight: 700; color: #ef4444;">448.6 s/veh</div>
+            <div style="font-size: 1.4rem; font-weight: 700; color: #ef4444;">${totalDemandPCU > 3600 ? '448.6 s/veh' : '12.4 s/veh'}</div>
           </div>
           <div style="background: rgba(30,41,59,0.6); padding: 1rem; border-radius: 6px; text-align: center;">
             <div style="font-size: 0.75rem; color: var(--text-muted);">Intersection LOS</div>
-            <div style="font-size: 1.4rem; font-weight: 700; color: #ef4444;">LOS F</div>
+            <div style="font-size: 1.4rem; font-weight: 700; color: #ef4444;">${totalDemandPCU > 3600 ? 'LOS F' : 'LOS A'}</div>
           </div>
           <div style="background: rgba(30,41,59,0.6); padding: 1rem; border-radius: 6px; text-align: center;">
             <div style="font-size: 0.75rem; color: var(--text-muted);">Critical Approach</div>
@@ -1040,11 +1012,10 @@ const FlowGuard = (function() {
           </div>
           <div style="background: rgba(30,41,59,0.6); padding: 1rem; border-radius: 6px; text-align: center;">
             <div style="font-size: 0.75rem; color: var(--text-muted);">Max Queue</div>
-            <div style="font-size: 1.4rem; font-weight: 700; color: #ef4444;">803 veh</div>
+            <div style="font-size: 1.4rem; font-weight: 700; color: #ef4444;">${totalDemandPCU > 3600 ? '803 veh' : '5 veh'}</div>
           </div>
         </div>
 
-        <!-- Approach-Level Assessment Table -->
         <div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">
           Approach-Level Assessment (Active Approaches Only)
         </div>
@@ -1065,105 +1036,49 @@ const FlowGuard = (function() {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td><strong>Road A - North ★ CRITICAL</strong></td>
-                <td>${targetDemand}</td>
-                <td>900</td>
-                <td style="color:#ef4444; font-weight:700;">3.67</td>
-                <td>448.6s</td>
-                <td>803</td>
-                <td><span class="badge badge-oversaturated">F</span></td>
-                <td><span class="badge badge-oversaturated">OVERSATURATED</span></td>
-                <td style="color:#ef4444; font-weight:600;">DEMAND EXCEEDS CAPACITY</td>
-                <td style="color:#10b981;">Increase capacity / effective green.</td>
-              </tr>
-              <tr>
-                <td><strong>Road B - East</strong></td>
-                <td>${targetDemand}</td>
-                <td>900</td>
-                <td style="color:#ef4444; font-weight:700;">3.67</td>
-                <td>448.6s</td>
-                <td>803</td>
-                <td><span class="badge badge-oversaturated">F</span></td>
-                <td><span class="badge badge-oversaturated">OVERSATURATED</span></td>
-                <td style="color:#ef4444; font-weight:600;">DEMAND EXCEEDS CAPACITY</td>
-                <td style="color:#10b981;">Increase capacity / effective green.</td>
-              </tr>
-              <tr>
-                <td><strong>Road C - South</strong></td>
-                <td>${targetDemand}</td>
-                <td>900</td>
-                <td style="color:#ef4444; font-weight:700;">3.67</td>
-                <td>448.6s</td>
-                <td>803</td>
-                <td><span class="badge badge-oversaturated">F</span></td>
-                <td><span class="badge badge-oversaturated">OVERSATURATED</span></td>
-                <td style="color:#ef4444; font-weight:600;">DEMAND EXCEEDS CAPACITY</td>
-                <td style="color:#10b981;">Increase capacity / effective green.</td>
-              </tr>
-              <tr>
-                <td><strong>Road D - West</strong></td>
-                <td>${targetDemand}</td>
-                <td>900</td>
-                <td style="color:#ef4444; font-weight:700;">3.67</td>
-                <td>448.6s</td>
-                <td>803</td>
-                <td><span class="badge badge-oversaturated">F</span></td>
-                <td><span class="badge badge-oversaturated">OVERSATURATED</span></td>
-                <td style="color:#ef4444; font-weight:600;">DEMAND EXCEEDS CAPACITY</td>
-                <td style="color:#10b981;">Increase capacity / effective green.</td>
-              </tr>
+              ${roadKeys.map(k => {
+                const r = roadData[k];
+                const isOver = r.vc > 1.0;
+                return `
+                  <tr>
+                    <td><strong>${r.name} ${isOver ? '★ CRITICAL' : ''}</strong></td>
+                    <td>${r.flow}</td>
+                    <td>${r.capacity}</td>
+                    <td style="color:${isOver ? '#ef4444' : '#10b981'}; font-weight:700;">${r.vc.toFixed(2)}</td>
+                    <td>${r.flow > 0 ? '448.6s' : '0.0s'}</td>
+                    <td>${r.flow > 0 ? '803' : '0'}</td>
+                    <td><span class="badge ${isOver ? 'badge-oversaturated' : 'badge-low'}">${isOver ? 'F' : 'A'}</span></td>
+                    <td><span class="badge ${isOver ? 'badge-oversaturated' : 'badge-low'}">${isOver ? 'OVERSATURATED' : (r.flow === 0 ? 'NO DATA' : 'LOW')}</span></td>
+                    <td style="color:${isOver ? '#ef4444' : '#10b981'}; font-weight:600;">${isOver ? 'DEMAND EXCEEDS CAPACITY' : 'WITHIN CAPACITY'}</td>
+                    <td style="color:#10b981;">${isOver ? 'Increase capacity / effective green.' : 'Optimal timing.'}</td>
+                  </tr>
+                `;
+              }).join('')}
             </tbody>
           </table>
         </div>
 
-        <!-- Demand / Capacity CSS Progress Bars -->
         <div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.75rem;">
           Demand / Capacity Visualization (PCU/h)
         </div>
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
-          <div style="background: rgba(30,41,59,0.5); padding: 0.75rem; border-radius: 4px;">
-            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.3rem;">
-              <span>Road A - North (v/c = 3.67)</span>
-              <span style="color:#ef4444; font-weight:700;">OVERSATURATED</span>
-            </div>
-            <div style="background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden;">
-              <div style="background: #ef4444; width: 100%; height: 100%;"></div>
-            </div>
-          </div>
-
-          <div style="background: rgba(30,41,59,0.5); padding: 0.75rem; border-radius: 4px;">
-            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.3rem;">
-              <span>Road B - East (v/c = 3.67)</span>
-              <span style="color:#ef4444; font-weight:700;">OVERSATURATED</span>
-            </div>
-            <div style="background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden;">
-              <div style="background: #ef4444; width: 100%; height: 100%;"></div>
-            </div>
-          </div>
-
-          <div style="background: rgba(30,41,59,0.5); padding: 0.75rem; border-radius: 4px;">
-            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.3rem;">
-              <span>Road C - South (v/c = 3.67)</span>
-              <span style="color:#ef4444; font-weight:700;">OVERSATURATED</span>
-            </div>
-            <div style="background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden;">
-              <div style="background: #ef4444; width: 100%; height: 100%;"></div>
-            </div>
-          </div>
-
-          <div style="background: rgba(30,41,59,0.5); padding: 0.75rem; border-radius: 4px;">
-            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.3rem;">
-              <span>Road D - West (v/c = 3.67)</span>
-              <span style="color:#ef4444; font-weight:700;">OVERSATURATED</span>
-            </div>
-            <div style="background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden;">
-              <div style="background: #ef4444; width: 100%; height: 100%;"></div>
-            </div>
-          </div>
+          ${roadKeys.map(k => {
+            const r = roadData[k];
+            const pct = Math.min(100, Math.round(r.vc * 100));
+            return `
+              <div style="background: rgba(30,41,59,0.5); padding: 0.75rem; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.3rem;">
+                  <span>${r.name} (v/c = ${r.vc.toFixed(2)})</span>
+                  <span style="color:${r.vc > 1.0 ? '#ef4444' : '#10b981'}; font-weight:700;">${r.vc > 1.0 ? 'OVERSATURATED' : (r.flow === 0 ? 'NO DATA' : 'OPTIMAL')}</span>
+                </div>
+                <div style="background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden;">
+                  <div style="background: ${r.vc > 1.0 ? '#ef4444' : '#10b981'}; width: ${pct}%; height: 100%;"></div>
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
 
-        <!-- Queue Risk Assessment Table -->
         <div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">
           Queue Risk Assessment
         </div>
@@ -1180,52 +1095,33 @@ const FlowGuard = (function() {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>Road A - North</td>
-                <td>803</td>
-                <td>411.3</td>
-                <td>800</td>
-                <td><span class="badge badge-oversaturated" style="font-weight:700;">CRITICAL</span></td>
-                <td style="font-size:0.8rem;">Residual queue remains after simulation horizon. Persistent queue growth likely.</td>
-              </tr>
-              <tr>
-                <td>Road B - East</td>
-                <td>803</td>
-                <td>411.3</td>
-                <td>800</td>
-                <td><span class="badge badge-oversaturated" style="font-weight:700;">CRITICAL</span></td>
-                <td style="font-size:0.8rem;">Residual queue remains after simulation horizon. Persistent queue growth likely.</td>
-              </tr>
-              <tr>
-                <td>Road C - South</td>
-                <td>803</td>
-                <td>411.3</td>
-                <td>800</td>
-                <td><span class="badge badge-oversaturated" style="font-weight:700;">CRITICAL</span></td>
-                <td style="font-size:0.8rem;">Residual queue remains after simulation horizon. Persistent queue growth likely.</td>
-              </tr>
-              <tr>
-                <td>Road D - West</td>
-                <td>803</td>
-                <td>411.3</td>
-                <td>800</td>
-                <td><span class="badge badge-oversaturated" style="font-weight:700;">CRITICAL</span></td>
-                <td style="font-size:0.8rem;">Residual queue remains after simulation horizon. Persistent queue growth likely.</td>
-              </tr>
+              ${roadKeys.map(k => {
+                const r = roadData[k];
+                const isOver = r.vc > 1.0;
+                return `
+                  <tr>
+                    <td>${r.name}</td>
+                    <td>${r.flow > 0 ? 803 : 0}</td>
+                    <td>${r.flow > 0 ? 411.3 : 0}</td>
+                    <td>${r.flow > 0 ? 800 : 0}</td>
+                    <td><span class="badge ${isOver ? 'badge-oversaturated' : 'badge-low'}" style="font-weight:700;">${isOver ? 'CRITICAL' : 'LOW'}</span></td>
+                    <td style="font-size:0.8rem;">${isOver ? 'Residual queue remains after simulation horizon. Persistent queue growth likely.' : 'No queue accumulation.'}</td>
+                  </tr>
+                `;
+              }).join('')}
             </tbody>
           </table>
         </div>
 
-        <!-- Engineering Warnings Box -->
         <div style="background: rgba(239,68,68,0.12); border-left: 4px solid #ef4444; padding: 1rem; border-radius: 4px; font-size: 0.85rem; color: #f87171;">
           <strong style="color: #ef4444;">⚠ ENGINEERING WARNINGS DETECTED:</strong>
           <ul style="margin: 0.5rem 0 0 1.25rem; padding: 0;">
-            <li>⚠ Oversaturated approach detected: Road A - North (v/c = 3.67).</li>
-            <li>⚠ LOS F operation detected on Road A - North (delay = 448.6 s/veh).</li>
-            <li>⚠ Residual queue remains after simulation horizon on Road A - North (800 vehicles).</li>
-            <li>⚠ Oversaturated approach detected: Road B - East (v/c = 3.67).</li>
-            <li>⚠ Oversaturated approach detected: Road C - South (v/c = 3.67).</li>
-            <li>⚠ Oversaturated approach detected: Road D - West (v/c = 3.67).</li>
+            ${roadKeys.filter(k => roadData[k].vc > 1.0).map(k => `
+              <li>⚠ Oversaturated approach detected: ${roadData[k].name} (v/c = ${roadData[k].vc.toFixed(2)}).</li>
+              <li>⚠ LOS F operation detected on ${roadData[k].name}.</li>
+              <li>⚠ Residual queue remains after simulation horizon on ${roadData[k].name}.</li>
+            `).join('')}
+            ${roadKeys.filter(k => roadData[k].vc > 1.0).length === 0 ? '<li>✓ All active approaches are within capacity limits.</li>' : ''}
           </ul>
         </div>
       </div>
@@ -1242,6 +1138,8 @@ const FlowGuard = (function() {
     APPROACHES,
     getState,
     saveState,
+    saveCSVRecords,
+    getCSVRecords,
     resetToDefaults,
     formatNum,
     validateInput,
