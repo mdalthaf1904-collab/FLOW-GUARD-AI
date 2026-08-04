@@ -75,9 +75,9 @@
         <span class="badge badge-low" id="activeConfigBadge">4-Arm Cross</span>
       </div>
 
-      <div class="grid-2" style="align-items: center;">
+      <div class="grid-2" style="row-gap: 1.25rem; column-gap: 1.5rem;">
         <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" for="configTypeSelector">Intersection Geometry Type</label>
+          <label class="form-label" for="configTypeSelector">Road Geometry</label>
           <select id="configTypeSelector" class="form-control" style="font-family: var(--font-family); font-weight: 600;">
             <option value="4CROSS" selected>4-Arm Cross (Roads A + B + C + D)</option>
             <option value="3NO_NORTH">3-Arm — No North (Roads B + C + D)</option>
@@ -95,6 +95,28 @@
             <option value="AI_DETECTION">AI Vehicle Detection Mode (Modular Prototype)</option>
           </select>
         </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="dayTypeSelector">Day Type</label>
+          <select id="dayTypeSelector" class="form-control" style="font-family: var(--font-family); font-weight: 600; color: #38bdf8;">
+            <option value="WEEKDAY" selected>Weekday (Normal Peak Factor 1.0)</option>
+            <option value="WEEKEND">Weekend (Off-Peak Factor 0.85)</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="timeOfDaySelector">Time-of-Day Selection</label>
+          <select id="timeOfDaySelector" class="form-control" style="font-family: var(--font-family); font-weight: 600; color: #2ecc71;">
+            <option value="07:00">7:00 AM (Morning Rush Peak)</option>
+            <option value="08:00" selected>8:00 AM (Morning Commute Peak)</option>
+            <option value="09:00">9:00 AM (Late Morning)</option>
+            <option value="12:00">12:00 PM (Mid-Day Off-Peak)</option>
+            <option value="15:00">3:00 PM (Afternoon School Peak)</option>
+            <option value="17:00">5:00 PM (Evening Rush Peak)</option>
+            <option value="18:00">6:00 PM (Evening Commute Peak)</option>
+            <option value="20:00">8:00 PM (Night Off-Peak)</option>
+          </select>
+        </div>
       </div>
 
       <div style="margin-top: 1rem;">
@@ -102,6 +124,47 @@
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.2rem;" id="activeApproachesList">
           <!-- Populated dynamically by JS -->
         </div>
+      </div>
+
+      <!-- Integrated CSV/Excel Traffic Data Ingestion Widget inside Section 1 -->
+      <div id="csvIngestionPanel" style="margin-top: 1.25rem; padding: 1.25rem; background: rgba(15, 23, 42, 0.6); border-radius: var(--radius-md); border: 1px solid rgba(56, 189, 248, 0.35);">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+          <h4 style="margin: 0; color: #38bdf8; display: flex; align-items: center; gap: 0.5rem; font-size: 0.95rem;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            Historical Traffic Dataset Upload (CSV / Excel)
+          </h4>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Supports separate road dataset files (Road A, B, C, D) or single dataset file</span>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: flex-end;">
+          <div style="flex: 1; min-width: 220px;">
+            <label class="form-label" for="csvTargetRoad" style="font-size: 0.8rem; margin-bottom: 0.3rem;">Target Approach Road</label>
+            <select id="csvTargetRoad" class="form-control" style="font-size: 0.85rem; font-weight: 600; background: rgba(30,41,59,0.8); width: 100%;">
+              <option value="north" selected>Road A — North</option>
+              <option value="east">Road B — East</option>
+              <option value="south">Road C — South</option>
+              <option value="west">Road D — West</option>
+              <option value="ALL">All Active Roads (Auto-Distribute)</option>
+            </select>
+          </div>
+
+          <div style="flex: 2; min-width: 280px;">
+            <label class="form-label" for="csvFileInput" style="font-size: 0.8rem; margin-bottom: 0.3rem;">Traffic Dataset File (.csv, .xlsx)</label>
+            <input type="file" id="csvFileInput" accept=".csv, .xlsx, .xls" class="form-control" style="font-size: 0.8rem; padding: 0.4rem 0.6rem; background: rgba(30,41,59,0.8); width: 100%; cursor: pointer;" />
+          </div>
+
+          <div style="flex: 0 0 auto;">
+            <button type="button" id="btnProcessCsv" class="btn btn-primary" style="padding: 0.55rem 1.5rem; font-weight: 600; font-size: 0.85rem; height: 38px; display: inline-flex; align-items: center; justify-content: center;">
+              Upload & Process Dataset
+            </button>
+          </div>
+        </div>
+
+        <div id="csvUploadError" style="display: none; font-size: 0.82rem; margin-top: 0.75rem; font-weight: 500; padding: 0.5rem 0.75rem; border-radius: 4px; background: rgba(15,23,42,0.9);"></div>
       </div>
     </div>
 
@@ -171,13 +234,11 @@
           </button>
         </div>
       </div>
-    </div>
-
     <!-- Section 2: Active Approach Inputs Grid & Configurable Lanes -->
     <form id="analysisForm">
       <div class="card">
         <div class="card-header">
-          <h3 class="card-title">2. Active Approach Traffic & Lane Configuration</h3>
+          <h3 class="card-title">2. Active Approach Traffic & Lane Configuration (Turning Movements Mode)</h3>
           <button type="button" class="btn btn-secondary" id="btnResetDefaults" style="padding: 0.4rem 0.85rem; font-size: 0.8rem;">
             Reset Demo Defaults
           </button>
@@ -191,7 +252,11 @@
 
           <!-- Road A - North -->
           <div class="approach-input-card" id="card_north" style="background: rgba(15,23,42,0.5); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <h4 style="font-size: 0.95rem; margin-bottom: 0.75rem; color: var(--primary);">Road A - North</h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <h4 style="font-size: 0.95rem; margin: 0; color: var(--primary);">Road A - North</h4>
+              <button type="button" class="btn btn-secondary btn-quick-road-csv" data-road="north" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; color: #38bdf8; border-color: rgba(56,189,248,0.4);">+ Road A CSV</button>
+            </div>
+
             
             <div class="form-group">
               <label class="form-label" for="lanes_north">Incoming Lane Count (Per Direction)</label>
@@ -199,6 +264,16 @@
                 <option value="1">1 Lane (1 IN + 1 OUT)</option>
                 <option value="2" selected>2 Lanes (2 IN + 2 OUT)</option>
                 <option value="3">3 Lanes (3 IN + 3 OUT)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="speed_north">Approach Speed Limit</label>
+              <select id="speed_north" class="form-control">
+                <option value="30">30 km/h (School / Slow Zone)</option>
+                <option value="40">40 km/h (Urban Collector)</option>
+                <option value="50" selected>50 km/h (Standard Urban)</option>
+                <option value="60">60 km/h (Major Arterial)</option>
               </select>
             </div>
 
@@ -233,7 +308,10 @@
 
           <!-- Road B - East -->
           <div class="approach-input-card" id="card_east" style="background: rgba(15,23,42,0.5); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <h4 style="font-size: 0.95rem; margin-bottom: 0.75rem; color: var(--primary);">Road B - East</h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <h4 style="font-size: 0.95rem; margin: 0; color: var(--primary);">Road B - East</h4>
+              <button type="button" class="btn btn-secondary btn-quick-road-csv" data-road="east" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; color: #38bdf8; border-color: rgba(56,189,248,0.4);">+ Road B CSV</button>
+            </div>
             
             <div class="form-group">
               <label class="form-label" for="lanes_east">Incoming Lane Count (Per Direction)</label>
@@ -241,6 +319,16 @@
                 <option value="1">1 Lane (1 IN + 1 OUT)</option>
                 <option value="2" selected>2 Lanes (2 IN + 2 OUT)</option>
                 <option value="3">3 Lanes (3 IN + 3 OUT)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="speed_east">Approach Speed Limit</label>
+              <select id="speed_east" class="form-control">
+                <option value="30">30 km/h (School / Slow Zone)</option>
+                <option value="40">40 km/h (Urban Collector)</option>
+                <option value="50" selected>50 km/h (Standard Urban)</option>
+                <option value="60">60 km/h (Major Arterial)</option>
               </select>
             </div>
 
@@ -275,7 +363,10 @@
 
           <!-- Road C - South -->
           <div class="approach-input-card" id="card_south" style="background: rgba(15,23,42,0.5); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <h4 style="font-size: 0.95rem; margin-bottom: 0.75rem; color: var(--primary);">Road C - South</h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <h4 style="font-size: 0.95rem; margin: 0; color: var(--primary);">Road C - South</h4>
+              <button type="button" class="btn btn-secondary btn-quick-road-csv" data-road="south" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; color: #38bdf8; border-color: rgba(56,189,248,0.4);">+ Road C CSV</button>
+            </div>
             
             <div class="form-group">
               <label class="form-label" for="lanes_south">Incoming Lane Count (Per Direction)</label>
@@ -283,6 +374,16 @@
                 <option value="1">1 Lane (1 IN + 1 OUT)</option>
                 <option value="2" selected>2 Lanes (2 IN + 2 OUT)</option>
                 <option value="3">3 Lanes (3 IN + 3 OUT)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="speed_south">Approach Speed Limit</label>
+              <select id="speed_south" class="form-control">
+                <option value="30">30 km/h (School / Slow Zone)</option>
+                <option value="40">40 km/h (Urban Collector)</option>
+                <option value="50" selected>50 km/h (Standard Urban)</option>
+                <option value="60">60 km/h (Major Arterial)</option>
               </select>
             </div>
 
@@ -317,7 +418,11 @@
 
           <!-- Road D - West -->
           <div class="approach-input-card" id="card_west" style="background: rgba(15,23,42,0.5); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <h4 style="font-size: 0.95rem; margin-bottom: 0.75rem; color: var(--primary);">Road D - West</h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <h4 style="font-size: 0.95rem; margin: 0; color: var(--primary);">Road D - West</h4>
+              <button type="button" class="btn btn-secondary btn-quick-road-csv" data-road="west" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; color: #38bdf8; border-color: rgba(56,189,248,0.4);">+ Road D CSV</button>
+            </div>
+
             
             <div class="form-group">
               <label class="form-label" for="lanes_west">Incoming Lane Count (Per Direction)</label>
@@ -327,6 +432,17 @@
                 <option value="3">3 Lanes (3 IN + 3 OUT)</option>
               </select>
             </div>
+
+            <div class="form-group">
+              <label class="form-label" for="speed_west">Approach Speed Limit</label>
+              <select id="speed_west" class="form-control">
+                <option value="30">30 km/h (School / Slow Zone)</option>
+                <option value="40">40 km/h (Urban Collector)</option>
+                <option value="50" selected>50 km/h (Standard Urban)</option>
+                <option value="60">60 km/h (Major Arterial)</option>
+              </select>
+            </div>
+
 
             <div class="turning-inputs-group">
               <div class="form-group">
@@ -1012,7 +1128,102 @@
       const validationAlert = document.getElementById('validationAlert');
       const validationErrorsList = document.getElementById('validationErrorsList');
 
+      // ── CSV Data Ingestion & Analysis Logic (Turning Movements / Per-Road Mode) ──
+      async function processRoadCSV(file, targetRoadKey) {
+        const errorDiv = document.getElementById('csvUploadError');
+        if (errorDiv) errorDiv.style.display = 'none';
+
+        const trafficData = await FlowGuard.parseTrafficCSV(file);
+        if (!trafficData || trafficData.length === 0) throw new Error("No valid data rows in CSV file.");
+
+        let maxVPM = 0;
+        let totalVPM = 0;
+        let peakRow = trafficData[0];
+
+        trafficData.forEach(row => {
+          const vpm = parseFloat(row.vehicles_per_minute) || 0;
+          totalVPM += vpm;
+          if (vpm > maxVPM) {
+            maxVPM = vpm;
+            peakRow = row;
+          }
+        });
+
+        const targetFlow = Math.round(maxVPM * 60);
+        const lanes = parseInt(peakRow.lanes, 10) || 2;
+        const roadNamesMap = { north: 'Road A (North)', east: 'Road B (East)', south: 'Road C (South)', west: 'Road D (West)' };
+
+        const activeKeys = FlowGuard.getActiveApproachKeys(configSelector.value);
+        const targetKeys = (targetRoadKey === 'ALL') ? activeKeys : [targetRoadKey];
+
+        targetKeys.forEach(rKey => {
+          const laneElem = document.getElementById(`lanes_${rKey}`);
+          if (laneElem) laneElem.value = lanes;
+
+          const turningRatios = peakRow.turning_ratios || { left: 0.15, straight: 0.70, right: 0.15 };
+          const leftVol = Math.round(targetFlow * (turningRatios.left || 0.15));
+          const rightVol = Math.round(targetFlow * (turningRatios.right || 0.15));
+          const throughVol = Math.max(0, targetFlow - leftVol - rightVol);
+
+          const leftElem = document.getElementById(`left_${rKey}`);
+          const throughElem = document.getElementById(`through_${rKey}`);
+          const rightElem = document.getElementById(`right_${rKey}`);
+          const flowElem = document.getElementById(`flow_${rKey}`);
+
+          if (leftElem) leftElem.value = leftVol;
+          if (throughElem) throughElem.value = throughVol;
+          if (rightElem) rightElem.value = rightVol;
+          if (flowElem) flowElem.value = targetFlow;
+        });
+
+        // Instantly recalculate all capacity, v/c ratios, schematic SVG, and signal timings
+        executeAnalysis();
+
+        if (errorDiv) {
+          errorDiv.style.color = '#10b981';
+          const roadLabel = (targetRoadKey === 'ALL') ? 'All Active Roads' : (roadNamesMap[targetRoadKey] || targetRoadKey);
+          errorDiv.innerHTML = `<strong>Success:</strong> Applied CSV (${trafficData.length} records, Peak: ${peakRow.time_of_day}, ${maxVPM} VPM) to <strong>${roadLabel}</strong>.<br>Calculated Demand: <strong>${targetFlow} veh/h</strong> (Lanes: ${lanes}). Recalculated all turning movements & v/c ratios.`;
+          errorDiv.style.display = 'block';
+        }
+
+        return trafficData;
+      }
+
+      const btnProcessCsv = document.getElementById('btnProcessCsv');
+      if (btnProcessCsv) {
+        btnProcessCsv.addEventListener('click', async () => {
+          const fileInput = document.getElementById('csvFileInput');
+          const targetSelect = document.getElementById('csvTargetRoad');
+          const targetRoadKey = targetSelect ? targetSelect.value : 'north';
+          const errorDiv = document.getElementById('csvUploadError');
+
+          try {
+            const file = fileInput.files[0];
+            await processRoadCSV(file, targetRoadKey);
+          } catch (error) {
+            if (errorDiv) {
+              errorDiv.style.color = '#ef4444';
+              errorDiv.textContent = error.message;
+              errorDiv.style.display = 'block';
+            }
+          }
+        });
+      }
+
+      // Quick per-road CSV buttons handler
+      document.querySelectorAll('.btn-quick-road-csv').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const roadKey = btn.getAttribute('data-road');
+          const fileInput = document.getElementById('csvFileInput');
+          const targetSelect = document.getElementById('csvTargetRoad');
+          if (targetSelect) targetSelect.value = roadKey;
+          if (fileInput) fileInput.click();
+        });
+      });
+
+
       let currentSelectedOrigin = 'north';
+
       let currentSelectedMove   = 'ALL';
       let currentAnalysisData   = null;
 

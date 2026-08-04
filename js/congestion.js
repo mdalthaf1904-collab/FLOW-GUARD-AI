@@ -18,9 +18,9 @@ const CongestionEngine = (function () {
   // =========================================================================
 
   /**
-   * CONGESTION_THRESHOLDS
+   * CONGESTION_THRESHOLDS (IRC:93 Aligned)
    * Maps v/c ratio ranges to severity levels.
-   * Ordered from most severe to least so the first-match logic works downward.
+   * Any 15-minute time block with v/c > 0.85 is flagged as a failing bottleneck (Severe or Oversaturated).
    */
   const CONGESTION_THRESHOLDS = [
     {
@@ -31,23 +31,23 @@ const CongestionEngine = (function () {
       color: '#ef4444',  // red
       badgeClass: 'badge-oversaturated',
       textClass: 'text-rose',
-      description: 'Demand exceeds estimated approach capacity.'
+      description: 'IRC:93 - Demand exceeds estimated approach capacity (v/c > 1.0).'
     },
     {
       id: 'SEVERE',
       label: 'SEVERE',
-      minVC: 0.90,       // exclusive (> 0.90)
+      minVC: 0.85,       // exclusive (> 0.85)
       maxVC: 1.00,       // inclusive (<= 1.00)
       color: '#f97316',  // orange
       badgeClass: 'badge-severe',
       textClass: 'text-orange',
-      description: 'Near-capacity operation. High risk of breakdown.'
+      description: 'IRC:93 - Flagged failing bottleneck interval (0.85 < v/c <= 1.00).'
     },
     {
       id: 'HIGH',
       label: 'HIGH',
-      minVC: 0.80,
-      maxVC: 0.90,
+      minVC: 0.75,
+      maxVC: 0.85,
       color: '#f59e0b',  // amber
       badgeClass: 'badge-medium',
       textClass: 'text-amber',
@@ -57,7 +57,7 @@ const CongestionEngine = (function () {
       id: 'MODERATE',
       label: 'MODERATE',
       minVC: 0.60,
-      maxVC: 0.80,
+      maxVC: 0.75,
       color: '#eab308',  // yellow
       badgeClass: 'badge-moderate',
       textClass: 'text-yellow',
@@ -74,6 +74,20 @@ const CongestionEngine = (function () {
       description: 'Low congestion. Intersection operating within capacity.'
     }
   ];
+
+  /**
+   * calculateIRCSaturationFlow(lanes, widthMeters)
+   * Saturation flow S according to Indian Roads Congress (IRC:93) standards.
+   * Formula: S = 525 * W (PCU/hr), where W is the effective approach width in meters.
+   * If width W is omitted, estimates W = lanes * 3.5m.
+   */
+  function calculateIRCSaturationFlow(lanes = 1, widthMeters = null) {
+    const W = (widthMeters !== null && !isNaN(parseFloat(widthMeters)))
+      ? parseFloat(widthMeters)
+      : (parseInt(lanes, 10) || 1) * 3.5;
+    return 525 * W;
+  }
+
 
   /**
    * LOS_THRESHOLDS
@@ -1029,9 +1043,15 @@ CongestionEngine.generateSyntheticHistoricalData = function(numIntersections = 3
           }
           
           const incident_event = incidents[Math.floor(Math.random() * incidents.length)];
-          if (incident_event !== 'none') {
-            vpm = Math.floor(vpm * (1.5 + Math.random())); // Spike due to bottleneck
+          let anomaly_multiplier = 1.0;
+          if (incident_event === 'roadwork') {
+            anomaly_multiplier = 1.3; // 1.3x volume spike for simulated roadwork event
+            vpm = Math.floor(vpm * anomaly_multiplier);
+          } else if (incident_event === 'accident') {
+            anomaly_multiplier = 1.5; // 1.5x volume spike for simulated accident event
+            vpm = Math.floor(vpm * anomaly_multiplier);
           }
+
           
           data.push({
             intersection_id: `INT-${i}`,

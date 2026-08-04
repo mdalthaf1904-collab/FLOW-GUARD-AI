@@ -1,6 +1,12 @@
 /**
  * FlowGuard AI - Simulation Controller
  * Implements deterministic D/D/1 arrival-discharge queuing theory model.
+ * 
+ * Mathematical Grounding:
+ * - Arrival rate lambda = q / 3600 (veh/sec)
+ * - Discharge service rate mu = s / 3600 (veh/sec during green)
+ * - Max red-phase queue buildup Q = lambda * R
+ * - Time to clear queue during green t_c = Q / (mu - lambda)
  */
 
 function simulatePlan(approaches, greenAllocation, config = {}) {
@@ -30,8 +36,11 @@ function simulatePlan(approaches, greenAllocation, config = {}) {
       ? appSatFlow
       : defaultSatFlow * numLanes;
 
+    // D/D/1 Queuing Model Parameters
     const lambda = qVehHr / 3600; // Arrival rate (veh/sec)
-    const mu = satFlow / 3600;    // Discharge rate (veh/sec)
+    const mu = satFlow / 3600;    // Discharge service rate during green (veh/sec)
+    const redQueueQ = lambda * rSec; // Q = lambda * R (max red-phase queue buildup)
+    const timeToClearTc = (mu > lambda) ? (redQueueQ / (mu - lambda)) : Infinity; // t_c = Q / (mu - lambda)
 
     const capacityVehHr = satFlow * (gSec / C);
     const vcRatio = capacityVehHr > 0 ? qVehHr / capacityVehHr : 99;
@@ -63,8 +72,8 @@ function simulatePlan(approaches, greenAllocation, config = {}) {
 
       if (totalGreenDemand <= maxDischargeCap && mu > lambda) {
         // Queue clears completely during green
-        const timeToClear = queuePeak / (mu - lambda);
-        const validClearTime = Math.min(gSec, timeToClear);
+        const tc = queuePeak / (mu - lambda);
+        const validClearTime = Math.min(gSec, tc);
         greenDelay = 0.5 * queuePeak * validClearTime;
         queueEnd = 0;
         servedInCycle = totalGreenDemand;
@@ -97,6 +106,12 @@ function simulatePlan(approaches, greenAllocation, config = {}) {
       isOversaturated: vcRatio > 1.0,
       greenTime: gSec,
       redTime: rSec,
+      dd1_metrics: {
+        lambda: parseFloat(lambda.toFixed(4)),
+        mu: parseFloat(mu.toFixed(4)),
+        redQueueQ: Math.round(redQueueQ),
+        timeToClearTcSec: isFinite(timeToClearTc) ? parseFloat(timeToClearTc.toFixed(2)) : 'Oversaturated'
+      },
       avgQueueLength: Math.round(avgQueue * 10) / 10,
       maxQueueLength: Math.round(maxQueueInSim),
       avgWaitTime: Math.round(avgWaitTimeSec * 10) / 10,
@@ -179,16 +194,17 @@ function calculateQueueMetrics(syntheticData, cycleLength, greenTime) {
   const capacityVehHr = satFlow * (greenTime / cycleLength);
   const vcRatio = capacityVehHr > 0 ? flowVehHr / capacityVehHr : 99;
 
-  let maxQueue = lambda * redTime;
-  let timeToClear = mu > lambda ? maxQueue / (mu - lambda) : Infinity;
+  const redQueueQ = lambda * redTime;
+  const timeToClearTc = mu > lambda ? redQueueQ / (mu - lambda) : Infinity;
   let totalDelay = 0;
+  let maxQueue = redQueueQ;
 
-  if (mu > lambda && timeToClear <= greenTime) {
-    totalDelay = (0.5 * maxQueue * redTime) + (0.5 * maxQueue * timeToClear);
+  if (mu > lambda && timeToClearTc <= greenTime) {
+    totalDelay = (0.5 * redQueueQ * redTime) + (0.5 * redQueueQ * timeToClearTc);
   } else {
-    let queueEnd = Math.max(0, maxQueue + (lambda - mu) * greenTime);
-    totalDelay = (0.5 * maxQueue * redTime) + (greenTime * (maxQueue + queueEnd) / 2);
-    maxQueue = Math.max(maxQueue, queueEnd);
+    let queueEnd = Math.max(0, redQueueQ + (lambda - mu) * greenTime);
+    totalDelay = (0.5 * redQueueQ * redTime) + (greenTime * (redQueueQ + queueEnd) / 2);
+    maxQueue = Math.max(redQueueQ, queueEnd);
   }
 
   const totalArrivals = lambda * cycleLength;
@@ -199,6 +215,12 @@ function calculateQueueMetrics(syntheticData, cycleLength, greenTime) {
     flow_veh_hr: flowVehHr,
     capacity_veh_hr: Math.round(capacityVehHr),
     vc_ratio: parseFloat(vcRatio.toFixed(2)),
+    dd1_metrics: {
+      lambda: parseFloat(lambda.toFixed(4)),
+      mu: parseFloat(mu.toFixed(4)),
+      redQueueQ: Math.round(redQueueQ),
+      timeToClearTcSec: isFinite(timeToClearTc) ? parseFloat(timeToClearTc.toFixed(2)) : 'Oversaturated'
+    },
     max_queue_length: Math.round(maxQueue),
     avg_queue_length: parseFloat(avgQueue.toFixed(2)),
     avg_delay_sec: parseFloat(avgDelay.toFixed(2))

@@ -78,45 +78,9 @@
       </div>
     </div>
 
-    <!-- CSV Upload Configuration -->
-    <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid rgba(56,189,248,0.3);">
-      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-        <h3 style="margin: 0; color: #38bdf8; display: flex; align-items: center; gap: 0.5rem;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="17 8 12 3 7 8"></polyline>
-            <line x1="12" y1="3" x2="12" y2="15"></line>
-          </svg>
-          Ingest Historical Traffic Data (CSV)
-        </h3>
-        <p style="margin: 0; font-size: 0.85rem; color: var(--text-dim);">Upload a CSV file containing: Time, Vehicles_Per_Minute, Lanes, and Incident.</p>
-        <div style="display: flex; gap: 1rem; align-items: center; margin-top: 1rem;">
-          <input type="file" id="csvFileInput" accept=".csv" style="flex: 1; padding: 0.5rem; border: 1px dashed var(--border-color); background: rgba(15,23,42,0.5); border-radius: 4px; color: var(--text-main);" />
-          <button id="btnProcessCsv" class="btn btn-primary" style="padding: 0.6rem 1.5rem; font-weight: 600;">Process Data</button>
-        </div>
-        <div id="csvUploadError" style="display: none; color: #ef4444; font-size: 0.85rem; margin-top: 0.5rem; font-weight: 500;"></div>
-      </div>
-    </div>
 
-    <!-- ── Interactive What-If Override ── -->
-    <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid rgba(16, 185, 129, 0.3);">
-      <h3 style="margin-top: 0; color: var(--status-low); display: flex; align-items: center; gap: 0.5rem;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <polyline points="12 16 16 12 12 8"></polyline>
-          <line x1="8" y1="12" x2="16" y2="12"></line>
-        </svg>
-        Manual Green Split Override (Seconds)
-      </h3>
-      <p style="margin: 0; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1.25rem;">Adjust the slider to instantly re-calculate D/D/1 queuing metrics and preview timing phases.</p>
-      
-      <div class="whatif-slider-container">
-        <input type="range" id="manualGreenOverride" class="range-slider" min="10" max="90" value="40" step="1" />
-        <div class="slider-label" style="text-align: right; margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-muted);">
-          Candidate Green Split: <span id="slider-value" style="font-size: 1.1rem; font-weight: 700; color: #2ecc71; font-family: var(--font-mono);">40</span> s
-        </div>
-      </div>
-    </div>
+
+
 
     <!-- ── Gantt-Style Phase Diagram Placeholder ── -->
     <div id="phase-diagram-container"></div>
@@ -839,10 +803,7 @@
                 'phase-diagram-container'
               );
               
-              // Initialize interactive slider
-              FlowGuard.initWhatIfSlider(syntheticRecord, baseline, 'simulation-results-container', 'phase-diagram-container');
-              
-              errorDiv.style.color = '#10b981';
+               errorDiv.style.color = '#10b981';
               errorDiv.textContent = `Success: Processed ${trafficData.length} records. Found peak at ${peakInfo.time_of_day}.`;
               errorDiv.style.display = 'block';
             } else {

@@ -16,8 +16,12 @@ router.get('/data/synthetic', analyticsController.getSyntheticData);
 // POST /api/analyze - Accepts traffic data array or approach configuration and returns v/c & congestion metrics
 router.post('/analyze', analyticsController.analyzeTraffic);
 
+// POST /api/optimize - Evaluates bottlenecks, calculates Webster's Optimum Cycle, & enforces Pedestrian Guardrail
+router.post('/optimize', analyticsController.optimizeTimings);
+
 // POST /api/simulate - Accepts timing plans and flow data, executes D/D/1 queue simulation
 router.post('/simulate', simulationController.simulateTraffic);
+
 
 // POST /api/recommend - Accepts simulation metrics and triggers Azure OpenAI rationale generation
 router.post('/recommend', aiController.getRecommendation);
