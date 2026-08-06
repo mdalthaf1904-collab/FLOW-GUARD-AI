@@ -316,6 +316,29 @@
       These are simulation constants only. <strong>No connection to real traffic signal infrastructure.</strong> No hardware communication is implemented.
     </div>
 
+    <!-- TASK 7: Visual Controller Decision Flow -->
+    <div class="card" style="margin-bottom: 1.25rem; padding: 1rem 1.25rem; background: rgba(15,23,42,0.6); border: 1px solid var(--border-color);">
+      <div style="font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--primary); font-weight: 700; margin-bottom: 0.6rem; display: flex; align-items: center; justify-content: space-between;">
+        <span>🎯 CONTROLLER DECISION FLOW (OFFLINE PIPELINE)</span>
+        <span class="badge badge-low" style="font-size: 0.7rem;">OFFLINE DECISION SUPPORT</span>
+      </div>
+      <div class="controller-decision-flow" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem; padding: 0.5rem 0.25rem;">
+        <div class="flow-step" style="background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.4); padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; color: #38bdf8; text-align: center;">1. Traffic Input</div>
+        <span style="color: var(--text-dim); font-size: 0.8rem;">➔</span>
+        <div class="flow-step" style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-align: center;">2. Engineering Analysis</div>
+        <span style="color: var(--text-dim); font-size: 0.8rem;">➔</span>
+        <div class="flow-step" style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-align: center;">3. Webster Optimization</div>
+        <span style="color: var(--text-dim); font-size: 0.8rem;">➔</span>
+        <div class="flow-step" style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-align: center;">4. IRC Validation</div>
+        <span style="color: var(--text-dim); font-size: 0.8rem;">➔</span>
+        <div class="flow-step" style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-align: center;">5. Signal Decision</div>
+        <span style="color: var(--text-dim); font-size: 0.8rem;">➔</span>
+        <div class="flow-step" style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color); padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-align: center;">6. Simulation</div>
+        <span style="color: var(--text-dim); font-size: 0.8rem;">➔</span>
+        <div class="flow-step" style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; color: #10b981; text-align: center;">7. Recommendation</div>
+      </div>
+    </div>
+
     <!-- Active Intersection Info Bar -->
     <div class="card" style="padding: 0.85rem 1.25rem; margin-bottom: 1.25rem;">
       <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">

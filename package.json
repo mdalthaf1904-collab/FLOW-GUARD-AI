@@ -1,15 +1,44 @@
 {
   "name": "flow-guard-ai",
   "version": "2.0.0",
-  "description": "FlowGuard AI - Express.js Full-Stack Backend for Traffic Signal Analysis & Simulation",
+  "description": "FlowGuard AI - Production Quality Offline Traffic Engineering Decision Support System & REST API",
   "main": "server/index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node server/index.js"
+    "dev": "node server/index.js",
+    "test": "jest --detectOpenHandles",
+    "test:coverage": "jest --coverage",
+    "security-check": "npm audit"
   },
+  "keywords": [
+    "traffic-engineering",
+    "signal-timing-optimization",
+    "webster-formula",
+    "irc93",
+    "irc106",
+    "queuing-theory",
+    "dd1-model",
+    "decision-support-system",
+    "express-js",
+    "full-stack"
+  ],
+  "author": "FlowGuard AI Engineering Team",
+  "license": "MIT",
   "dependencies": {
+    "compression": "^1.7.4",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "winston": "^3.13.0"
+  },
+  "devDependencies": {
+    "jest": "^29.5.0",
+    "supertest": "^6.3.3"
   }
 }

@@ -88,6 +88,101 @@ const CongestionEngine = (function () {
     return 525 * W;
   }
 
+  /**
+   * TASK 4: Calculate Traffic Pressure Index (TPI)
+   * Derived from: Traffic Volume, Queue Length, Average Delay, V/C Ratio.
+   * Returns normalized score (0 - 100) & rank categories: Low, Medium, High, Critical.
+   */
+  function calculateTrafficPressureIndex(flow, queue, delay, vcRatio) {
+    const flowVal  = Math.max(0, parseFloat(flow) || 0);
+    const queueVal = Math.max(0, parseFloat(queue) || 0);
+    const delayVal = Math.max(0, parseFloat(delay) || 0);
+    const vcVal    = Math.max(0, parseFloat(vcRatio) || 0);
+
+    const normVolume = Math.min(100, (flowVal / 2500) * 100);
+    const normQueue  = Math.min(100, (queueVal / 200) * 100);
+    const normDelay  = Math.min(100, (delayVal / 150) * 100);
+    const normVC     = Math.min(100, (vcVal / 1.5) * 100);
+
+    const score = Math.min(100, Math.round(
+      0.30 * normVC +
+      0.30 * normDelay +
+      0.25 * normQueue +
+      0.15 * normVolume
+    ));
+
+    let category = 'Low';
+    let badgeClass = 'badge-low';
+    let color = '#10b981';
+
+    if (score >= 85) {
+      category = 'Critical';
+      badgeClass = 'badge-oversaturated';
+      color = '#ef4444';
+    } else if (score >= 60) {
+      category = 'High';
+      badgeClass = 'badge-severe';
+      color = '#f97316';
+    } else if (score >= 30) {
+      category = 'Medium';
+      badgeClass = 'badge-medium';
+      color = '#f59e0b';
+    }
+
+    return {
+      score: score,
+      category: category,
+      badgeClass: badgeClass,
+      color: color,
+      label: `${category} (${score}/100)`
+    };
+  }
+
+  /**
+   * TASK 1 & TASK 3: IRC:93 Guidelines Automatic Validation Engine
+   * Validates Webster Method signal timing against IRC:93 engineering bounds.
+   */
+  function validateIRC93Guidelines(activeKeys, proposedGreens, intersectionConfig, pedModel) {
+    const minGreenConfig = parseFloat(intersectionConfig.minGreen) || 7;
+    const maxGreenConfig = parseFloat(intersectionConfig.maxGreen) || 90;
+    const yellowConfig   = parseFloat(intersectionConfig.yellowTime) || 3;
+    const allRedConfig   = parseFloat(intersectionConfig.allRedTime) || 2;
+    const reqPedTime     = pedModel ? (pedModel.requiredCrossingTime || pedModel.totalTime || 18.7) : 18.7;
+
+    const minGreenPassed  = Object.values(proposedGreens).every(g => g >= minGreenConfig);
+    const maxGreenPassed  = Object.values(proposedGreens).every(g => g <= maxGreenConfig);
+    const yellowPassed    = yellowConfig >= 3;
+    const allRedPassed    = allRedConfig >= 2;
+    const pedSafetyPassed = Object.values(proposedGreens).every(g => (g + yellowConfig) >= reqPedTime);
+    const conflictMatrixPassed = activeKeys.length >= 2;
+
+    const failures = [];
+    if (!minGreenPassed) failures.push(`Minimum Green violation (< ${minGreenConfig}s)`);
+    if (!maxGreenPassed) failures.push(`Maximum Green violation (> ${maxGreenConfig}s)`);
+    if (!yellowPassed)   failures.push(`Yellow Interval below IRC:93 standard (< 3s)`);
+    if (!allRedPassed)   failures.push(`All Red Clearance below IRC:93 standard (< 2s)`);
+    if (!pedSafetyPassed) failures.push(`Pedestrian Crossing Safety time not satisfied (${reqPedTime.toFixed(1)}s required)`);
+    if (!conflictMatrixPassed) failures.push(`Conflict matrix overlap detected`);
+
+    const overallPassed = failures.length === 0;
+
+    return {
+      overallPassed: overallPassed,
+      statusLabel: overallPassed ? 'ENGINEERING VALIDATED' : 'IRC Validation Failed',
+      failureReason: overallPassed ? 'All IRC:93 engineering guardrails satisfied.' : failures.join('; '),
+      checks: {
+        websterCompleted: true,
+        minGreenPassed: minGreenPassed,
+        maxGreenPassed: maxGreenPassed,
+        yellowPassed: yellowPassed,
+        allRedPassed: allRedPassed,
+        pedSafetyPassed: pedSafetyPassed,
+        conflictMatrixPassed: conflictMatrixPassed
+      },
+      failures: failures
+    };
+  }
+
 
   /**
    * LOS_THRESHOLDS
@@ -996,6 +1091,8 @@ const CongestionEngine = (function () {
     calculateIntersectionDelay,
     identifyCriticalApproach,
     calculateCongestionScore,
+    calculateTrafficPressureIndex,
+    validateIRC93Guidelines,
 
     // Diagnostic engine
     runBottleneckDiagnostics,

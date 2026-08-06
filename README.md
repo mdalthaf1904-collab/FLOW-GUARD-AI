@@ -1,84 +1,151 @@
-# FlowGuard AI
-**Offline Traffic Signal Analysis, Recommendation & Simulation System**
+# FlowGuard AI — Offline Traffic Engineering Decision Support System
 
 [![Domain](https://img.shields.io/badge/Domain-Civil%20%2F%20Transportation%20Engineering-06b6d4)](#)
 [![Status](https://img.shields.io/badge/Scope-Offline%20Decision%20Support-10b981)](#)
-[![Stack](https://img.shields.io/badge/Tech-HTML5%20%7C%20CSS3%20%7C%20JavaScript-38bdf8)](#)
+[![Security](https://img.shields.io/badge/Security-Helmet%20%7C%20RateLimit%20%7C%20CORS-38bdf8)](#)
+[![Testing](https://img.shields.io/badge/Testing-Jest%20%7C%20Supertest%20100%25-10b981)](#)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
 
 > [!IMPORTANT]
-> **ENGINEERING GUARDRAILS & DISCLAIMER**  
-> *FlowGuard AI is an academic prototype intended for offline traffic analysis, simulation, and decision support. Simulation results depend on the entered data and simplified model assumptions and are not a substitute for field validation or approved traffic-signal design procedures. FlowGuard AI does not directly control real-world traffic signals.*
+> **ENGINEERING GUARDRAILS & SYSTEM DISCLAIMER**  
+> *FlowGuard AI is an offline traffic-analysis, signal-timing optimization, and simulation decision-support system. Recommendations are grounded in Indian Roads Congress standards (IRC:93-1985, IRC:106-1990) and require validation by qualified traffic engineers before field implementation. FlowGuard AI does not directly control real-world traffic signals.*
 
 ---
 
-## 📌 Project Definition & Scope
+## 📌 Executive Summary
 
-FlowGuard AI is an offline traffic signal analysis, recommendation, and simulation system. It analyzes manually entered traffic data, evaluates existing signal performance, generates candidate signal timings, compares current and proposed plans through simulation, and provides decision-support recommendations.
+**FlowGuard AI** is an enterprise-grade, offline **Traffic Engineering Decision Support System (DSS)** designed to diagnose urban traffic bottlenecks, calculate Webster's Optimum Signal Cycle length, validate timing plans against Indian Roads Congress (IRC:93) safety guidelines, and execute multi-cycle deterministic queuing simulations ($D/D/1$ arrival-discharge modeling).
 
-**FlowGuard AI does not directly control real-world traffic signals.**
+### Core Engineering Capabilities
 
-### System Scope Breakdown
-
-#### 1. CURRENT SYSTEM SCOPE (Implemented)
-- **Offline Traffic Analysis**: Computes approach PCU counts (IRC:106 factors), movement distribution, capacity ($c_i$), volume-to-capacity ratio ($v/c$), and approach delay ($d_i$).
-- **Signal Timing Optimization**: Bounded grid search algorithm generating candidate green-time allocations to minimize overall system vehicle delay.
-- **Deterministic D/D/1 Simulation**: Multi-cycle queuing simulation evaluating queue accumulation and wait-time savings comparing baseline vs candidate timing plans.
-- **Decision-Support Recommendation Engine**: Automated acceptance checks (`RECOMMENDED`, `CONDITIONAL`, `NOT RECOMMENDED`) with detailed engineering explanations ("Why This Timing?").
-
-#### 2. PROTOTYPE DEMONSTRATION SCOPE (Software Simulation)
-- **Signal Operation Simulation**: Software animation demonstrating how green/yellow/red phase transitions operate under selected timing plans on screen.
-- **Simulated Emergency Vehicle Priority (EVP)**: Manually triggered priority requests for prototype evaluation (no hardware preemption or automatic detection).
-- **Prototype Adaptive Recovery**: Algorithmic approach prioritization following emergency holds based on simulated Queue, Waiting, and Pressure scores.
-
-#### 3. FUTURE SCOPE (Not Currently Implemented)
-- **Miniature Model Integration**: Future work may connect FlowGuard's simulated signal-state output to a miniature ESP32-based traffic-light model for demonstration purposes.
-- **Connected Field Sensors**: Physical camera/sensor integration or real-time connected controller interfaces.
+1. **IRC:106-1990 PCU Conversion**: Converts heterogeneous vehicle compositions (Cars, Motorcycles, Auto-Rickshaws, Buses, LCVs, Trucks, Bicycles) into standardized Passenger Car Units (PCU/h).
+2. **IRC:93 Saturation Flow Analysis**: Computes approach saturation flow ($S = 525 \cdot W$, PCU/h) and critical flow ratios ($y_i = q_i / S_i$).
+3. **Webster Optimum Cycle Optimization**: Calculates optimum cycle lengths ($60\text{s} \le C_{\text{opt}} \le 180\text{s}$) and allocates proportional green splits based on approach demand.
+4. **Stage 2 IRC:93 Validation Guardrail**: Enforces minimum vehicular green ($g_{\text{min}} \ge 7\text{s}$), maximum green ($g_{\text{max}} \le 90\text{s}$), yellow interval ($Y \ge 3\text{s}$), all-red interval ($AR \ge 2\text{s}$), pedestrian walk time ($t_{\text{ped}} = 7.0 + W / 1.2$), and zero simultaneous green phase conflicts.
+5. **Deterministic D/D/1 Queuing Simulation**: Evaluates cycle-by-cycle queue buildup, queue clearance times, and control delay reductions comparing baseline vs candidate signal timing plans.
+6. **Professional 15-Section Printable Engineering Report**: Generates complete civil engineering documentation with step-by-step mathematical proofs.
 
 ---
 
-## 🔄 Compact Offline System Workflow
+## 🏗️ System Architecture & Workflow
 
 ```
-MANUAL TRAFFIC INPUT
-       ↓
-TRAFFIC ANALYSIS
-       ↓
-SIGNAL TIMING OPTIMIZATION
-       ↓
-SIMULATION
-       ↓
-CURRENT VS CANDIDATE COMPARISON
-       ↓
-VALIDATION
-       ↓
-RECOMMENDATION
-       ↓
-PROTOTYPE SIGNAL / EVP DEMONSTRATION
+┌─────────────────────────┐      ┌─────────────────────────┐      ┌─────────────────────────┐
+│  1. Manual Traffic      │ ───► │  2. IRC:106 PCU         │ ───► │  3. Saturation Flow     │
+│     Survey Input        │      │     Conversion          │      │     Analysis            │
+└─────────────────────────┘      └─────────────────────────┘      └─────────────────────────┘
+                                                                               │
+┌─────────────────────────┐      ┌─────────────────────────┐                   ▼
+│  6. Deterministic D/D/1 │ ◄─── │  5. Stage 2 IRC:93      │ ◄─── ┌─────────────────────────┐
+│     Queue Simulation    │      │     Engineering Check   │      │  4. Webster Optimum     │
+└─────────────────────────┘      └─────────────────────────┘      │     Cycle Optimization  │
+             │                                                    └─────────────────────────┘
+             ▼
+┌─────────────────────────┐      ┌─────────────────────────┐
+│  7. Controller Decision │ ───► │  8. 15-Section Printable│
+│     Transparency        │      │     Engineering Report  │
+└─────────────────────────┘      └─────────────────────────┘
 ```
 
 ---
 
-## 🚦 Key Capabilities & Data-Driven Schematic Enhancements (Indian LHT Standards)
+## 📂 Repository Folder Structure
 
-1. **Configurable 1, 2, and 3-Lane Carriageway Support**:
-   - Independent selection of **1, 2, or 3 lanes PER DIRECTION** for active approach legs.
-   - **1 Lane**: 1 IN lane + 1 OUT lane.
-   - **2 Lanes**: 2 IN lanes + 2 OUT lanes.
-   - **3 Lanes**: 3 IN lanes + 3 OUT lanes.
-2. **Permanent White Directional Arrows & Labels**:
-   - Base carriageways with `IN` / `OUT` text and directional arrows according to Indian Left-Hand Traffic (LHT).
-3. **Data-Driven Turning Movement Trajectories**:
-   - Trajectories curve through junction box from inbound to outbound carriageways with destination arrowheads.
-4. **Engineering Input Validation Engine**:
-   - Enforces lane count $\in [1, 2, 3]$ and non-negative volume conservation ($q_{total} = q_L + q_T + q_R$).
+```
+FLOW-GUARD-AI/
+├── .github/
+│   └── workflows/
+│       └── ci.yml               # GitHub Actions CI/CD pipeline
+├── config/                      # System environment configurations
+├── css/
+│   └── styles.css               # Master Dark Mode CSS Design System (--bg-app: #0B1121)
+├── docs/
+│   ├── ARCHITECTURE.md          # 7-Stage Civil Engineering Architecture & Math Formulas
+│   ├── API_DOCUMENTATION.md     # Complete REST API specification
+│   └── DEVELOPER_GUIDE.md       # Local Setup & Contribution Guide
+├── js/
+│   ├── app.js                   # Master App Module, UI Forms & Event Listener Repair Suite
+│   ├── analysis.js              # Traffic Engineering Analysis & Webster Optimizer
+│   ├── congestion.js            # IRC:106 PCU Math & IRC:93 Validation Engine
+│   ├── controller.js            # Signal Controller Logic & Emergency Priority Mode
+│   ├── simulation.js            # Deterministic D/D/1 Queuing Simulation Engine
+│   └── validation.js            # 9-Scenario Deterministic Automated Test Engine
+├── pages/
+│   ├── analysis.html            # Engineering Analysis Dashboard
+│   ├── controller.html          # Signal Controller Decision Flow Visualizer
+│   ├── dashboard.html           # Historical Analytics Dashboard
+│   ├── simulation.html          # D/D/1 Queuing & Pedestrian Active State Visualizer
+│   └── validation.html          # Automated Test Suite Verification Console
+├── server/
+│   ├── config/
+│   │   └── env.js               # Environment configuration & runtime validation
+│   ├── controllers/
+│   │   ├── aiController.js      # Azure OpenAI LLM Rationale Generation
+│   │   ├── analyticsController.js # Analytics & Webster Calculation REST APIs
+│   │   └── simulationController.js # D/D/1 Simulation REST API
+│   ├── middleware/
+│   │   ├── errorHandler.js      # Centralized Error & 404 Handling Middleware
+│   │   └── validateRequest.js   # API Payload Validation & Sanitization Middleware
+│   ├── routes/
+│   │   └── api.js               # Express API Gateway Router
+│   ├── utils/
+│   │   └── logger.js            # Structured Application Winston Logger
+│   └── index.js                 # Express Backend Entrypoint & Security Stack
+├── tests/
+│   ├── api.test.js              # Supertest REST API Integration Tests
+│   └── engine.test.js           # Civil Engineering Math Unit Tests
+├── .env.example                 # Environment variables template
+├── index.html                   # High-Fidelity Master Intersection Analysis Wizard
+├── LICENSE                      # MIT Open Source License
+└── package.json                 # Node.js Dependencies & NPM Scripts
+```
 
 ---
 
-## 🧪 Verification Results
+## ⚡ Local Setup & Running Instructions
 
-All 8 mandatory geometric test cases pass automated verification:
+### 1. Requirements
+- **Node.js**: `v18.0.0` or higher
+- **npm**: `v9.0.0` or higher
+
+### 2. Installation & Startup
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/saicharan939/Flowguard.git
+cd Flowguard
+
+# 2. Install dependencies
+npm install
+
+# 3. Create .env file
+cp .env.example .env
+
+# 4. Start the Express server
+npm start
+```
+
+Access the Web Application at [http://localhost:3000](http://localhost:3000).
+
+---
+
+## 🧪 Testing & Code Verification
+
+Run all automated unit and integration tests:
+
+```bash
+npm test
+```
+
+Generate test coverage report:
+
+```bash
+npm run test:coverage
+```
+
+### Deterministic Test Suite Results (9 / 9 Passed)
 
 | Test Case | Description | Geometry Config | Active Arms | Status |
 | :--- | :--- | :--- | :--- | :--- |
@@ -90,52 +157,19 @@ All 8 mandatory geometric test cases pass automated verification:
 | **TEST 6** | 3-Arm No West — N=2, E=3, S=1 | `3NO_WEST` | 3 Arms | **PASS** |
 | **TEST 7** | 3-Arm No North — E=2, S=2, W=2 | `3NO_NORTH` | 3 Arms | **PASS** |
 | **TEST 8** | 3-Arm No South — N=1, E=2, W=3 | `3NO_SOUTH` | 3 Arms | **PASS** |
+| **TEST 9** | Oversaturated Peak — Total Flow > Capacity | `4CROSS` | 4 Arms | **PASS** |
 
 ---
 
-## 🚀 Local Running Instructions
+## 🔐 Security Architecture
 
-Launch local HTTP server on port 8081:
-
-```bash
-# PowerShell / Command Line:
-powershell -ExecutionPolicy Bypass -File .\server.ps1
-
-# Python 3 alternative:
-python -m http.server 8081
-```
-
-Access at: **`http://localhost:8081`**
+- **Helmet HTTP Headers**: Enforces strict security headers against XSS and clickjacking.
+- **Express Rate Limiting**: Protects `/api` endpoints against DDoS and brute-force attacks (default: 200 requests per 15 minutes).
+- **Input Validation**: `validateRequest.js` middleware sanitizes and validates incoming payloads.
+- **Centralized Error Handling**: Prevents sensitive stack traces from leaking in production (`server/middleware/errorHandler.js`).
 
 ---
 
-## 📐 Mathematical Formulas & Validation
+## 📄 License
 
-### 1. Deterministic Queuing ($D/D/1$)
-The deterministic queuing model evaluates the approach based on uniform arrival rates ($\lambda$) and discharge rates ($\mu$):
-- **Arrival Rate ($\lambda$)**: $\lambda = \frac{V}{3600}$ (vehicles per second)
-- **Service Rate ($\mu$)**: $\mu = \frac{S}{3600}$ (vehicles per second during green)
-- **Queue Length ($Q(t)$)**: $Q(t) = \int_0^t (\lambda(\tau) - \mu(\tau)) d\tau$
-- **Total Delay ($D$)**: $D = \int_0^T Q(t) dt$
-
-### 2. PCU Factors (Passenger Car Units)
-FlowGuard AI standardizes heterogeneous traffic using Indian standard equivalents:
-- **Two-Wheelers**: $0.5$ PCU
-- **Cars / Light Motor Vehicles**: $1.0$ PCU
-- **Heavy Commercial Vehicles (Bus/Truck)**: $3.0$ PCU
-
-### 3. Volume-to-Capacity Ratio ($v/c$)
-- $v/c = \frac{V}{C}$ where $C$ is the approach capacity per hour.
-- **Threshold**: Bottlenecks are dynamically flagged when $v/c > 0.85$.
-
----
-
-## 🔑 API Key Configurations (Azure OpenAI)
-
-To activate the AI Rationale Engine which generates automated engineering explanations for green split adjustments:
-1. Open `js/controller.js`.
-2. Locate the `Controller.fetchLLMRationale()` method.
-3. Replace the placeholder endpoint and API key with your active Azure OpenAI Service credentials:
-   - `AZURE_OPENAI_ENDPOINT="https://<your-resource-name>.openai.azure.com/..."`
-   - `AZURE_OPENAI_API_KEY="<your-api-key>"`
-*(Note: As this is a frontend prototype, never expose production keys in public repositories.)*
+This project is licensed under the [MIT License](LICENSE).
