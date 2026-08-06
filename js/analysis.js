@@ -3,7 +3,7 @@
  * Data-Driven 1, 2, & 3-Lane IN/OUT LHT Carriageway SVG Generator & Validation Engine
  */
 
-const AnalysisEngine = (function() {
+const AnalysisEngine = (function () {
   'use strict';
 
   function analyzeApproaches(approaches, intersectionConfig, configType = '4CROSS', inputMode = 'TURNING_MOVEMENTS') {
@@ -20,13 +20,13 @@ const AnalysisEngine = (function() {
       const numLanes = parseInt(app.lanes, 10) || 2;
       const totalSatFlow = numLanes * satPerLane;
 
-      const isLeftValid    = FlowGuard.isMovementValid(k, 'left', configType);
+      const isLeftValid = FlowGuard.isMovementValid(k, 'left', configType);
       const isThroughValid = FlowGuard.isMovementValid(k, 'through', configType);
-      const isRightValid   = FlowGuard.isMovementValid(k, 'right', configType);
+      const isRightValid = FlowGuard.isMovementValid(k, 'right', configType);
 
-      let qLeft    = Math.max(0, isLeftValid    ? (parseFloat(app.left) || 0) : 0);
+      let qLeft = Math.max(0, isLeftValid ? (parseFloat(app.left) || 0) : 0);
       let qThrough = Math.max(0, isThroughValid ? (parseFloat(app.through) || 0) : 0);
-      let qRight   = Math.max(0, isRightValid   ? (parseFloat(app.right) || 0) : 0);
+      let qRight = Math.max(0, isRightValid ? (parseFloat(app.right) || 0) : 0);
 
       let qTotal = 0;
       if (inputMode === 'TURNING_MOVEMENTS') {
@@ -39,17 +39,17 @@ const AnalysisEngine = (function() {
         if (validCount > 0) {
           if (isThroughValid && isLeftValid && isRightValid) {
             qThrough = Math.round(qTotal * 0.70);
-            qLeft    = Math.round(qTotal * 0.15);
-            qRight   = Math.round(qTotal * 0.15);
+            qLeft = Math.round(qTotal * 0.15);
+            qRight = Math.round(qTotal * 0.15);
           } else if (isThroughValid && isLeftValid) {
             qThrough = Math.round(qTotal * 0.80);
-            qLeft    = Math.round(qTotal * 0.20);
+            qLeft = Math.round(qTotal * 0.20);
           } else if (isThroughValid && isRightValid) {
             qThrough = Math.round(qTotal * 0.80);
-            qRight   = Math.round(qTotal * 0.20);
+            qRight = Math.round(qTotal * 0.20);
           } else if (isLeftValid && isRightValid) {
-            qLeft    = Math.round(qTotal * 0.50);
-            qRight   = Math.round(qTotal * 0.50);
+            qLeft = Math.round(qTotal * 0.50);
+            qRight = Math.round(qTotal * 0.50);
           }
         }
       }
@@ -57,9 +57,9 @@ const AnalysisEngine = (function() {
 
       totalDemand += qTotal;
 
-      const leftPct    = qTotal > 0 ? (qLeft / qTotal) * 100 : 0;
+      const leftPct = qTotal > 0 ? (qLeft / qTotal) * 100 : 0;
       const throughPct = qTotal > 0 ? (qThrough / qTotal) * 100 : 0;
-      const rightPct   = qTotal > 0 ? (qRight / qTotal) * 100 : 0;
+      const rightPct = qTotal > 0 ? (qRight / qTotal) * 100 : 0;
 
       const capacity = totalSatFlow * (g / C);
       const vcRatio = capacity > 0 ? qTotal / capacity : 99;
@@ -160,11 +160,11 @@ const AnalysisEngine = (function() {
     let currentBestScore = evaluateBalancedCandidateScore(currentBestSim, currentSimResult, activeKeys, initialSimResult);
 
     const stage2NetworkDelay = currentBestSim.overallAvgWaitTime || 0;
-    const stage2MaxQueue     = currentBestSim.overallMaxQueue || 0;
-    const stage2WorstDelay   = currentBestSim.maxApproachWaitTime || 0;
+    const stage2MaxQueue = currentBestSim.overallMaxQueue || 0;
+    const stage2WorstDelay = currentBestSim.maxApproachWaitTime || 0;
 
     let evaluationsCount = 1; // Initial Stage 2 plan evaluation
-    let iterationsCount  = 0;
+    let iterationsCount = 0;
     let improvedInStage3 = false;
 
     while (iterationsCount < PROTOTYPE_REFINEMENT_PARAMS.MAX_REFINEMENT_ITERATIONS && evaluationsCount < PROTOTYPE_REFINEMENT_PARAMS.MAX_EVALUATIONS) {
@@ -176,11 +176,11 @@ const AnalysisEngine = (function() {
           if (i === j) continue;
           if (evaluationsCount >= PROTOTYPE_REFINEMENT_PARAMS.MAX_EVALUATIONS) break;
 
-          const donorKey    = activeKeys[i];
+          const donorKey = activeKeys[i];
           const receiverKey = activeKeys[j];
-          const donorG      = currentBestGreens[donorKey] || gMin;
-          const receiverG   = currentBestGreens[receiverKey] || gMin;
-          const step        = PROTOTYPE_REFINEMENT_PARAMS.REFINEMENT_STEP_SECONDS;
+          const donorG = currentBestGreens[donorKey] || gMin;
+          const receiverG = currentBestGreens[receiverKey] || gMin;
+          const step = PROTOTYPE_REFINEMENT_PARAMS.REFINEMENT_STEP_SECONDS;
 
           // Check feasibility bounds
           if (donorG - step < gMin || receiverG + step > gMax) {
@@ -188,7 +188,7 @@ const AnalysisEngine = (function() {
           }
 
           const candGreens = { ...currentBestGreens };
-          candGreens[donorKey]    = donorG - step;
+          candGreens[donorKey] = donorG - step;
           candGreens[receiverKey] = receiverG + step;
 
           // Verify green sum
@@ -203,11 +203,11 @@ const AnalysisEngine = (function() {
 
           // Require a meaningful score improvement
           if (candScore < currentBestScore - 0.05) {
-            currentBestScore  = candScore;
+            currentBestScore = candScore;
             currentBestGreens = candGreens;
-            currentBestSim    = candSim;
+            currentBestSim = candSim;
             foundNeighborImprovement = true;
-            improvedInStage3  = true;
+            improvedInStage3 = true;
             break; // Greedy hill-climbing: accept first improving neighbor and restart
           }
         }
@@ -249,14 +249,14 @@ const AnalysisEngine = (function() {
    * Formula: Pedestrian Crossing Time = Start-up Time + (Crossing Width / Walking Speed)
    */
   function calculatePedestrianCrossingTime(crossingWidth, walkingSpeed, startUpTime) {
-    const width   = parseFloat(crossingWidth) > 0 ? parseFloat(crossingWidth) : 14.0;
-    const speed   = parseFloat(walkingSpeed) > 0 ? parseFloat(walkingSpeed) : 1.2;
+    const width = parseFloat(crossingWidth) > 0 ? parseFloat(crossingWidth) : 14.0;
+    const speed = parseFloat(walkingSpeed) > 0 ? parseFloat(walkingSpeed) : 1.2;
     const startUp = (startUpTime !== undefined && startUpTime !== null && startUpTime !== '' && !isNaN(parseFloat(startUpTime)))
       ? parseFloat(startUpTime) : 7.0;
 
-    const walkTime    = width / speed;
-    const totalTime   = startUp + walkTime;
-    const totalCeil   = Math.ceil(totalTime);
+    const walkTime = width / speed;
+    const totalTime = startUp + walkTime;
+    const totalCeil = Math.ceil(totalTime);
     const roundedTime = Math.round(totalTime * 10) / 10;
 
     return {
@@ -464,13 +464,13 @@ const AnalysisEngine = (function() {
     // Run active optimization with effectiveGMin
     const optRes = runOptimizationLoop(effectiveGMin);
 
-    const initialGreens     = optRes.stage1Greens;
-    const initialSimResult  = optRes.stage1SimResult;
-    const balancedGreens    = optRes.stage2Greens;
+    const initialGreens = optRes.stage1Greens;
+    const initialSimResult = optRes.stage1SimResult;
+    const balancedGreens = optRes.stage2Greens;
     const balancedSimResult = optRes.stage2SimResult;
-    const finalGreens       = optRes.finalGreens;
-    const finalSimResult    = optRes.finalSimResult;
-    const refinementStatus  = optRes.refinementStatus;
+    const finalGreens = optRes.finalGreens;
+    const finalSimResult = optRes.finalSimResult;
+    const refinementStatus = optRes.refinementStatus;
     const refinementSummary = optRes.refinementSummary;
 
     // Run central Validation Layer on FINAL STAGE 3 PLAN
@@ -486,14 +486,14 @@ const AnalysisEngine = (function() {
     const recommendation = {};
 
     activeKeys.forEach(k => {
-      const currG  = rawCurrentGreens[k];
-      const initG  = initialGreens[k];
-      const balG   = balancedGreens[k];
+      const currG = rawCurrentGreens[k];
+      const initG = initialGreens[k];
+      const balG = balancedGreens[k];
       const finalG = finalGreens[k];
 
-      const currW  = currentSimResult.approaches[k] ? currentSimResult.approaches[k].avgWaitTime : 0;
-      const initW  = initialSimResult.approaches[k] ? initialSimResult.approaches[k].avgWaitTime : 0;
-      const balW   = balancedSimResult.approaches[k] ? balancedSimResult.approaches[k].avgWaitTime : 0;
+      const currW = currentSimResult.approaches[k] ? currentSimResult.approaches[k].avgWaitTime : 0;
+      const initW = initialSimResult.approaches[k] ? initialSimResult.approaches[k].avgWaitTime : 0;
+      const balW = balancedSimResult.approaches[k] ? balancedSimResult.approaches[k].avgWaitTime : 0;
       const finalW = finalSimResult.approaches[k] ? finalSimResult.approaches[k].avgWaitTime : 0;
 
       const appName = activeApproaches[k] ? (activeApproaches[k].name || k) : k;
@@ -609,7 +609,7 @@ const AnalysisEngine = (function() {
     const overallWait = candSim.overallAvgWaitTime || 0;
     const currentOverall = currentSimResult ? (currentSimResult.overallAvgWaitTime || 0) : 0;
     const maxWait = candSim.maxApproachWaitTime || 0;
-    
+
     const delays = activeKeys.map(k => (candSim.approaches[k] ? candSim.approaches[k].avgWaitTime || 0 : 0));
     const minWait = Math.min(...delays);
     const spread = maxWait - minWait;
@@ -626,8 +626,8 @@ const AnalysisEngine = (function() {
     activeKeys.forEach(k => {
       const cWait = currentSimResult.approaches[k] ? (currentSimResult.approaches[k].avgWaitTime || 0) : 0;
       const bWait = candSim.approaches[k] ? (candSim.approaches[k].avgWaitTime || 0) : 0;
-      const cVC   = currentSimResult.approaches[k] ? (currentSimResult.approaches[k].vcRatio || 0) : 0;
-      const bVC   = candSim.approaches[k] ? (candSim.approaches[k].vcRatio || 0) : 0;
+      const cVC = currentSimResult.approaches[k] ? (currentSimResult.approaches[k].vcRatio || 0) : 0;
+      const bVC = candSim.approaches[k] ? (candSim.approaches[k].vcRatio || 0) : 0;
 
       const deltaWait = bWait - cWait;
 
@@ -820,7 +820,7 @@ const AnalysisEngine = (function() {
 
   function generateMovementMappingData(approaches, configType = '4CROSS') {
     const origins = ['north', 'east', 'south', 'west'];
-    const mTypes  = ['left', 'through', 'right'];
+    const mTypes = ['left', 'through', 'right'];
     const mappings = [];
 
     origins.forEach(orig => {
@@ -936,7 +936,7 @@ const AnalysisEngine = (function() {
 
   function generateMovementMappingData(approaches, configType = '4CROSS') {
     const origins = ['north', 'east', 'south', 'west'];
-    const mTypes  = ['left', 'through', 'right'];
+    const mTypes = ['left', 'through', 'right'];
     const mappings = [];
 
     origins.forEach(orig => {
@@ -981,15 +981,15 @@ const AnalysisEngine = (function() {
     const apps = analysisData.approaches || {};
 
     const hasNorth = activeKeys.includes('north');
-    const hasEast  = activeKeys.includes('east');
+    const hasEast = activeKeys.includes('east');
     const hasSouth = activeKeys.includes('south');
-    const hasWest  = activeKeys.includes('west');
+    const hasWest = activeKeys.includes('west');
 
     const fullNameMap = {
       north: 'ROAD A \u2014 NORTH',
-      east:  'ROAD B \u2014 EAST',
+      east: 'ROAD B \u2014 EAST',
       south: 'ROAD C \u2014 SOUTH',
-      west:  'ROAD D \u2014 WEST'
+      west: 'ROAD D \u2014 WEST'
     };
 
     let baseRoadsHTML = '';
@@ -1000,24 +1000,24 @@ const AnalysisEngine = (function() {
 
     // Corner Curbs & Absent Arm Boundary Lines (3-Arm Support)
     const nwCurb = (hasNorth && hasWest)
-      ? `<path d="M ${450 - MEDIAN_WIDTH/2 - (apps.north?.lanes||2)*LANE_WIDTH} 290 Q 290 290 290 ${450 - MEDIAN_WIDTH/2 - (apps.west?.lanes||2)*LANE_WIDTH}" stroke="#f8fafc" stroke-width="4" fill="none"/>`
+      ? `<path d="M ${450 - MEDIAN_WIDTH / 2 - (apps.north?.lanes || 2) * LANE_WIDTH} 290 Q 290 290 290 ${450 - MEDIAN_WIDTH / 2 - (apps.west?.lanes || 2) * LANE_WIDTH}" stroke="#f8fafc" stroke-width="4" fill="none"/>`
       : '';
     const neCurb = (hasNorth && hasEast)
-      ? `<path d="M ${450 + MEDIAN_WIDTH/2 + (apps.north?.lanes||2)*LANE_WIDTH} 290 Q 610 290 610 ${450 - MEDIAN_WIDTH/2 - (apps.east?.lanes||2)*LANE_WIDTH}" stroke="#f8fafc" stroke-width="4" fill="none"/>`
+      ? `<path d="M ${450 + MEDIAN_WIDTH / 2 + (apps.north?.lanes || 2) * LANE_WIDTH} 290 Q 610 290 610 ${450 - MEDIAN_WIDTH / 2 - (apps.east?.lanes || 2) * LANE_WIDTH}" stroke="#f8fafc" stroke-width="4" fill="none"/>`
       : '';
     const seCurb = (hasSouth && hasEast)
-      ? `<path d="M ${450 + MEDIAN_WIDTH/2 + (apps.south?.lanes||2)*LANE_WIDTH} 610 Q 610 610 610 ${450 + MEDIAN_WIDTH/2 + (apps.east?.lanes||2)*LANE_WIDTH}" stroke="#f8fafc" stroke-width="4" fill="none"/>`
+      ? `<path d="M ${450 + MEDIAN_WIDTH / 2 + (apps.south?.lanes || 2) * LANE_WIDTH} 610 Q 610 610 610 ${450 + MEDIAN_WIDTH / 2 + (apps.east?.lanes || 2) * LANE_WIDTH}" stroke="#f8fafc" stroke-width="4" fill="none"/>`
       : '';
     const swCurb = (hasSouth && hasWest)
-      ? `<path d="M ${450 - MEDIAN_WIDTH/2 - (apps.south?.lanes||2)*LANE_WIDTH} 610 Q 290 610 290 ${450 + MEDIAN_WIDTH/2 + (apps.west?.lanes||2)*LANE_WIDTH}" stroke="#f8fafc" stroke-width="4" fill="none"/>`
+      ? `<path d="M ${450 - MEDIAN_WIDTH / 2 - (apps.south?.lanes || 2) * LANE_WIDTH} 610 Q 290 610 290 ${450 + MEDIAN_WIDTH / 2 + (apps.west?.lanes || 2) * LANE_WIDTH}" stroke="#f8fafc" stroke-width="4" fill="none"/>`
       : '';
 
     curbsHTML = nwCurb + neCurb + seCurb + swCurb;
 
     if (!hasNorth) curbsHTML += `<line x1="290" y1="290" x2="610" y2="290" stroke="#f8fafc" stroke-width="6" />`;
-    if (!hasEast)  curbsHTML += `<line x1="610" y1="290" x2="610" y2="610" stroke="#f8fafc" stroke-width="6" />`;
+    if (!hasEast) curbsHTML += `<line x1="610" y1="290" x2="610" y2="610" stroke="#f8fafc" stroke-width="6" />`;
     if (!hasSouth) curbsHTML += `<line x1="290" y1="610" x2="610" y2="610" stroke="#f8fafc" stroke-width="6" />`;
-    if (!hasWest)  curbsHTML += `<line x1="290" y1="290" x2="290" y2="610" stroke="#f8fafc" stroke-width="6" />`;
+    if (!hasWest) curbsHTML += `<line x1="290" y1="290" x2="290" y2="610" stroke="#f8fafc" stroke-width="6" />`;
 
     // 1. NORTH ROAD (Road A)
     if (hasNorth) {
@@ -1037,7 +1037,7 @@ const AnalysisEngine = (function() {
         <line x1="455" y1="290" x2="${xRight}" y2="290" stroke="#ffffff" stroke-width="6" />
         <!-- Crosswalk Stripes -->
         <g stroke="#ffffff" stroke-width="4" opacity="0.8">
-          ${Array.from({length: Math.floor((xRight - xLeft)/14)}).map((_, i) => '<line x1="' + (xLeft + 5 + i*14) + '" y1="265" x2="' + (xLeft + 5 + i*14) + '" y2="282" />').join('')}
+          ${Array.from({ length: Math.floor((xRight - xLeft) / 14) }).map((_, i) => '<line x1="' + (xLeft + 5 + i * 14) + '" y1="265" x2="' + (xLeft + 5 + i * 14) + '" y2="282" />').join('')}
         </g>
         <!-- Outer Road Title (Outside top canvas edge) -->
         <text x="450" y="38" fill="#f8fafc" font-size="16" font-weight="bold" text-anchor="middle">ROAD A \u2014 NORTH (${nLanes} Lanes / Direction)</text>
@@ -1052,7 +1052,7 @@ const AnalysisEngine = (function() {
           </g>
         `;
       });
-      baseRoadsHTML += `<text x="${(xLeft + 445)/2}" y="225" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">OUT \u2191</text>`;
+      baseRoadsHTML += `<text x="${(xLeft + 445) / 2}" y="225" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">OUT \u2191</text>`;
 
       // IN Lanes (East half) - Southbound \u2193
       inCenters.forEach(cx => {
@@ -1063,7 +1063,7 @@ const AnalysisEngine = (function() {
           </g>
         `;
       });
-      baseRoadsHTML += `<text x="${(455 + xRight)/2}" y="115" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">IN \u2193</text>`;
+      baseRoadsHTML += `<text x="${(455 + xRight) / 2}" y="115" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">IN \u2193</text>`;
 
       // Lane dividers
       for (let i = 1; i < nLanes; i++) {
@@ -1102,7 +1102,7 @@ const AnalysisEngine = (function() {
         <line x1="610" y1="455" x2="610" y2="${yBottom}" stroke="#ffffff" stroke-width="6" />
         <!-- Crosswalk Stripes -->
         <g stroke="#ffffff" stroke-width="4" opacity="0.8">
-          ${Array.from({length: Math.floor((yBottom - yTop)/14)}).map((_, i) => '<line x1="618" y1="' + (yTop + 5 + i*14) + '" x2="635" y2="' + (yTop + 5 + i*14) + '" />').join('')}
+          ${Array.from({ length: Math.floor((yBottom - yTop) / 14) }).map((_, i) => '<line x1="618" y1="' + (yTop + 5 + i * 14) + '" x2="635" y2="' + (yTop + 5 + i * 14) + '" />').join('')}
         </g>
         <!-- Outer Road Title (Outside right canvas edge) -->
         <text x="862" y="455" fill="#f8fafc" font-size="15" font-weight="bold" text-anchor="start" writing-mode="tb" glyph-orientation-vertical="0">ROAD B \u2014 EAST (${eLanes} Lanes)</text>
@@ -1117,7 +1117,7 @@ const AnalysisEngine = (function() {
           </g>
         `;
       });
-      baseRoadsHTML += `<text x="675" y="${(yTop + 445)/2 + 4}" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">OUT \u2192</text>`;
+      baseRoadsHTML += `<text x="675" y="${(yTop + 445) / 2 + 4}" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">OUT \u2192</text>`;
 
       // IN Lanes (Bottom half) - Westbound \u2190
       inCenters.forEach(cy => {
@@ -1128,7 +1128,7 @@ const AnalysisEngine = (function() {
           </g>
         `;
       });
-      baseRoadsHTML += `<text x="785" y="${(455 + yBottom)/2 + 4}" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">IN \u2190</text>`;
+      baseRoadsHTML += `<text x="785" y="${(455 + yBottom) / 2 + 4}" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">IN \u2190</text>`;
 
       // Lane dividers
       for (let i = 1; i < eLanes; i++) {
@@ -1167,7 +1167,7 @@ const AnalysisEngine = (function() {
         <line x1="${xLeft}" y1="610" x2="445" stroke="#ffffff" stroke-width="6" />
         <!-- Crosswalk Stripes -->
         <g stroke="#ffffff" stroke-width="4" opacity="0.8">
-          ${Array.from({length: Math.floor((xRight - xLeft)/14)}).map((_, i) => '<line x1="' + (xLeft + 5 + i*14) + '" y1="618" x2="' + (xLeft + 5 + i*14) + '" y2="635" />').join('')}
+          ${Array.from({ length: Math.floor((xRight - xLeft) / 14) }).map((_, i) => '<line x1="' + (xLeft + 5 + i * 14) + '" y1="618" x2="' + (xLeft + 5 + i * 14) + '" y2="635" />').join('')}
         </g>
         <!-- Outer Road Title (Outside bottom canvas edge) -->
         <text x="450" y="872" fill="#f8fafc" font-size="16" font-weight="bold" text-anchor="middle">ROAD C \u2014 SOUTH (${sLanes} Lanes / Direction)</text>
@@ -1182,7 +1182,7 @@ const AnalysisEngine = (function() {
           </g>
         `;
       });
-      baseRoadsHTML += `<text x="${(xLeft + 445)/2}" y="785" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">IN \u2191</text>`;
+      baseRoadsHTML += `<text x="${(xLeft + 445) / 2}" y="785" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">IN \u2191</text>`;
 
       // OUT Lanes (East half) - Southbound \u2193
       outCenters.forEach(cx => {
@@ -1193,7 +1193,7 @@ const AnalysisEngine = (function() {
           </g>
         `;
       });
-      baseRoadsHTML += `<text x="${(455 + xRight)/2}" y="675" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">OUT \u2193</text>`;
+      baseRoadsHTML += `<text x="${(455 + xRight) / 2}" y="675" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">OUT \u2193</text>`;
 
       // Lane dividers
       for (let i = 1; i < sLanes; i++) {
@@ -1232,7 +1232,7 @@ const AnalysisEngine = (function() {
         <line x1="290" y1="455" x2="290" y2="${yBottom}" stroke="#ffffff" stroke-width="6" />
         <!-- Crosswalk Stripes -->
         <g stroke="#ffffff" stroke-width="4" opacity="0.8">
-          ${Array.from({length: Math.floor((yBottom - yTop)/14)}).map((_, i) => '<line x1="265" y1="' + (yTop + 5 + i*14) + '" x2="' + (yTop + 5 + i*14) + '" y2="282" />').join('')}
+          ${Array.from({ length: Math.floor((yBottom - yTop) / 14) }).map((_, i) => '<line x1="265" y1="' + (yTop + 5 + i * 14) + '" x2="' + (yTop + 5 + i * 14) + '" y2="282" />').join('')}
         </g>
         <!-- Outer Road Title (Outside left canvas edge) -->
         <text x="35" y="455" fill="#f8fafc" font-size="15" font-weight="bold" text-anchor="end" writing-mode="tb" glyph-orientation-vertical="0">ROAD D \u2014 WEST (${wLanes} Lanes)</text>
@@ -1247,7 +1247,7 @@ const AnalysisEngine = (function() {
           </g>
         `;
       });
-      baseRoadsHTML += `<text x="115" y="${(yTop + 445)/2 + 4}" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">OUT \u2190</text>`;
+      baseRoadsHTML += `<text x="115" y="${(yTop + 445) / 2 + 4}" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">OUT \u2190</text>`;
 
       // IN Lanes (Bottom half) - Eastbound \u2192
       inCenters.forEach(cy => {
@@ -1258,7 +1258,7 @@ const AnalysisEngine = (function() {
           </g>
         `;
       });
-      baseRoadsHTML += `<text x="225" y="${(455 + yBottom)/2 + 4}" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">IN \u2192</text>`;
+      baseRoadsHTML += `<text x="225" y="${(455 + yBottom) / 2 + 4}" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">IN \u2192</text>`;
 
       // Lane dividers
       for (let i = 1; i < wLanes; i++) {
@@ -1290,7 +1290,7 @@ const AnalysisEngine = (function() {
       if (!m.isValid || !m.volume || m.volume <= 0) return;
 
       const isOriginMatch = (selectedOrigin === 'ALL' || selectedOrigin === m.originKey);
-      const isMoveMatch   = (selectedMovement === 'ALL' || selectedMovement === m.movementType);
+      const isMoveMatch = (selectedMovement === 'ALL' || selectedMovement === m.movementType);
       const isHighlighted = isOriginMatch && isMoveMatch;
 
       const strokeColor = m.movementType === 'left' ? '#38bdf8' : (m.movementType === 'through' ? '#10b981' : '#f59e0b');
@@ -1328,7 +1328,7 @@ const AnalysisEngine = (function() {
       key: 'north',
       id: 'A',
       roadName: 'ROAD A \u2014 NORTH',
-      inboundVector:  { dx: 0, dy: 1, arrow: '\u2193', label: 'IN' },   // SOUTHBOUND (toward intersection)
+      inboundVector: { dx: 0, dy: 1, arrow: '\u2193', label: 'IN' },   // SOUTHBOUND (toward intersection)
       outboundVector: { dx: 0, dy: -1, arrow: '\u2191', label: 'OUT' }, // NORTHBOUND (away from intersection)
       inboundSide: 'right',
       outboundSide: 'left',
@@ -1339,7 +1339,7 @@ const AnalysisEngine = (function() {
       key: 'east',
       id: 'B',
       roadName: 'ROAD B \u2014 EAST',
-      inboundVector:  { dx: -1, dy: 0, arrow: '\u2190', label: 'IN' },  // WESTBOUND (toward intersection)
+      inboundVector: { dx: -1, dy: 0, arrow: '\u2190', label: 'IN' },  // WESTBOUND (toward intersection)
       outboundVector: { dx: 1, dy: 0, arrow: '\u2192', label: 'OUT' },  // EASTBOUND (away from intersection)
       inboundSide: 'bottom',
       outboundSide: 'top',
@@ -1350,7 +1350,7 @@ const AnalysisEngine = (function() {
       key: 'south',
       id: 'C',
       roadName: 'ROAD C \u2014 SOUTH',
-      inboundVector:  { dx: 0, dy: -1, arrow: '\u2191', label: 'IN' },  // NORTHBOUND (toward intersection)
+      inboundVector: { dx: 0, dy: -1, arrow: '\u2191', label: 'IN' },  // NORTHBOUND (toward intersection)
       outboundVector: { dx: 0, dy: 1, arrow: '\u2193', label: 'OUT' },  // SOUTHBOUND (away from intersection)
       inboundSide: 'left',
       outboundSide: 'right',
@@ -1361,7 +1361,7 @@ const AnalysisEngine = (function() {
       key: 'west',
       id: 'D',
       roadName: 'ROAD D \u2014 WEST',
-      inboundVector:  { dx: 1, dy: 0, arrow: '\u2192', label: 'IN' },   // EASTBOUND (toward intersection)
+      inboundVector: { dx: 1, dy: 0, arrow: '\u2192', label: 'IN' },   // EASTBOUND (toward intersection)
       outboundVector: { dx: -1, dy: 0, arrow: '\u2190', label: 'OUT' },  // WESTBOUND (away from intersection)
       inboundSide: 'top',
       outboundSide: 'bottom',
@@ -1379,19 +1379,19 @@ const AnalysisEngine = (function() {
 
     const coords = {
       north: {
-        in:  { start: { x: 440, y: 100 }, end: { x: 440, y: 260 }, expected: '\u2193', check: (dx, dy) => dy > 0 },
+        in: { start: { x: 440, y: 100 }, end: { x: 440, y: 260 }, expected: '\u2193', check: (dx, dy) => dy > 0 },
         out: { start: { x: 360, y: 260 }, end: { x: 360, y: 100 }, expected: '\u2191', check: (dx, dy) => dy < 0 }
       },
       east: {
-        in:  { start: { x: 700, y: 440 }, end: { x: 540, y: 440 }, expected: '\u2190', check: (dx, dy) => dx < 0 },
+        in: { start: { x: 700, y: 440 }, end: { x: 540, y: 440 }, expected: '\u2190', check: (dx, dy) => dx < 0 },
         out: { start: { x: 540, y: 360 }, end: { x: 700, y: 360 }, expected: '\u2192', check: (dx, dy) => dx > 0 }
       },
       south: {
-        in:  { start: { x: 360, y: 700 }, end: { x: 360, y: 540 }, expected: '\u2191', check: (dx, dy) => dy < 0 },
+        in: { start: { x: 360, y: 700 }, end: { x: 360, y: 540 }, expected: '\u2191', check: (dx, dy) => dy < 0 },
         out: { start: { x: 440, y: 540 }, end: { x: 440, y: 700 }, expected: '\u2193', check: (dx, dy) => dy > 0 }
       },
       west: {
-        in:  { start: { x: 100, y: 360 }, end: { x: 260, y: 360 }, expected: '\u2192', check: (dx, dy) => dx > 0 },
+        in: { start: { x: 100, y: 360 }, end: { x: 260, y: 360 }, expected: '\u2192', check: (dx, dy) => dx > 0 },
         out: { start: { x: 260, y: 440 }, end: { x: 200, y: 440 }, expected: '\u2190', check: (dx, dy) => dx < 0 }
       }
     };
@@ -1441,9 +1441,9 @@ const AnalysisEngine = (function() {
     const apps = analysisData.approaches || {};
 
     const hasNorth = activeKeys.includes('north');
-    const hasEast  = activeKeys.includes('east');
+    const hasEast = activeKeys.includes('east');
     const hasSouth = activeKeys.includes('south');
-    const hasWest  = activeKeys.includes('west');
+    const hasWest = activeKeys.includes('west');
 
     // Programmatic direction validation for active approaches
     const valRes = validateDirections(configType);
@@ -1832,24 +1832,24 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = Analysis
  * Parses synthetic historical data and identifies peak congestion hours
  * based on volume-to-capacity (v/c) ratios.
  */
-AnalysisEngine.identifyPeakCongestionHours = function(historicalData) {
+AnalysisEngine.identifyPeakCongestionHours = function (historicalData) {
   // Capacity assumption: roughly 15 vehicles per minute per lane (900 vphpl)
   const BASE_CAPACITY_PER_LANE_VPM = 15;
-  
+
   const hourlyAggregates = {};
-  
+
   historicalData.forEach(record => {
     // Capacity adjustment based on incident
     let capacityModifier = 1.0;
     if (record.incident_event === 'accident') capacityModifier = 0.5;
     else if (record.incident_event === 'roadwork') capacityModifier = 0.7;
-    
+
     const capacity = record.lanes * BASE_CAPACITY_PER_LANE_VPM * capacityModifier;
     const vcRatio = record.vehicles_per_minute / capacity;
-    
+
     const hour = record.time_of_day.split(':')[0]; // e.g., '07'
     const key = `${record.intersection_id}_${record.date}_${hour}`;
-    
+
     if (!hourlyAggregates[key]) {
       hourlyAggregates[key] = {
         intersection_id: record.intersection_id,
@@ -1861,7 +1861,7 @@ AnalysisEngine.identifyPeakCongestionHours = function(historicalData) {
         incidents: new Set()
       };
     }
-    
+
     hourlyAggregates[key].total_vc += vcRatio;
     hourlyAggregates[key].count += 1;
     if (vcRatio > hourlyAggregates[key].max_vc) {
@@ -1871,7 +1871,7 @@ AnalysisEngine.identifyPeakCongestionHours = function(historicalData) {
       hourlyAggregates[key].incidents.add(record.incident_event);
     }
   });
-  
+
   // Convert to array and calculate average v/c
   const hourlyResults = Object.values(hourlyAggregates).map(agg => ({
     intersection_id: agg.intersection_id,
@@ -1881,10 +1881,10 @@ AnalysisEngine.identifyPeakCongestionHours = function(historicalData) {
     avg_vc: parseFloat((agg.total_vc / agg.count).toFixed(2)),
     incidents: Array.from(agg.incidents)
   }));
-  
+
   // Sort by highest max v/c ratio
   hourlyResults.sort((a, b) => b.max_vc - a.max_vc);
-  
+
   // Filter for peak congestion (e.g. max v/c > 0.85)
   return hourlyResults.filter(result => result.max_vc > 0.85);
 };

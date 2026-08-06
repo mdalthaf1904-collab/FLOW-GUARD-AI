@@ -470,84 +470,441 @@ const FlowGuard = (function() {
   }
 
   /**
-   * Vanilla JS function to parse an uploaded CSV file.
-   * Expected columns (case-insensitive): Time, Vehicles_Per_Minute, Lanes, Incident
+   * Helper to normalize dataset row keys flexibly
    */
-  function parseTrafficCSV(file) {
+  function normalizeRow(row) {
+    const norm = {};
+    Object.keys(row).forEach(k => {
+      const cleanKey = k.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      norm[cleanKey] = row[k];
+    });
+    return norm;
+  }
+
+  /**
+   * Process raw dataset rows from CSV or Excel (.xlsx)
+   * Engineering schema:
+   * Time, Road, Cars, Bikes, AutoRickshaw, Bus, Truck, Bicycle, LeftTurn, Through, RightTurn, IncomingLanes, SpeedLimit(km/h), PedestrianCount, CrosswalkWidth(m), Incident
+   */
+  function processRawDatasetRows(rawRows) {
+    const records = [];
+    const aggregated = {
+      north: { road: 'Road A - North', name: 'Road A - North', key: 'north', cars: 0, bikes: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, left: 0, through: 0, right: 0, lanes: 2, speedLimit: 50, pedCount: 20, crosswalkWidth: 14, incident: 'None', recordsCount: 0 },
+      east:  { road: 'Road B - East',  name: 'Road B - East',  key: 'east',  cars: 0, bikes: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, left: 0, through: 0, right: 0, lanes: 2, speedLimit: 50, pedCount: 20, crosswalkWidth: 14, incident: 'None', recordsCount: 0 },
+      south: { road: 'Road C - South', name: 'Road C - South', key: 'south', cars: 0, bikes: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, left: 0, through: 0, right: 0, lanes: 2, speedLimit: 50, pedCount: 20, crosswalkWidth: 14, incident: 'None', recordsCount: 0 },
+      west:  { road: 'Road D - West',  name: 'Road D - West',  key: 'west',  cars: 0, bikes: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, left: 0, through: 0, right: 0, lanes: 2, speedLimit: 50, pedCount: 20, crosswalkWidth: 14, incident: 'None', recordsCount: 0 }
+    };
+
+    rawRows.forEach((row) => {
+      const n = normalizeRow(row);
+
+      const timeVal = n.time || n.timeofday || '00:00';
+      const roadVal = String(n.road || n.roadid || n.intersectionid || n.roadname || 'Road A').trim();
+
+      // Determine approach key
+      let key = 'north';
+      const rLower = roadVal.toLowerCase();
+      if (rLower.includes('b') || rLower.includes('east')) key = 'east';
+      else if (rLower.includes('c') || rLower.includes('south')) key = 'south';
+      else if (rLower.includes('d') || rLower.includes('west')) key = 'west';
+
+      const cars = parseInt(n.cars || n.car, 10) || 0;
+      const bikes = parseInt(n.bikes || n.bike || n.motorcycle || n.twowheeler || n.twowheeler, 10) || 0;
+      const autorickshaw = parseInt(n.autorickshaw || n.autorickshaws || n.auto || n.threewheeler, 10) || 0;
+      const bus = parseInt(n.bus || n.buses, 10) || 0;
+      const truck = parseInt(n.truck || n.trucks, 10) || 0;
+      const bicycle = parseInt(n.bicycle || n.bicycles || n.cycle, 10) || 0;
+
+      const leftTurn = parseInt(n.leftturn || n.left, 10) || 0;
+      const through = parseInt(n.through || n.thru || n.straight, 10) || 0;
+      const rightTurn = parseInt(n.rightturn || n.right, 10) || 0;
+
+      const incomingLanes = parseInt(n.incominglanes || n.lanes, 10) || 2;
+      const speedLimit = parseInt(n.speedlimitkmh || n.speedlimit, 10) || 50;
+      const pedCount = parseInt(n.pedestriancount || n.pedestrians, 10) || 20;
+      const crosswalkWidth = parseFloat(n.crosswalkwidthm || n.crosswalkwidth) || 14.0;
+      const incident = String(n.incident || n.incidentevent || 'None').trim();
+
+      const totalVeh = cars + bikes + autorickshaw + bus + truck + bicycle;
+
+      const rec = {
+        time: timeVal,
+        road: roadVal,
+        key: key,
+        cars: cars,
+        bikes: bikes,
+        autorickshaw: autorickshaw,
+        bus: bus,
+        truck: truck,
+        bicycle: bicycle,
+        totalVehicles: totalVeh,
+        leftTurn: leftTurn,
+        through: through,
+        rightTurn: rightTurn,
+        incomingLanes: incomingLanes,
+        speedLimit: speedLimit,
+        pedestrianCount: pedCount,
+        crosswalkWidth: crosswalkWidth,
+        incident: incident
+      };
+
+      records.push(rec);
+
+      // Accumulate into approach data
+      const target = aggregated[key];
+      target.cars += cars;
+      target.bikes += bikes;
+      target.autorickshaw += autorickshaw;
+      target.bus += bus;
+      target.truck += truck;
+      target.bicycle += bicycle;
+      target.left += leftTurn;
+      target.through += through;
+      target.right += rightTurn;
+      target.lanes = incomingLanes;
+      target.speedLimit = speedLimit;
+      target.pedCount += pedCount;
+      target.crosswalkWidth = crosswalkWidth;
+      if (incident !== 'None' && incident !== 'none' && incident !== '') {
+        target.incident = incident;
+      }
+      target.recordsCount += 1;
+    });
+
+    // Compute aggregated PCU, flow rate (veh/h), and turning percentages
+    Object.keys(aggregated).forEach(k => {
+      const a = aggregated[k];
+      a.totalVehicles = a.cars + a.bikes + a.autorickshaw + a.bus + a.truck + a.bicycle;
+      
+      // Calculate total PCU using exact IRC:106 PCU factors
+      a.pcuTotal = Math.round(
+        (a.cars * 1.0) +
+        (a.bikes * 0.5) +
+        (a.autorickshaw * 0.8) +
+        (a.bus * 3.0) +
+        (a.truck * 3.0) +
+        (a.bicycle * 0.4)
+      );
+
+      a.flow = a.pcuTotal; // Standard demand PCU/h
+
+      const turnSum = a.left + a.through + a.right;
+      if (turnSum > 0) {
+        a.leftPct = parseFloat(((a.left / turnSum) * 100).toFixed(1));
+        a.throughPct = parseFloat(((a.through / turnSum) * 100).toFixed(1));
+        a.rightPct = parseFloat(((a.right / turnSum) * 100).toFixed(1));
+      } else if (a.pcuTotal > 0) {
+        a.leftPct = 15.0;
+        a.throughPct = 70.0;
+        a.rightPct = 15.0;
+        a.left = Math.round(a.pcuTotal * 0.15);
+        a.through = Math.round(a.pcuTotal * 0.70);
+        a.right = Math.round(a.pcuTotal * 0.15);
+      } else {
+        a.leftPct = 0;
+        a.throughPct = 0;
+        a.rightPct = 0;
+      }
+    });
+
+    return {
+      records: records,
+      aggregated: aggregated
+    };
+  }
+
+  /**
+   * Universal Traffic Dataset Import Parser
+   * Supports both CSV and Excel (.xlsx) formats.
+   */
+  function parseTrafficDataset(file) {
     return new Promise((resolve, reject) => {
       if (!file) {
-        return reject(new Error("No file selected. Please choose a CSV file."));
+        return reject(new Error("No file selected. Please choose a CSV or Excel (.xlsx) file."));
       }
 
-      const reader = new FileReader();
+      const fileName = file.name.toLowerCase();
+      const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
 
-      reader.onload = function(e) {
-        let text = e.target.result;
-        if (!text || text.trim() === '') {
-          return reject(new Error("The uploaded file is empty."));
+      if (isExcel) {
+        if (typeof XLSX === 'undefined') {
+          return reject(new Error("SheetJS (xlsx) library is not loaded. Please ensure script tag is included."));
         }
-        text = text.replace(/^\uFEFF/, '');
-
-        const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-        if (lines.length < 2) {
-          return reject(new Error("The CSV must contain a header row and at least one data row."));
-        }
-
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-        const requiredColumns = ['time', 'vehicles_per_minute', 'lanes', 'incident'];
-        
-        const missing = requiredColumns.filter(col => !headers.includes(col));
-        if (missing.length > 0) {
-          return reject(new Error(`Missing required columns: ${missing.join(', ')}`));
-        }
-
-        const timeIdx = headers.indexOf('time');
-        const vpmIdx = headers.indexOf('vehicles_per_minute');
-        const lanesIdx = headers.indexOf('lanes');
-        const incidentIdx = headers.indexOf('incident');
-
-        const parsedData = [];
-
-        for (let i = 1; i < lines.length; i++) {
-          const cols = lines[i].split(',').map(c => c.trim());
-          if (cols.length < headers.length) {
-            return reject(new Error(`Malformed data at row ${i + 1}: incorrect number of columns.`));
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+            if (!rawRows || rawRows.length === 0) {
+              return reject(new Error("The uploaded Excel sheet contains no data rows."));
+            }
+            const result = processRawDatasetRows(rawRows);
+            resolve(result);
+          } catch (err) {
+            reject(new Error("Failed to parse Excel file: " + err.message));
           }
+        };
+        reader.onerror = () => reject(new Error("Failed to read Excel file."));
+        reader.readAsArrayBuffer(file);
+      } else {
+        // CSV Parser
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            let text = e.target.result;
+            if (!text || text.trim() === '') {
+              return reject(new Error("The CSV file is empty."));
+            }
+            text = text.replace(/^\uFEFF/, '');
+            const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+            if (lines.length < 2) {
+              return reject(new Error("The CSV file must contain a header row and data rows."));
+            }
 
-          const timeVal = cols[timeIdx];
-          const vpmVal = parseInt(cols[vpmIdx], 10);
-          const lanesVal = parseInt(cols[lanesIdx], 10);
-          const incidentVal = cols[incidentIdx];
-
-          // Basic validation for H:MM, HH:MM, or HH:MM:SS
-          if (!timeVal || !timeVal.match(/^\d{1,2}:\d{2}(:\d{2})?$/)) {
-            return reject(new Error(`Malformed time format at row ${i + 1}. Expected HH:MM.`));
+            const headers = lines[0].split(',').map(h => h.trim());
+            const rawRows = [];
+            for (let i = 1; i < lines.length; i++) {
+              const cols = lines[i].split(',').map(c => c.trim());
+              const rowObj = {};
+              headers.forEach((h, idx) => {
+                rowObj[h] = cols[idx] !== undefined ? cols[idx] : '';
+              });
+              rawRows.push(rowObj);
+            }
+            const result = processRawDatasetRows(rawRows);
+            resolve(result);
+          } catch (err) {
+            reject(new Error("Failed to parse CSV file: " + err.message));
           }
-
-          if (isNaN(vpmVal) || vpmVal < 0) {
-            return reject(new Error(`Invalid Vehicles_Per_Minute at row ${i + 1}.`));
-          }
-          if (isNaN(lanesVal) || lanesVal <= 0) {
-            return reject(new Error(`Invalid Lanes count at row ${i + 1}.`));
-          }
-
-          parsedData.push({
-            time_of_day: timeVal,
-            vehicles_per_minute: vpmVal,
-            lanes: lanesVal,
-            incident_event: incidentVal
-          });
-        }
-
-        resolve(parsedData);
-      };
-
-      reader.onerror = function() {
-        reject(new Error("Failed to read the file. It may be corrupted or inaccessible."));
-      };
-
-      reader.readAsText(file);
+        };
+        reader.onerror = () => reject(new Error("Failed to read CSV file."));
+        reader.readAsText(file);
+      }
     });
+  }
+
+  function parseTrafficCSV(file) {
+    return parseTrafficDataset(file);
+  }
+
+  /**
+   * Webster Signal Timing Engine
+   * Calculates Saturation Flow, Flow Ratios, Webster Optimum Cycle, and Green Splits.
+   */
+  function calculateWebsterEngine(approachesData) {
+    const roadKeys = ['north', 'east', 'south', 'west'];
+    const activeKeys = roadKeys.filter(k => approachesData[k] && (approachesData[k].flow > 0 || approachesData[k].pcuTotal > 0 || approachesData[k].lanes > 0));
+
+    const results = {};
+    let totalFlowRatioY = 0;
+    const amberTime = 3;   // seconds
+    const allRedTime = 2;  // seconds
+    const numPhases = activeKeys.length || 4;
+    const totalLostTimeL = numPhases * (amberTime + allRedTime); // e.g. 4 * 5 = 20s
+
+    // Step 1 & 2: Calculate Saturation Flow and Flow Ratio per approach
+    activeKeys.forEach(k => {
+      const app = approachesData[k];
+      const demandPCU = parseFloat(app.flow || app.pcuTotal) || 0;
+      const lanes = parseInt(app.lanes, 10) || 2;
+      const approachWidthM = lanes * 3.5;
+      
+      // Saturation Flow S = 525 * width (IRC:93 / Webster standard formula)
+      const SatFlowS = Math.round(525 * approachWidthM);
+      const flowRatioY = SatFlowS > 0 ? parseFloat((demandPCU / SatFlowS).toFixed(4)) : 0;
+
+      totalFlowRatioY += flowRatioY;
+
+      results[k] = {
+        key: k,
+        name: app.road || app.name || k,
+        demandPCU: demandPCU,
+        lanes: lanes,
+        approachWidthM: approachWidthM,
+        SatFlowS: SatFlowS,
+        flowRatioY: flowRatioY
+      };
+    });
+
+    // Step 3 & 4: Compute Webster Optimum Cycle C = (1.5L + 5) / (1 - Y)
+    const Y_calc = Math.min(0.95, totalFlowRatioY);
+    let websterCycle = Math.round((1.5 * totalLostTimeL + 5) / (1 - Y_calc));
+    
+    // IRC:93 Cycle Length Bounds: Minimum 40s, Maximum 180s
+    websterCycle = Math.max(40, Math.min(180, websterCycle));
+
+    // Step 5: Effective Green Total G_total = C - L
+    const effectiveGreenTotal = Math.max(10, websterCycle - totalLostTimeL);
+
+    // Step 6: Allocate Green Split proportionally g_i = (y_i / Y) * G_total
+    let totalAllocatedGreen = 0;
+    activeKeys.forEach(k => {
+      const res = results[k];
+      const proportion = totalFlowRatioY > 0 ? (res.flowRatioY / totalFlowRatioY) : (1 / numPhases);
+      let g_i = Math.max(7, Math.round(proportion * effectiveGreenTotal));
+      res.greenSplit = g_i;
+      totalAllocatedGreen += g_i;
+    });
+
+    // Adjust any rounding difference on critical approach
+    const diff = effectiveGreenTotal - totalAllocatedGreen;
+    if (diff !== 0 && activeKeys.length > 0) {
+      let maxKey = activeKeys[0];
+      activeKeys.forEach(k => {
+        if (results[k].flowRatioY > results[maxKey].flowRatioY) maxKey = k;
+      });
+      results[maxKey].greenSplit += diff;
+    }
+
+    return {
+      activeKeys: activeKeys,
+      totalLostTimeL: totalLostTimeL,
+      totalFlowRatioY: parseFloat(totalFlowRatioY.toFixed(4)),
+      websterCycle: websterCycle,
+      effectiveGreenTotal: effectiveGreenTotal,
+      amberTime: amberTime,
+      allRedTime: allRedTime,
+      approaches: results
+    };
+  }
+
+  /**
+   * IRC:93 Signal Timing Engineering Validation
+   */
+  function validateIRC93(websterResult, approachesData) {
+    const validations = [];
+    const updatedGreenSplits = {};
+    let totalAdjustedGreen = 0;
+
+    websterResult.activeKeys.forEach(k => {
+      const res = websterResult.approaches[k];
+      const app = approachesData[k] || {};
+      const crosswalkWidthM = parseFloat(app.crosswalkWidth) || 14.0;
+      const walkSpeedMs = 1.2; // IRC standard pedestrian walk speed (m/s)
+      const startUpTimeSec = 7.0; // IRC standard pedestrian start-up time (s)
+
+      // Minimum Pedestrian Crossing Time T_ped = 7 + (W / 1.2)
+      const pedCrossingTimeReq = parseFloat((startUpTimeSec + (crosswalkWidthM / walkSpeedMs)).toFixed(1));
+      const minGreenReq = Math.max(7, Math.ceil(pedCrossingTimeReq));
+      const maxGreenReq = 90;
+
+      let g_final = res.greenSplit;
+      let status = 'PASSED';
+      const notes = [];
+
+      if (g_final < 7) {
+        notes.push(`Minimum vehicular green violation (< 7s). Adjusted to 7s.`);
+        g_final = 7;
+        status = 'AUTO_ADJUSTED';
+      }
+
+      if (g_final < minGreenReq) {
+        notes.push(`Pedestrian crossing requirement (${minGreenReq}s for ${crosswalkWidthM}m crosswalk) not met. Auto-adjusted green from ${g_final}s to ${minGreenReq}s.`);
+        g_final = minGreenReq;
+        status = 'AUTO_ADJUSTED';
+      }
+
+      if (g_final > maxGreenReq) {
+        notes.push(`Maximum green bound exceeded (> 90s). Capped to 90s.`);
+        g_final = maxGreenReq;
+        status = 'AUTO_ADJUSTED';
+      }
+
+      updatedGreenSplits[k] = g_final;
+      totalAdjustedGreen += g_final;
+
+      validations.push({
+        key: k,
+        name: res.name,
+        calculatedGreen: res.greenSplit,
+        validatedGreen: g_final,
+        pedCrossingTimeReq: pedCrossingTimeReq,
+        minGreenReq: minGreenReq,
+        maxGreenReq: maxGreenReq,
+        amberTime: websterResult.amberTime,
+        allRedTime: websterResult.allRedTime,
+        status: status,
+        notes: notes.length > 0 ? notes.join(' ') : '✓ IRC:93 timing bounds satisfied.'
+      });
+    });
+
+    // Recompute total cycle = sum(Green) + sum(Amber) + sum(AllRed)
+    const finalCycleTime = totalAdjustedGreen + websterResult.totalLostTimeL;
+
+    return {
+      finalCycleTime: finalCycleTime,
+      totalAdjustedGreen: totalAdjustedGreen,
+      validations: validations,
+      updatedGreenSplits: updatedGreenSplits
+    };
+  }
+
+  /**
+   * Professional Step-by-Step Calculation Panel Generator
+   */
+  function buildCalculationPanelHTML(key, app, websterRes, valData) {
+    const res = (websterRes.approaches || {})[key] || {};
+    const val = ((valData || {}).validations || []).find(v => v.key === key) || {};
+    const finalGreen = val.validatedGreen || res.greenSplit || 30;
+    const finalCycle = (valData || {}).finalCycleTime || websterRes.websterCycle || 120;
+    const satFlow = res.SatFlowS || ((app.lanes || 2) * 1838);
+    const capacity = Math.round(satFlow * (finalGreen / finalCycle));
+    const demandPCU = app.pcuTotal || app.flow || 0;
+    const vc = capacity > 0 ? (demandPCU / capacity) : 0;
+    const isOver = vc > 1.0;
+
+    const panelId = `calc_panel_${key}`;
+
+    return `
+      <div style="background: rgba(15,23,42,0.7); border: 1px solid rgba(56,189,248,0.3); border-radius: 8px; margin-top: 0.75rem; overflow: hidden;">
+        <button onclick="document.getElementById('${panelId}').style.display = document.getElementById('${panelId}').style.display === 'none' ? 'block' : 'none'" style="width: 100%; text-align: left; background: rgba(30,41,59,0.8); color: #38bdf8; border: none; padding: 0.75rem 1rem; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+          <span>🔍 ${app.road || app.name || key.toUpperCase()} — Detailed Step-by-Step Engineering Calculation Breakdown</span>
+          <span style="font-size: 0.8rem; color: #a5b4fc;">▼ Expand / Collapse</span>
+        </button>
+        <div id="${panelId}" style="display: none; padding: 1rem; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.6; color: #e2e8f0; border-top: 1px solid rgba(255,255,255,0.1);">
+          
+          <div style="color: #38bdf8; font-weight: 700; margin-bottom: 0.3rem;">[STEP 1: VEHICLE COUNTS FROM DATASET]</div>
+          <div>• Cars: <strong>${app.cars || 0}</strong> | Bikes: <strong>${app.bikes || 0}</strong> | Auto: <strong>${app.autorickshaw || 0}</strong> | Bus: <strong>${app.bus || 0}</strong> | Truck: <strong>${app.truck || 0}</strong> | Bicycle: <strong>${app.bicycle || 0}</strong></div>
+          <div>• Total Physical Vehicles = ${app.totalVehicles || (app.cars + app.bikes + app.autorickshaw + app.bus + app.truck + app.bicycle) || 0} vehicles</div>
+
+          <div style="color: #38bdf8; font-weight: 700; margin-top: 0.75rem; margin-bottom: 0.3rem;">[STEP 2: IRC:106-1990 PCU CONVERSION]</div>
+          <div>• Formula: Total PCU = (Cars×1.0) + (Bikes×0.5) + (Auto×0.8) + (Bus×3.0) + (Truck×3.0) + (Bicycle×0.4)</div>
+          <div>• Calculation: (${app.cars || 0}×1.0) + (${app.bikes || 0}×0.5) + (${app.autorickshaw || 0}×0.8) + (${app.bus || 0}×3.0) + (${app.truck || 0}×3.0) + (${app.bicycle || 0}×0.4)</div>
+          <div>• Result Total Demand = <strong style="color: var(--primary);">${demandPCU} PCU/h</strong></div>
+
+          <div style="color: #38bdf8; font-weight: 700; margin-top: 0.75rem; margin-bottom: 0.3rem;">[STEP 3: TURNING MOVEMENT DISTRIBUTION]</div>
+          <div>• Dataset Turning Counts: Left = <strong>${app.left || 0}</strong>, Through = <strong>${app.through || 0}</strong>, Right = <strong>${app.right || 0}</strong></div>
+          <div>• Turning Percentage Share: Left = <strong>${app.leftPct || 0}%</strong> | Through = <strong>${app.throughPct || 0}%</strong> | Right = <strong>${app.rightPct || 0}%</strong></div>
+
+          <div style="color: #38bdf8; font-weight: 700; margin-top: 0.75rem; margin-bottom: 0.3rem;">[STEP 4: SATURATION FLOW & FLOW RATIO]</div>
+          <div>• Incoming Lanes (N) = <strong>${app.lanes || 2}</strong> IN Lanes | Carriageway Width (W) = <strong>${(app.lanes || 2) * 3.5}m</strong></div>
+          <div>• Saturation Flow S = 525 × W = 525 × ${(app.lanes || 2) * 3.5} = <strong style="color: #10b981;">${satFlow} PCU/h</strong></div>
+          <div>• Flow Ratio y = Demand / S = ${demandPCU} / ${satFlow} = <strong style="color: #f59e0b;">${res.flowRatioY || 0}</strong></div>
+
+          <div style="color: #38bdf8; font-weight: 700; margin-top: 0.75rem; margin-bottom: 0.3rem;">[STEP 5: WEBSTER OPTIMUM CYCLE & GREEN SPLIT]</div>
+          <div>• Total Critical Flow Ratio Y = sum(y_i) = <strong>${websterRes.totalFlowRatioY || 0}</strong></div>
+          <div>• Total Lost Time L = sum(Amber + AllRed) = <strong>${websterRes.totalLostTimeL || 20}s</strong></div>
+          <div>• Webster Optimum Cycle C = (1.5L + 5) / (1 - Y) = <strong style="color: #6366f1;">${websterRes.websterCycle || 120}s</strong></div>
+          <div>• Webster Allocated Green g_i = (y_i / Y) × (C - L) = <strong>${res.greenSplit || 30}s</strong></div>
+
+          <div style="color: #38bdf8; font-weight: 700; margin-top: 0.75rem; margin-bottom: 0.3rem;">[STEP 6: IRC:93 ENGINEERING VALIDATION]</div>
+          <div>• Min Vehicular Green Required = 7s</div>
+          <div>• Min Pedestrian Crossing Time = 7s + (${app.crosswalkWidth || 14}m / 1.2m/s) = <strong>${val.pedCrossingTimeReq || 18.7}s</strong></div>
+          <div>• Validation Status: <strong style="color: ${val.status === 'PASSED' ? '#10b981' : '#f59e0b'};">${val.status || 'PASSED'}</strong> — ${val.notes || 'OK'}</div>
+          <div>• Final Validated Green Split = <strong style="color: #10b981;">${finalGreen}s</strong></div>
+
+          <div style="color: #38bdf8; font-weight: 700; margin-top: 0.75rem; margin-bottom: 0.3rem;">[STEP 7: FINAL APPROACH CAPACITY & PERFORMANCE]</div>
+          <div>• Final Cycle Length C = sum(Green) + sum(Amber) + sum(AllRed) = <strong style="color: #6366f1;">${finalCycle}s</strong></div>
+          <div>• Approach Capacity = S × (Green / Cycle) = ${satFlow} × (${finalGreen} / ${finalCycle}) = <strong style="color: #10b981;">${capacity} PCU/h</strong></div>
+          <div>• Volume-to-Capacity Ratio v/c = ${demandPCU} / ${capacity} = <strong style="color: ${isOver ? '#ef4444' : '#10b981'};">${vc.toFixed(2)}</strong></div>
+          <div>• Level of Service (LOS): <strong style="color: ${isOver ? '#ef4444' : '#10b981'};">${isOver ? 'LOS F (Oversaturated)' : 'LOS A - D (Optimal)'}</strong></div>
+
+        </div>
+      </div>
+    `;
   }
 
   /**
@@ -684,22 +1041,28 @@ const FlowGuard = (function() {
     const roadKeys = ['north', 'east', 'south', 'west'];
     const roadNamesMap = { north: 'Road A - North', east: 'Road B - East', south: 'Road C - South', west: 'Road D - West' };
 
+    // Perform Webster Signal Timing Engine & IRC:93 Engineering Validation
+    const websterRes = calculateWebsterEngine(approaches);
+    const valRes = validateIRC93(websterRes, approaches);
+
     let totalDemandPCU = 0;
     const roadData = {};
 
     roadKeys.forEach(k => {
       const app = approaches[k] || {};
-      const flow = parseFloat(app.flow) || 0;
+      const flow = parseFloat(app.flow || app.pcuTotal) || 0;
       const left = parseFloat(app.left) || 0;
       const through = parseFloat(app.through) || 0;
       const right = parseFloat(app.right) || 0;
       const lanes = parseInt(app.lanes, 10) || 2;
-      const green = parseFloat(app.currentGreen) || 30;
+      const valInfo = (valRes.validations || []).find(v => v.key === k) || {};
+      const recGreen = valInfo.validatedGreen || (websterRes.approaches[k] ? websterRes.approaches[k].greenSplit : 30);
+      const currGreen = parseFloat(app.currentGreen) || 30;
       const uploaded = app.uploaded === true || (flow > 0 && app.fromCSV === true);
 
-      // Compute capacity based on lanes & green split
-      const satFlow = 525 * (lanes * 3.5);
-      const capacity = Math.round(satFlow * (green / 120)) || 900;
+      // Compute Saturation Flow S = 525 * (lanes * 3.5m)
+      const satFlow = Math.round(525 * (lanes * 3.5));
+      const capacity = Math.round(satFlow * (recGreen / valRes.finalCycleTime)) || 900;
       const vc = capacity > 0 ? parseFloat((flow / capacity).toFixed(2)) : 0;
 
       roadData[k] = {
@@ -709,11 +1072,14 @@ const FlowGuard = (function() {
         through: through,
         right: right,
         lanes: lanes,
-        green: green,
+        green: currGreen,
+        recGreen: recGreen,
         capacity: capacity,
+        satFlow: satFlow,
         vc: vc,
         uploaded: uploaded,
-        isOversaturated: vc > 1.0
+        isOversaturated: vc > 1.0,
+        appObj: app
       };
 
       totalDemandPCU += flow;
@@ -734,9 +1100,9 @@ const FlowGuard = (function() {
           <h4 style="margin: 0 0 0.5rem 0; color: ${r.uploaded ? 'var(--primary)' : 'var(--text-muted)'};">${r.name}</h4>
           <div style="font-size: 0.83rem; display: flex; flex-direction: column; gap: 0.25rem;">
             <div>Incoming Lanes: <strong>${r.lanes} IN Lanes</strong></div>
-            <div>Speed Limit: <strong>50 km/h</strong></div>
-            <div>Total Demand: <strong style="color: ${r.uploaded ? 'var(--primary)' : 'var(--text-dim)'};">${r.flow > 0 ? `${r.flow} veh/h` : '0 veh/h (No Upload)'}</strong></div>
-            <div>Current Green: <strong>${r.green}s</strong></div>
+            <div>Speed Limit: <strong>${r.appObj.speedLimit || 50} km/h</strong></div>
+            <div>Total Demand: <strong style="color: ${r.uploaded ? 'var(--primary)' : 'var(--text-dim)'};">${r.flow > 0 ? `${r.flow} PCU/h` : '0 PCU/h (No Upload)'}</strong></div>
+            <div>Current / Rec. Green: <strong>${r.green}s / <span style="color:#10b981;">${r.recGreen}s</span></strong></div>
           </div>
         </div>
       `;
@@ -755,7 +1121,7 @@ const FlowGuard = (function() {
           <td>${r.flow > 0 ? r.left : 0}</td>
           <td>${r.flow > 0 ? r.through : 0}</td>
           <td>${r.flow > 0 ? r.right : 0}</td>
-          <td><strong style="color:${r.flow > 0 ? 'var(--primary)' : 'var(--text-dim)'};">${r.flow}</strong></td>
+          <td><strong style="color:${r.flow > 0 ? 'var(--primary)' : 'var(--text-dim)'};">${r.flow} PCU/h</strong></td>
           <td>${r.flow > 0 ? `Left: ${leftPct}% | Thru: ${thruPct}% | Right: ${rightPct}%` : '<span style="color:var(--text-dim);">No Data / Awaiting Upload</span>'}</td>
         </tr>
       `;
@@ -767,12 +1133,12 @@ const FlowGuard = (function() {
       return `
         <tr style="${isOver ? 'background: rgba(239,68,68,0.08);' : ''}">
           <td><strong>${r.name}</strong></td>
-          <td>${r.flow}</td>
-          <td>${r.capacity}</td>
-          <td>${r.green}s</td>
+          <td>${r.flow} PCU/h</td>
+          <td>${r.capacity} PCU/h</td>
+          <td>${r.recGreen}s (Rec) / ${r.green}s (Curr)</td>
           <td>${totalDemandPCU > 0 ? ((r.flow / totalDemandPCU) * 100).toFixed(1) : '0.0'}%</td>
           <td style="font-weight: 700; color: ${isOver ? '#ef4444' : '#10b981'};">${r.vc.toFixed(2)}</td>
-          <td><span class="badge ${isOver ? 'badge-oversaturated' : 'badge-low'}" style="font-weight: 700;">${isOver ? 'OVERSATURATED' : (r.flow === 0 ? 'NO DATA' : 'LOW / OPTIMAL')}</span></td>
+          <td><span class="badge ${isOver ? 'badge-oversaturated' : 'badge-low'}" style="font-weight: 700;">${isOver ? 'OVERSATURATED' : (r.flow === 0 ? 'NO DATA' : 'OPTIMAL')}</span></td>
         </tr>
       `;
     }).join('');
@@ -811,17 +1177,17 @@ const FlowGuard = (function() {
               <div>Bicycle: <strong>0.4 PCU</strong></div>
             </div>
 
-            <div style="font-weight: 700; color: var(--text-main); margin-bottom: 0.3rem;">Signal Parameters</div>
+            <div style="font-weight: 700; color: var(--text-main); margin-bottom: 0.3rem;">Webster & IRC:93 Parameters</div>
             <div style="display: flex; flex-direction: column; gap: 0.2rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-              <div>Cycle Length (C): <strong>120s</strong></div>
-              <div>Amber (Y): <strong>3s</strong></div>
-              <div>All-Red (AR): <strong>2s</strong></div>
-              <div>Base Saturation: <strong>1800 PCU/h/lane</strong></div>
+              <div>Cycle Length (C): <strong>${valRes.finalCycleTime}s</strong></div>
+              <div>Amber (Y): <strong>${websterRes.amberTime}s</strong></div>
+              <div>All-Red (AR): <strong>${websterRes.allRedTime}s</strong></div>
+              <div>Base Saturation: <strong>525 × Width PCU/h</strong></div>
             </div>
 
             <div style="background: rgba(56,189,248,0.1); padding: 0.5rem; border-radius: 4px; border-left: 3px solid #38bdf8;">
               <strong>Pedestrian Safety Module:</strong><br>
-              Crossing Time = 7.0s + (14.0m / 1.2m/s) = 18.7s
+              T_ped = 7.0s + (W / 1.2m/s) (IRC:93 Compliant)
             </div>
           </div>
         </div>
@@ -839,9 +1205,9 @@ const FlowGuard = (function() {
               <tr>
                 <th>Active Origin Road</th>
                 <th>Incoming Lanes</th>
-                <th>Left Turn (veh/h)</th>
-                <th>Through (veh/h)</th>
-                <th>Right Turn (veh/h)</th>
+                <th>Left Turn</th>
+                <th>Through</th>
+                <th>Right Turn</th>
                 <th>Total Demand</th>
                 <th>Turning Distribution (%)</th>
               </tr>
@@ -851,9 +1217,6 @@ const FlowGuard = (function() {
             </tbody>
           </table>
         </div>
-        <div style="font-size: 0.78rem; color: var(--text-dim); margin-top: 0.5rem;">
-          * Destination mapping follows Indian Left-Hand Traffic (LHT). Inactive destination roads are automatically assigned 0 veh/h.
-        </div>
       </div>
 
       <!-- SECTION 3: Approach Capacity & Volume-to-Capacity (v/c) Ratios -->
@@ -862,7 +1225,7 @@ const FlowGuard = (function() {
           <h3 style="margin: 0; color: var(--primary); font-size: 1.1rem;">
             3. Approach Capacity & Volume-to-Capacity (v/c) Ratios
           </h3>
-          <span style="font-size: 0.95rem; font-weight: 700; color: #ef4444; background: rgba(239,68,68,0.15); padding: 0.3rem 0.75rem; border-radius: 4px; border: 1px solid rgba(239,68,68,0.3);">
+          <span style="font-size: 0.95rem; font-weight: 700; color: #38bdf8; background: rgba(56,189,248,0.15); padding: 0.3rem 0.75rem; border-radius: 4px; border: 1px solid rgba(56,189,248,0.3);">
             Total Demand: ${totalDemandPCU.toLocaleString()} PCU/h
           </span>
         </div>
@@ -872,9 +1235,9 @@ const FlowGuard = (function() {
             <thead>
               <tr>
                 <th>Active Approach</th>
-                <th>Total Demand (veh/h)</th>
-                <th>Capacity (veh/h)</th>
-                <th>Current Green</th>
+                <th>Total Demand (PCU/h)</th>
+                <th>Capacity (PCU/h)</th>
+                <th>Signal Timing (Green)</th>
                 <th>Demand Share</th>
                 <th>v/c Ratio</th>
                 <th>Status</th>
@@ -907,22 +1270,13 @@ const FlowGuard = (function() {
         </div>
       </div>
 
-      <!-- SECTION 5: Signal Timing Optimization Plan -->
+      <!-- SECTION 5: Webster Optimum Signal Timing & IRC:93 Validation Plan -->
       <div class="card" style="padding: 1.5rem;">
-        <h3 style="margin-top: 0; color: #f97316; font-size: 1.1rem; margin-bottom: 0.5rem;">
-          5. Signal Timing Optimization Plan (Simulation Outputs)
+        <h3 style="margin-top: 0; color: #10b981; font-size: 1.1rem; margin-bottom: 0.5rem;">
+          5. Webster Signal Timing & IRC:93 Validation Recommendation
         </h3>
-        <div style="font-weight: 700; color: #ef4444; background: rgba(239,68,68,0.12); padding: 0.6rem 1rem; border-radius: 4px; border-left: 4px solid #ef4444; margin-bottom: 1rem;">
-          PROPOSED PLAN — NOT RECOMMENDED — Retain baseline signal timing
-        </div>
-
-        <div style="background: rgba(30,41,59,0.5); padding: 1rem; border-radius: 6px; margin-bottom: 1.25rem; font-size: 0.85rem;">
-          <strong>Three-Stage Refinement Summary:</strong>
-          <div style="display: flex; gap: 1.5rem; margin-top: 0.4rem; font-family: var(--font-mono);">
-            <div>Stage 1 Candidate: A: 7s | B: 7s | C: 7s | D: 79s</div>
-            <div>Stage 2 Balanced: A: 25s | B: 25s | C: 25s | D: 25s</div>
-            <div>Stage 3 Final: A: 25s | B: 25s | C: 25s | D: 25s</div>
-          </div>
+        <div style="font-weight: 700; color: #10b981; background: rgba(16,185,129,0.12); padding: 0.6rem 1rem; border-radius: 4px; border-left: 4px solid #10b981; margin-bottom: 1rem;">
+          RECOMMENDED PLAN — Webster Optimum Cycle C = ${valRes.finalCycleTime}s | Effective Green Split Allocated
         </div>
 
         <div class="table-responsive">
@@ -930,199 +1284,76 @@ const FlowGuard = (function() {
             <thead>
               <tr>
                 <th>Active Approach Road</th>
-                <th>Current Green</th>
-                <th>Proposed Green</th>
-                <th>Difference (&Delta;g)</th>
-                <th>Current Delay</th>
-                <th>Simulated Delay</th>
-                <th>Status</th>
+                <th>Baseline Green</th>
+                <th>Webster Allocated Green</th>
+                <th>IRC:93 Validated Green</th>
+                <th>Capacity (PCU/h)</th>
+                <th>v/c Ratio</th>
+                <th>IRC:93 Validation Status</th>
               </tr>
             </thead>
             <tbody>
               ${roadKeys.map(k => {
                 const r = roadData[k];
+                const valInfo = (valRes.validations || []).find(v => v.key === k) || {};
                 return `
                   <tr>
                     <td><strong>${r.name}</strong></td>
                     <td>${r.green}s</td>
-                    <td>25s</td>
-                    <td>-5s</td>
-                    <td>${r.flow > 0 ? '448.6s' : '0.0s'}</td>
-                    <td>${r.flow > 0 ? '474.4s (+25.8s)' : '0.0s'}</td>
-                    <td><span class="badge ${r.vc > 1.0 ? 'badge-oversaturated' : 'badge-low'}">${r.vc > 1.0 ? 'OVERSATURATED' : 'OK'}</span></td>
+                    <td>${(websterRes.approaches[k] || {}).greenSplit || 30}s</td>
+                    <td><strong style="color:#10b981;">${r.recGreen}s</strong></td>
+                    <td>${r.capacity}</td>
+                    <td style="color:${r.vc > 1.0 ? '#ef4444' : '#10b981'}; font-weight:700;">${r.vc.toFixed(2)}</td>
+                    <td><span class="badge ${valInfo.status === 'PASSED' ? 'badge-low' : 'badge-medium'}">${valInfo.status || 'PASSED'}</span></td>
                   </tr>
                 `;
               }).join('')}
             </tbody>
           </table>
         </div>
-
-        <div style="margin-top: 1rem; background: rgba(15,23,42,0.8); padding: 1rem; border-radius: 6px; border-left: 4px solid var(--primary); font-size: 0.85rem; line-height: 1.5;">
-          <strong>AI RATIONALE:</strong> Candidate green redistribution alone cannot provide acceptable approach-level performance under current demand and cycle constraints. Baseline timing should be retained. Advisory: Review physical approach geometry or overall cycle budget.
-        </div>
       </div>
 
-      <!-- SECTION 6: Live Engineering Formula Breakdown -->
+      <!-- SECTION 6: Professional Step-by-Step Engineering Calculation Panels (Task 11) -->
       <div class="card" style="padding: 1.5rem;">
-        <h3 style="margin-top: 0; color: var(--primary); font-size: 1.1rem; margin-bottom: 0.75rem;">
-          6. Live Engineering Formula Breakdown (How FlowGuard Calculated This)
+        <h3 style="margin-top: 0; color: #38bdf8; font-size: 1.1rem; margin-bottom: 0.75rem;">
+          6. Professional Step-by-Step Engineering Calculation Panel (Interactive)
         </h3>
 
-        <div style="background: rgba(30,41,59,0.5); padding: 0.75rem 1rem; border-radius: 4px; font-size: 0.8rem; margin-bottom: 1.25rem;">
-          <strong>10-Step Operational Workflow Pipeline:</strong><br>
-          1. Traffic Input &rarr; 2. PCU Demand &rarr; 3. Sat. Flow & Capacity &rarr; 4. V/C Ratio &rarr; 5. Baseline Performance &rarr; 6. Stage 1 Candidate &rarr; 7. Stage 2 Balanced &rarr; 8. Stage 3 Sim Validation &rarr; 9. Final Timing &rarr; 10. Recommendation
+        <div style="background: rgba(30,41,59,0.5); padding: 0.75rem 1rem; border-radius: 4px; font-size: 0.8rem; margin-bottom: 1rem;">
+          <strong>Complete 9-Step Engineering Pipeline per Approach:</strong><br>
+          1. Vehicle Counts &rarr; 2. IRC:106 PCU &rarr; 3. Turning Distribution &rarr; 4. Saturation Flow S &rarr; 5. Flow Ratio y &rarr; 6. Webster Cycle C &rarr; 7. Green Split g &rarr; 8. IRC:93 Validation &rarr; 9. Approach Capacity & Performance
         </div>
 
-        <div style="background: #0f172a; padding: 1.25rem; border-radius: 6px; border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.6; color: #38bdf8;">
-          <div>// LIVE ENGINEERING MATH EXECUTED PER ROAD APPROACH:</div>
-          ${roadKeys.map(k => {
-            const r = roadData[k];
-            return `
-              <div style="margin-top:0.4rem; padding-top:0.4rem; border-top:1px dashed rgba(255,255,255,0.1);">
-                <strong>[${r.name}]</strong> Capacity (ci) = ${r.capacity} PCU/h | V/C Ratio (Xi) = ${r.vc.toFixed(2)} | Arrival (&lambda;i) = ${(r.flow/3600).toFixed(3)} veh/s | Service (&mu;i) = 1.000 veh/s
-              </div>
-            `;
-          }).join('')}
-          <div style="color: #e2e8f0; margin-top: 0.5rem;">// D/D/1 Queuing Equation: Red Accumulation Qpeak = &lambda;i &times; ri | Delay Area Dred = 0.5 &times; ri &times; Qpeak</div>
-        </div>
+        ${roadKeys.map(k => buildCalculationPanelHTML(k, roadData[k].appObj, websterRes, valRes)).join('')}
       </div>
 
       <!-- SECTION 7: Congestion & Level-of-Service (LOS) Assessment -->
-      <div class="card" style="padding: 1.5rem; border: 1px solid rgba(239,68,68,0.4);">
-        <h3 style="margin-top: 0; color: #ef4444; font-size: 1.1rem; margin-bottom: 0.75rem;">
+      <div class="card" style="padding: 1.5rem; border: 1px solid ${totalDemandPCU > 3600 ? 'rgba(239,68,68,0.4)' : 'rgba(16,185,129,0.4)'};">
+        <h3 style="margin-top: 0; color: ${totalDemandPCU > 3600 ? '#ef4444' : '#10b981'}; font-size: 1.1rem; margin-bottom: 0.75rem;">
           7. Congestion & Level-of-Service (LOS) Assessment
         </h3>
 
-        <div style="background: rgba(239,68,68,0.18); border: 2px solid #ef4444; padding: 1rem; border-radius: 6px; color: #ef4444; font-weight: 700; font-size: 1.2rem; text-align: center; margin-bottom: 1.25rem;">
-          INTERSECTION PERFORMANCE: ${totalDemandPCU > 3600 ? 'LOS F — OVERSATURATED' : 'LOS A — OPTIMAL'}
+        <div style="background: ${totalDemandPCU > 3600 ? 'rgba(239,68,68,0.18)' : 'rgba(16,185,129,0.18)'}; border: 2px solid ${totalDemandPCU > 3600 ? '#ef4444' : '#10b981'}; padding: 1rem; border-radius: 6px; color: ${totalDemandPCU > 3600 ? '#ef4444' : '#10b981'}; font-weight: 700; font-size: 1.2rem; text-align: center; margin-bottom: 1.25rem;">
+          INTERSECTION PERFORMANCE: ${totalDemandPCU > 3600 ? 'LOS F — OVERSATURATED' : (totalDemandPCU > 2400 ? 'LOS D — CONGESTED' : 'LOS B / C — ACCEPTABLE')}
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
           <div style="background: rgba(30,41,59,0.6); padding: 1rem; border-radius: 6px; text-align: center;">
-            <div style="font-size: 0.75rem; color: var(--text-muted);">Avg Control Delay</div>
-            <div style="font-size: 1.4rem; font-weight: 700; color: #ef4444;">${totalDemandPCU > 3600 ? '448.6 s/veh' : '12.4 s/veh'}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Total Network Demand</div>
+            <div style="font-size: 1.4rem; font-weight: 700; color: #38bdf8;">${totalDemandPCU.toLocaleString()} PCU/h</div>
           </div>
           <div style="background: rgba(30,41,59,0.6); padding: 1rem; border-radius: 6px; text-align: center;">
-            <div style="font-size: 0.75rem; color: var(--text-muted);">Intersection LOS</div>
-            <div style="font-size: 1.4rem; font-weight: 700; color: #ef4444;">${totalDemandPCU > 3600 ? 'LOS F' : 'LOS A'}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Webster Cycle</div>
+            <div style="font-size: 1.4rem; font-weight: 700; color: #6366f1;">${valRes.finalCycleTime}s</div>
           </div>
           <div style="background: rgba(30,41,59,0.6); padding: 1rem; border-radius: 6px; text-align: center;">
             <div style="font-size: 0.75rem; color: var(--text-muted);">Critical Approach</div>
-            <div style="font-size: 1.1rem; font-weight: 700; color: #38bdf8;">Road A - North</div>
+            <div style="font-size: 1rem; font-weight: 700; color: #38bdf8;">${(() => { let maxK = roadKeys[0]; roadKeys.forEach(k => { if ((roadData[k].vc || 0) > (roadData[maxK].vc || 0)) maxK = k; }); return roadData[maxK].name; })()}</div>
           </div>
           <div style="background: rgba(30,41,59,0.6); padding: 1rem; border-radius: 6px; text-align: center;">
-            <div style="font-size: 0.75rem; color: var(--text-muted);">Max Queue</div>
-            <div style="font-size: 1.4rem; font-weight: 700; color: #ef4444;">${totalDemandPCU > 3600 ? '803 veh' : '5 veh'}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Worst v/c Ratio</div>
+            <div style="font-size: 1.4rem; font-weight: 700; color: ${Math.max(...roadKeys.map(k => roadData[k].vc || 0)) > 1.0 ? '#ef4444' : '#10b981'};">${Math.max(...roadKeys.map(k => roadData[k].vc || 0)).toFixed(2)}</div>
           </div>
-        </div>
-
-        <div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">
-          Approach-Level Assessment (Active Approaches Only)
-        </div>
-        <div class="table-responsive" style="margin-bottom: 1.5rem;">
-          <table class="data-table" style="width: 100%; font-size: 0.85rem;">
-            <thead>
-              <tr>
-                <th>Road</th>
-                <th>Demand (PCU/h)</th>
-                <th>Capacity (PCU/h)</th>
-                <th>v/c Ratio</th>
-                <th>Avg Delay</th>
-                <th>Max Queue</th>
-                <th>LOS</th>
-                <th>Severity</th>
-                <th>Primary Problem</th>
-                <th>Recommended Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${roadKeys.map(k => {
-                const r = roadData[k];
-                const isOver = r.vc > 1.0;
-                return `
-                  <tr>
-                    <td><strong>${r.name} ${isOver ? '★ CRITICAL' : ''}</strong></td>
-                    <td>${r.flow}</td>
-                    <td>${r.capacity}</td>
-                    <td style="color:${isOver ? '#ef4444' : '#10b981'}; font-weight:700;">${r.vc.toFixed(2)}</td>
-                    <td>${r.flow > 0 ? '448.6s' : '0.0s'}</td>
-                    <td>${r.flow > 0 ? '803' : '0'}</td>
-                    <td><span class="badge ${isOver ? 'badge-oversaturated' : 'badge-low'}">${isOver ? 'F' : 'A'}</span></td>
-                    <td><span class="badge ${isOver ? 'badge-oversaturated' : 'badge-low'}">${isOver ? 'OVERSATURATED' : (r.flow === 0 ? 'NO DATA' : 'LOW')}</span></td>
-                    <td style="color:${isOver ? '#ef4444' : '#10b981'}; font-weight:600;">${isOver ? 'DEMAND EXCEEDS CAPACITY' : 'WITHIN CAPACITY'}</td>
-                    <td style="color:#10b981;">${isOver ? 'Increase capacity / effective green.' : 'Optimal timing.'}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-
-        <div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.75rem;">
-          Demand / Capacity Visualization (PCU/h)
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
-          ${roadKeys.map(k => {
-            const r = roadData[k];
-            const pct = Math.min(100, Math.round(r.vc * 100));
-            return `
-              <div style="background: rgba(30,41,59,0.5); padding: 0.75rem; border-radius: 4px;">
-                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.3rem;">
-                  <span>${r.name} (v/c = ${r.vc.toFixed(2)})</span>
-                  <span style="color:${r.vc > 1.0 ? '#ef4444' : '#10b981'}; font-weight:700;">${r.vc > 1.0 ? 'OVERSATURATED' : (r.flow === 0 ? 'NO DATA' : 'OPTIMAL')}</span>
-                </div>
-                <div style="background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden;">
-                  <div style="background: ${r.vc > 1.0 ? '#ef4444' : '#10b981'}; width: ${pct}%; height: 100%;"></div>
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-
-        <div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">
-          Queue Risk Assessment
-        </div>
-        <div class="table-responsive" style="margin-bottom: 1.5rem;">
-          <table class="data-table" style="width: 100%; font-size: 0.85rem;">
-            <thead>
-              <tr>
-                <th>Approach</th>
-                <th>Max Queue (veh)</th>
-                <th>Avg Queue (veh)</th>
-                <th>Residual Queue</th>
-                <th>Queue Risk</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${roadKeys.map(k => {
-                const r = roadData[k];
-                const isOver = r.vc > 1.0;
-                return `
-                  <tr>
-                    <td>${r.name}</td>
-                    <td>${r.flow > 0 ? 803 : 0}</td>
-                    <td>${r.flow > 0 ? 411.3 : 0}</td>
-                    <td>${r.flow > 0 ? 800 : 0}</td>
-                    <td><span class="badge ${isOver ? 'badge-oversaturated' : 'badge-low'}" style="font-weight:700;">${isOver ? 'CRITICAL' : 'LOW'}</span></td>
-                    <td style="font-size:0.8rem;">${isOver ? 'Residual queue remains after simulation horizon. Persistent queue growth likely.' : 'No queue accumulation.'}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-
-        <div style="background: rgba(239,68,68,0.12); border-left: 4px solid #ef4444; padding: 1rem; border-radius: 4px; font-size: 0.85rem; color: #f87171;">
-          <strong style="color: #ef4444;">⚠ ENGINEERING WARNINGS DETECTED:</strong>
-          <ul style="margin: 0.5rem 0 0 1.25rem; padding: 0;">
-            ${roadKeys.filter(k => roadData[k].vc > 1.0).map(k => `
-              <li>⚠ Oversaturated approach detected: ${roadData[k].name} (v/c = ${roadData[k].vc.toFixed(2)}).</li>
-              <li>⚠ LOS F operation detected on ${roadData[k].name}.</li>
-              <li>⚠ Residual queue remains after simulation horizon on ${roadData[k].name}.</li>
-            `).join('')}
-            ${roadKeys.filter(k => roadData[k].vc > 1.0).length === 0 ? '<li>✓ All active approaches are within capacity limits.</li>' : ''}
-          </ul>
         </div>
       </div>
     `;
@@ -1153,6 +1384,10 @@ const FlowGuard = (function() {
     DEFAULT_STATE,
     renderSimulationDashboardResults,
     parseTrafficCSV,
+    parseTrafficDataset,
+    calculateWebsterEngine,
+    validateIRC93,
+    buildCalculationPanelHTML,
     renderPhaseDiagram,
     generateEngineeringReport,
     initWhatIfSlider,
