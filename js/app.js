@@ -2060,19 +2060,19 @@ const FlowGuard = (function() {
           };
 
           // Update input elements on DOM if present
-          const flowEl = document.getElementById(`flow_${k}`);
+          const flowEl = typeof document !== 'undefined' ? document.getElementById(`flow_${k}`) : null;
           if (flowEl) flowEl.value = agg.flow;
 
-          const leftEl = document.getElementById(`left_${k}`);
+          const leftEl = typeof document !== 'undefined' ? document.getElementById(`left_${k}`) : null;
           if (leftEl) leftEl.value = agg.left;
 
-          const thruEl = document.getElementById(`through_${k}`);
+          const thruEl = typeof document !== 'undefined' ? document.getElementById(`through_${k}`) : null;
           if (thruEl) thruEl.value = agg.through;
 
-          const rightEl = document.getElementById(`right_${k}`);
+          const rightEl = typeof document !== 'undefined' ? document.getElementById(`right_${k}`) : null;
           if (rightEl) rightEl.value = agg.right;
 
-          const lanesEl = document.getElementById(`lanes_${k}`);
+          const lanesEl = typeof document !== 'undefined' ? document.getElementById(`lanes_${k}`) : null;
           if (lanesEl) lanesEl.value = agg.lanes;
         }
       });
