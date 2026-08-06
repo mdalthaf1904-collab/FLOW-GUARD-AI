@@ -1891,6 +1891,7 @@ const FlowGuard = (function() {
    * Render Dataset Preview Table & Analysis Metrics Card
    */
   function renderDatasetPreviewTable(datasetResult, containerElId) {
+    if (typeof document === 'undefined') return;
     const container = document.getElementById(containerElId || 'datasetPreviewContainer');
     if (!container) return;
 
