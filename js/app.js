@@ -447,8 +447,9 @@ const FlowGuard = (function() {
     const surveyDur = parseFloat(project.geometry.surveyDuration) || 15;
     const mult = 60 / surveyDur;
 
-    let totalVehicles = 0;
-    let totalPCUDemand = 0;
+    let totalVehiclesSum = 0;
+    let totalPCUSum = 0;
+    let totalHourlyDemandSum = 0;
     const approachStats = {};
 
     const movementPCUMap = {};
@@ -459,6 +460,7 @@ const FlowGuard = (function() {
     // Category vehicle totals across all approaches
     const modalCounts = { car: 0, motorcycle: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, tractor: 0, cart: 0 };
 
+    // ── STEP 1: CALCULATE EVERY ROAD (APPROACH) INDEPENDENTLY ──
     activeKeys.forEach(k => {
       const turning = (project.trafficInput.turningCounts && project.trafficInput.turningCounts[k]) || {};
       const left = parseFloat(turning.left) || 0;
@@ -467,45 +469,43 @@ const FlowGuard = (function() {
       const appVehTotal = parseFloat(turning.flow) || (left + through + right);
 
       const vehCounts = (project.trafficInput.vehicleCounts && project.trafficInput.vehicleCounts[k]) || null;
-      let pcuVal = 0;
+      let roadTotalPCU = 0;
+      const convertedPCUPerCategory = {};
+
       if (vehCounts) {
-        pcuVal = calculateApproachPCU(vehCounts, pcuFactors);
-        Object.keys(modalCounts).forEach(cat => {
-          modalCounts[cat] += parseFloat(vehCounts[cat] || vehCounts[cat === 'motorcycle' ? 'bike' : cat] || 0) || 0;
+        roadTotalPCU = calculateApproachPCU(vehCounts, pcuFactors);
+        Object.keys(pcuFactors).forEach(cat => {
+          const count = parseFloat(vehCounts[cat] || vehCounts[cat === 'motorcycle' ? 'bike' : cat] || 0) || 0;
+          const factor = pcuFactors[cat] || 1.0;
+          convertedPCUPerCategory[cat] = Math.round(count * factor);
+          if (modalCounts[cat] !== undefined) {
+            modalCounts[cat] += count;
+          }
         });
       } else {
-        pcuVal = Math.round(appVehTotal * 1.5);
+        roadTotalPCU = Math.round(appVehTotal * 1.5);
       }
 
-      // Movement-Based PCU Calculation Model
+      // Movement-Based PCU Calculations for this Road
       const totTurnVeh = (left + through + right) || 1;
       const pLeft = left / totTurnVeh;
       const pThrough = through / totTurnVeh;
       const pRight = right / totTurnVeh;
 
-      const leftPCU = Math.round(pcuVal * pLeft);
-      const throughPCU = Math.round(pcuVal * pThrough);
-      const rightPCU = Math.max(0, pcuVal - leftPCU - throughPCU);
+      const leftPCU = Math.round(roadTotalPCU * pLeft);
+      const throughPCU = Math.round(roadTotalPCU * pThrough);
+      const rightPCU = Math.max(0, roadTotalPCU - leftPCU - throughPCU);
 
       const leftHourlyPCU = Math.round(leftPCU * mult);
       const throughHourlyPCU = Math.round(throughPCU * mult);
       const rightHourlyPCU = Math.round(rightPCU * mult);
-      const approachHourlyPCU = Math.round(pcuVal * mult);
+      const roadHourlyDemand = Math.round(roadTotalPCU * mult);
 
-      movementPCUMap[k] = {
-        leftPCU: leftPCU,
-        throughPCU: throughPCU,
-        rightPCU: rightPCU,
-        totalPCU: pcuVal,
-        leftHourlyPCU: leftHourlyPCU,
-        throughHourlyPCU: throughHourlyPCU,
-        rightHourlyPCU: rightHourlyPCU,
-        totalHourlyPCU: approachHourlyPCU
-      };
-      approachPCUMap[k] = pcuVal;
-      hourlyDemandMap[k] = approachHourlyPCU;
+      totalVehiclesSum += appVehTotal;
+      totalPCUSum += roadTotalPCU;
+      totalHourlyDemandSum += roadHourlyDemand;
 
-      // Dominant movement detection
+      // Dominant movement detection for this Road
       let dominant = 'Through';
       let maxMoveVal = through;
       if (left > maxMoveVal) { dominant = 'Left Turn'; maxMoveVal = left; }
@@ -515,19 +515,63 @@ const FlowGuard = (function() {
 
       const lanes = parseInt(project.geometry.laneCounts ? project.geometry.laneCounts[k] : 2, 10) || 2;
       const appSatFlow = lanes * baseSat;
-      const flowRatioY = appSatFlow > 0 ? parseFloat((pcuVal / appSatFlow).toFixed(4)) : 0;
+      const flowRatioY = appSatFlow > 0 ? parseFloat((roadTotalPCU / appSatFlow).toFixed(4)) : 0;
 
-      totalVehicles += appVehTotal;
-      totalPCUDemand += pcuVal;
+      const roadName = (project.geometry.roadNames && project.geometry.roadNames[k])
+        ? (project.geometry.roadNames[k] + ' - ' + k.charAt(0).toUpperCase() + k.slice(1))
+        : `Road ${k.toUpperCase()}`;
+
+      // Vehicle composition for this Road independently
+      const roadVehComp = [];
+      if (vehCounts) {
+        Object.keys(vehCounts).forEach(cat => {
+          const count = parseFloat(vehCounts[cat]) || 0;
+          if (count > 0) {
+            const pct = appVehTotal > 0 ? parseFloat(((count / appVehTotal) * 100).toFixed(1)) : 0;
+            const pcu = Math.round(count * (pcuFactors[cat] || 1.0));
+            roadVehComp.push({ category: cat, count: count, pct: pct, pcu: pcu });
+          }
+        });
+      }
+
+      // Store Independent Road Object inside processedTraffic
+      project.processedTraffic[k] = {
+        roadName: roadName,
+        lanes: lanes,
+        vehicleCounts: vehCounts || {},
+        turningCounts: { left: left, through: through, right: right, total: appVehTotal },
+        convertedPCU: convertedPCUPerCategory,
+        movementPCU: {
+          leftPCU: leftPCU,
+          throughPCU: throughPCU,
+          rightPCU: rightPCU,
+          totalPCU: roadTotalPCU,
+          leftHourlyPCU: leftHourlyPCU,
+          throughHourlyPCU: throughHourlyPCU,
+          rightHourlyPCU: rightHourlyPCU,
+          totalHourlyPCU: roadHourlyDemand
+        },
+        totalVehicles: appVehTotal,
+        totalPCU: roadTotalPCU,
+        hourlyDemand: roadHourlyDemand,
+        vehicleComposition: roadVehComp,
+        satFlow: appSatFlow,
+        flowRatioY: flowRatioY,
+        dominantMovement: dominantText
+      };
+
+      // Aliases for compatibility
+      movementPCUMap[k] = project.processedTraffic[k].movementPCU;
+      approachPCUMap[k] = roadTotalPCU;
+      hourlyDemandMap[k] = roadHourlyDemand;
+      criticalLaneInputsMap[k] = { lanes: lanes, satFlow: appSatFlow, flowRatioY: flowRatioY };
 
       approachStats[k] = {
-        name: (project.geometry.roadNames && project.geometry.roadNames[k])
-          ? (project.geometry.roadNames[k] + ' - ' + k.charAt(0).toUpperCase() + k.slice(1))
-          : `Road ${k.toUpperCase()}`,
+        name: roadName,
         lanes: lanes,
         vehCount: appVehTotal,
-        pcuVal: pcuVal,
-        hourlyDemand: approachHourlyPCU,
+        pcuVal: roadTotalPCU,
+        hourlyDemand: roadHourlyDemand,
         flowRatioY: flowRatioY,
         satFlow: appSatFlow,
         left: left,
@@ -538,16 +582,9 @@ const FlowGuard = (function() {
         rightPCU: rightPCU,
         dominantMovement: dominantText
       };
-
-      criticalLaneInputsMap[k] = {
-        lanes: lanes,
-        satFlow: appSatFlow,
-        flowRatioY: flowRatioY
-      };
     });
 
-    const hourlyTotalDemand = Math.round(totalPCUDemand * mult);
-
+    // ── STEP 2: CALCULATE INTERSECTION TOTALS AFTER EVERY ROAD HAS BEEN PROCESSED ──
     let maxFlowRatioKey = activeKeys[0];
     activeKeys.forEach(k => {
       if (approachStats[k] && approachStats[k].flowRatioY > (approachStats[maxFlowRatioKey] ? approachStats[maxFlowRatioKey].flowRatioY : 0)) {
@@ -555,7 +592,6 @@ const FlowGuard = (function() {
       }
     });
 
-    // Build PCU Summary Category Breakdown
     const pcuCategoryNames = {
       car: 'Car / Jeep / Van',
       motorcycle: 'Two-Wheeler',
@@ -583,54 +619,37 @@ const FlowGuard = (function() {
           name: pcuCategoryNames[catKey],
           count: count,
           factor: factor,
-          calculatedPcu: calcPcu
+          calculatedPcu: calcPcu,
+          pct: totalVehiclesSum > 0 ? parseFloat(((count / totalVehiclesSum) * 100).toFixed(1)) : 0
         });
       }
     });
 
-    // If modalCounts were empty, estimate breakdown cleanly from totalVehicles
-    if (pcuCategoryBreakdown.length === 0 && totalVehicles > 0) {
-      const defaultBreakdown = [
-        { key: 'car', name: 'Car / Jeep / Van', pct: 0.48 },
-        { key: 'motorcycle', name: 'Two-Wheeler', pct: 0.32 },
-        { key: 'autorickshaw', name: 'Auto-Rickshaw', pct: 0.12 },
-        { key: 'bus', name: 'Bus / Coach', pct: 0.05 },
-        { key: 'truck', name: 'Truck / LCV', pct: 0.03 }
-      ];
-      defaultBreakdown.forEach(item => {
-        const cnt = Math.round(totalVehicles * item.pct);
-        const f = pcuFactors[item.key] || 1.0;
-        const pcu = Math.round(cnt * f);
-        sumModalVeh += cnt;
-        sumModalPcu += pcu;
-        pcuCategoryBreakdown.push({
-          key: item.key,
-          name: item.name,
-          count: cnt,
-          factor: f,
-          calculatedPcu: pcu
-        });
-      });
-    }
-
-    project.trafficInput.observedVehicles = totalVehicles;
-    project.trafficInput.convertedPCU = totalPCUDemand;
-    project.trafficInput.hourlyDemand = hourlyTotalDemand;
-
-    project.processedTraffic = {
-      approachStats: approachStats,
-      totalVehicles: totalVehicles,
-      totalPCUDemand: totalPCUDemand,
-      hourlyTotalDemand: hourlyTotalDemand,
-      criticalLaneKey: maxFlowRatioKey,
-      movementPCU: movementPCUMap,
-      approachPCU: approachPCUMap,
-      hourlyDemand: hourlyDemandMap,
-      criticalLaneInputs: criticalLaneInputsMap,
-      pcuCategoryBreakdown: pcuCategoryBreakdown,
-      sumModalVeh: sumModalVeh,
-      sumModalPcu: sumModalPcu
+    // Intersection summary object
+    project.processedTraffic.intersection = {
+      totalVehicles: totalVehiclesSum,
+      totalPCU: totalPCUSum,
+      totalHourlyDemand: totalHourlyDemandSum,
+      vehicleComposition: pcuCategoryBreakdown
     };
+
+    project.trafficInput.observedVehicles = totalVehiclesSum;
+    project.trafficInput.convertedPCU = totalPCUSum;
+    project.trafficInput.hourlyDemand = totalHourlyDemandSum;
+
+    // Top-level aliases on processedTraffic for compatibility
+    project.processedTraffic.approachStats = approachStats;
+    project.processedTraffic.totalVehicles = totalVehiclesSum;
+    project.processedTraffic.totalPCUDemand = totalPCUSum;
+    project.processedTraffic.hourlyTotalDemand = totalHourlyDemandSum;
+    project.processedTraffic.criticalLaneKey = maxFlowRatioKey;
+    project.processedTraffic.movementPCU = movementPCUMap;
+    project.processedTraffic.approachPCU = approachPCUMap;
+    project.processedTraffic.hourlyDemand = hourlyDemandMap;
+    project.processedTraffic.criticalLaneInputs = criticalLaneInputsMap;
+    project.processedTraffic.pcuCategoryBreakdown = pcuCategoryBreakdown;
+    project.processedTraffic.sumModalVeh = sumModalVeh;
+    project.processedTraffic.sumModalPcu = sumModalPcu;
 
     if (project.projectInfo) {
       project.projectInfo.updatedAt = new Date().toISOString();
