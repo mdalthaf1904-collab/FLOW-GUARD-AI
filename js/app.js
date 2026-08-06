@@ -466,7 +466,6 @@ const FlowGuard = (function() {
       const left = parseFloat(turning.left) || 0;
       const through = parseFloat(turning.through) || 0;
       const right = parseFloat(turning.right) || 0;
-      const appVehTotal = parseFloat(turning.flow) || (left + through + right);
 
       // Robust extraction of modal vehicle counts from project or state
       let vehCounts = (project.trafficInput.vehicleCounts && project.trafficInput.vehicleCounts[k]) || null;
@@ -486,6 +485,15 @@ const FlowGuard = (function() {
           others: parseFloat(v.others || v.other || 0) || 0
         };
       }
+
+      let modalVehSum = 0;
+      if (vehCounts) {
+        Object.keys(vehCounts).forEach(cat => {
+          modalVehSum += parseFloat(vehCounts[cat]) || 0;
+        });
+      }
+
+      const appVehTotal = modalVehSum > 0 ? modalVehSum : (parseFloat(turning.flow) || (left + through + right));
 
       // Sync extracted vehCounts back to project store for strict persistence
       if (!project.trafficInput.vehicleCounts) project.trafficInput.vehicleCounts = {};
@@ -2522,6 +2530,10 @@ const FlowGuard = (function() {
         sec.style.display = 'none';
       });
 
+      // Always invalidate stale cache & recompute project data before step rendering
+      const currentProj = getProject();
+      recomputeProjectData(currentProj);
+
       const targetSection = document.getElementById(`wizard-section-${numericId}`);
       if (targetSection) {
         targetSection.style.display = 'block';
@@ -3095,65 +3107,48 @@ const FlowGuard = (function() {
   function renderTrafficSummaryDashboard() {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
+    // ── CENTRALIZED STATE RECOMPUTATION & CACHE INVALIDATION ──
+    const proj = getProject();
+    recomputeProjectData(proj);
+
+    // Automatic 6-point Engine Validation
+    const valResult = validateProcessedTrafficData(proj);
+    if (!valResult.valid) {
+      console.warn('[Cache Invalidation] Traffic Summary validation mismatch detected. Force recomputing project data...', valResult.errors);
+      recomputeProjectData(proj);
+    }
+
     const state = getState();
-    const activeKeys = getActiveApproachKeys(state.configType || '4CROSS');
-    const approaches = state.approaches || {};
-    const pcuFactors = state.pcuFactors || DEFAULT_STATE.pcuFactors;
-    const interConfig = state.intersection || {};
+    const processed = proj.processedTraffic || {};
+    const activeKeys = getActiveApproachKeys(proj.geometry.configType || state.configType || '4CROSS');
+    const approachStats = processed.approachStats || {};
+    const interConfig = proj.engineeringParameters.intersection || state.intersection || {};
+    const pcuFactors = proj.engineeringParameters.pcuFactors || state.pcuFactors || DEFAULT_STATE.pcuFactors;
 
-    // 1. Intersection & Survey Summary Metadata
-    const geoLabel = getConfigLabel(state.configType || '4CROSS');
-    const durationLabel = `${state.duration || 15} Minutes`;
-    const surveyMethod = state.excelUploaded ? 'Uploaded Excel Data' : 'Automated Video Survey';
-    const peakIntervalText = state.selectedPeakWindow || '08:30 AM - 08:45 AM';
-    const selectedIntervalText = state.selectedIntervalName || 'Peak Interval #3';
+    const totalVehicles = processed.totalVehicles || 0;
+    const totalPCUDemand = processed.totalPCUDemand || 0;
+    const hourlyTotalDemand = processed.hourlyTotalDemand || 0;
 
-    let totalVehicles = 0;
-    let totalPCUDemand = 0;
-    const approachStats = {};
-
-    activeKeys.forEach(k => {
-      const app = approaches[k] || {};
-      const left = parseFloat(app.left) || 0;
-      const through = parseFloat(app.through) || 0;
-      const right = parseFloat(app.right) || 0;
-      const appVehTotal = parseFloat(app.flow) || (left + through + right);
-
-      const pcuVal = app.pcuTotal || calculateApproachPCU(app, pcuFactors) || Math.round(appVehTotal * 1.5);
-      const lanes = parseInt(app.lanes, 10) || 2;
-      const baseSat = parseFloat(interConfig.baseSaturationFlow || interConfig.saturationFlow) || 1800;
-      const appSatFlow = lanes * baseSat;
-      const flowRatioY = appSatFlow > 0 ? parseFloat((pcuVal / appSatFlow).toFixed(4)) : 0;
-
-      totalVehicles += appVehTotal;
-      totalPCUDemand += pcuVal;
-
-      approachStats[k] = {
-        name: app.name || `Road ${k.toUpperCase()}`,
-        lanes: lanes,
-        vehCount: appVehTotal,
-        pcuVal: pcuVal,
-        hourlyDemand: pcuVal * (60 / (parseFloat(state.duration) || 15)),
-        flowRatioY: flowRatioY,
-        satFlow: appSatFlow,
-        left: left,
-        through: through,
-        right: right
-      };
-    });
-
-    const hourlyTotalDemand = Math.round(totalPCUDemand * (60 / (parseFloat(state.duration) || 15)));
+    // 1. Intersection & Survey Summary Metadata (Strictly bound to proj.trafficInput & proj.geometry)
+    const geoLabel = getConfigLabel(proj.geometry.configType || state.configType || '4CROSS');
+    const durationLabel = `${proj.geometry.surveyDuration || state.duration || 15} Minutes`;
+    
+    const isExcelUploaded = !!(proj.trafficInput.inputMode === 'EXCEL_UPLOAD' || proj.trafficInput.excelUploaded || state.excelUploaded || proj.trafficInput.datasetStats);
+    const surveyMethod = isExcelUploaded ? 'Uploaded Excel Data' : 'Automated Video Survey';
+    
+    const datasetStats = proj.trafficInput.datasetStats || state.datasetStats || null;
+    const peakIntervalText = (datasetStats && datasetStats.peakIntervalWindow) || proj.trafficInput.selectedPeakWindow || state.selectedPeakWindow || '08:30 AM - 08:45 AM';
+    const selectedIntervalText = proj.trafficInput.selectedIntervalName || state.selectedIntervalName || 'Peak Interval #3';
 
     // CARD 1: FULL DATASET STATISTICS (POPULATED IF DATASET LOADED)
     const fullDatasetCard = document.getElementById('sumDashFullDatasetCard');
-    const datasetStats = state.datasetStats || (state.project && state.project.trafficInput && state.project.trafficInput.datasetStats);
     if (fullDatasetCard) {
       if (datasetStats && datasetStats.rowsRead) {
         fullDatasetCard.style.display = 'block';
         const rowsEl = document.getElementById('sumStatRowsRead');
-        if (rowsEl) rowsEl.textContent = datasetStats.rowsRead;
+        if (rowsEl) rowsEl.textContent = datasetStats.rowsRead.toLocaleString();
         const invEl = document.getElementById('sumStatInterval');
-        if (invEl) invEl.textContent = datasetStats.surveyIntervalLabel || `${state.duration || 15} Mins`;
+        if (invEl) invEl.textContent = datasetStats.surveyIntervalLabel || durationLabel;
         const timeRangeEl = document.getElementById('sumStatTimeRange');
         if (timeRangeEl) timeRangeEl.textContent = `${datasetStats.startTime || '08:00'} – ${datasetStats.endTime || '09:00'}`;
         const peakEl = document.getElementById('sumStatPeakInterval');
@@ -3176,7 +3171,7 @@ const FlowGuard = (function() {
     const cardsGrid = document.getElementById('sumDashApproachCardsGrid');
     if (cardsGrid) {
       cardsGrid.innerHTML = activeKeys.map(k => {
-        const stat = approachStats[k];
+        const stat = approachStats[k] || { name: k, hourlyDemand: 0, vehCount: 0, pcuVal: 0, left: 0, through: 0, right: 0 };
         return `
           <div style="background: var(--bg-input); border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px;">
             <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">${stat.name}</div>
