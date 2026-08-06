@@ -1038,6 +1038,72 @@ const FlowGuard = (function() {
 
     const state = getState();
     const approaches = state.approaches || DEFAULT_STATE.approaches;
+    const storedRecords = getCSVRecords();
+    const isExplicitlyProcessed = (parsedData && (Array.isArray(parsedData) ? parsedData.length > 0 : Object.keys(parsedData).length > 0));
+    const hasUploadedRoads = Object.values(approaches).some(app => app.uploaded === true || app.fromCSV === true);
+
+    const hasData = isExplicitlyProcessed || (storedRecords && storedRecords.length > 0) || hasUploadedRoads;
+
+    // ── DATA CHECK GATEKEEPER — EMPTY STATE UI (Fixes "Ghost Data" Bug) ──
+    if (!hasData) {
+      container.innerHTML = `
+        <div class="card" style="padding: 2.5rem; text-align: center; border: 1px dashed rgba(56,189,248,0.4); background: rgba(15,23,42,0.6); margin-top: 1.5rem;">
+          <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">📊</div>
+          <div style="font-size: 0.85rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #94a3b8; margin-bottom: 0.5rem;">
+            STATUS: AWAITING DATA INPUT
+          </div>
+          <h3 style="margin: 0 0 0.75rem 0; color: #38bdf8; font-size: 1.25rem;">
+            No Traffic Data Uploaded Yet
+          </h3>
+          <p style="color: var(--text-muted); max-width: 600px; margin: 0 auto 1.5rem auto; font-size: 0.88rem; line-height: 1.6;">
+            The D/D/1 queuing calculations and saturation flow metrics are halted to prevent phantom baseline rendering. Upload a historical traffic CSV file or load demo mock data to calculate volume-to-capacity ratios, queuing metrics, and signal timing plans.
+          </p>
+          <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
+            <button id="btnEmptyStateLoadDemo" class="btn btn-primary" style="padding: 0.6rem 1.25rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
+              ⚡ Load Demo Mock Data
+            </button>
+            <button id="btnEmptyStateTriggerUpload" class="btn btn-secondary" style="padding: 0.6rem 1.25rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
+              📂 Upload Traffic CSV
+            </button>
+          </div>
+        </div>
+      `;
+
+      const demoBtn = document.getElementById('btnEmptyStateLoadDemo');
+      if (demoBtn) {
+        demoBtn.addEventListener('click', () => {
+          const demoApproaches = {
+            north: { id: 'north', road: 'A', name: 'Road A - North', flow: 3300, currentGreen: 30, left: 495, through: 2310, right: 495, lanes: 2, uploaded: true, fromCSV: true },
+            east:  { id: 'east',  road: 'B', name: 'Road B - East',  flow: 720,  currentGreen: 30, left: 100, through: 520,  right: 100, lanes: 2, uploaded: true, fromCSV: true },
+            south: { id: 'south', road: 'C', name: 'Road C - South', flow: 280,  currentGreen: 30, left: 40,  through: 200,  right: 40,  lanes: 2, uploaded: true, fromCSV: true },
+            west:  { id: 'west',  road: 'D', name: 'Road D - West',  flow: 350,  currentGreen: 30, left: 50,  through: 250,  right: 50,  lanes: 2, uploaded: true, fromCSV: true }
+          };
+          const newState = { ...state, approaches: demoApproaches };
+          saveState(newState);
+          saveCSVRecords([
+            { time_of_day: '08:00 AM', vehicles_per_minute: 55, lanes: 2, incident_event: 'none' },
+            { time_of_day: '08:15 AM', vehicles_per_minute: 40, lanes: 2, incident_event: 'none' },
+            { time_of_day: '08:30 AM', vehicles_per_minute: 25, lanes: 2, incident_event: 'roadwork' }
+          ]);
+          renderEngineeringDashboard(demoApproaches, containerId);
+        });
+      }
+
+      const uploadBtn = document.getElementById('btnEmptyStateTriggerUpload');
+      if (uploadBtn) {
+        uploadBtn.addEventListener('click', () => {
+          const fileInput = document.getElementById('csvFileInput');
+          if (fileInput) {
+            fileInput.click();
+          } else {
+            window.location.href = 'analysis.html#csvUploadSection';
+          }
+        });
+      }
+
+      return;
+    }
+
     const roadKeys = ['north', 'east', 'south', 'west'];
     const roadNamesMap = { north: 'Road A - North', east: 'Road B - East', south: 'Road C - South', west: 'Road D - West' };
 
