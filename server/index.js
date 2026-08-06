@@ -77,6 +77,21 @@ app.use(express.static(path.join(__dirname, '..'), {
   maxAge: env.isProduction ? '1d' : 0
 }));
 
+// Friendly Subpage Alias Route Handler (supports /simulation.html, /simulation, etc.)
+app.get(['/:page.html', '/:page'], (req, res, next) => {
+  const pageName = req.params.page;
+  const fs = require('fs');
+  const subpagePath = path.join(__dirname, '..', 'pages', `${pageName}.html`);
+  const rootPath = path.join(__dirname, '..', `${pageName}.html`);
+
+  if (fs.existsSync(subpagePath)) {
+    return res.sendFile(subpagePath);
+  } else if (fs.existsSync(rootPath)) {
+    return res.sendFile(rootPath);
+  }
+  next();
+});
+
 // 404 & Global Error Handling Middleware
 app.use(notFoundHandler);
 app.use(errorHandler);
