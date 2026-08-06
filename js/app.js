@@ -2091,11 +2091,13 @@ const FlowGuard = (function() {
 
       setProgress('Generating Preview Table...', 100);
 
-      setTimeout(() => {
-        if (progressContainer) progressContainer.style.display = 'none';
-        renderDatasetPreviewTable(result);
-        console.log('[Dataset Pipeline Complete] All modules synchronized successfully.');
-      }, 400);
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          if (progressContainer) progressContainer.style.display = 'none';
+          renderDatasetPreviewTable(result);
+          console.log('[Dataset Pipeline Complete] All modules synchronized successfully.');
+        }, 100);
+      }
 
       return result;
     }).catch(err => {
