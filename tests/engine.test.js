@@ -12,25 +12,24 @@ describe('FlowGuard AI Civil Engineering Math Engines', () => {
 
   test('Dataset Road Aggregation (Road A, B, C, D) & IRC:106 PCU Calculation', () => {
     const demoRows = [
-      { Approach: 'Approach A', Cars: 50, Bikes: 40, Auto: 10, Bus: 2, Truck: 1, Left: 10, Through: 50, Right: 10 },
-      { Approach: 'Approach B', Cars: 40, Bikes: 30, Auto: 5, Bus: 1, Truck: 0, Left: 8, Through: 40, Right: 8 },
-      { Approach: 'Approach C', Cars: 30, Bikes: 20, Auto: 5, Bus: 1, Truck: 0, Left: 5, Through: 30, Right: 5 },
-      { Approach: 'Approach D', Cars: 35, Bikes: 25, Auto: 5, Bus: 1, Truck: 0, Left: 6, Through: 35, Right: 6 }
+      { Date: '2026-08-06', Time: '08:30', Road: 'Road A - North', Cars: 50, Bikes: 40, AutoRickshaw: 10, Bus: 2, Truck: 1, Bicycle: 0, LeftTurn: 20, Through: 63, RightTurn: 20, IncomingLanes: 2, SpeedLimit: 50, PedestrianCount: 20, CrosswalkWidth: 14, Incident: 'None' },
+      { Date: '2026-08-06', Time: '08:30', Road: 'Road B - East',  Cars: 40, Bikes: 30, AutoRickshaw: 5,  Bus: 1, Truck: 0, Bicycle: 0, LeftTurn: 15, Through: 46, RightTurn: 15, IncomingLanes: 2, SpeedLimit: 50, PedestrianCount: 20, CrosswalkWidth: 14, Incident: 'None' },
+      { Date: '2026-08-06', Time: '08:30', Road: 'Road C - South', Cars: 30, Bikes: 20, AutoRickshaw: 5,  Bus: 1, Truck: 0, Bicycle: 0, LeftTurn: 10, Through: 36, RightTurn: 10, IncomingLanes: 2, SpeedLimit: 50, PedestrianCount: 20, CrosswalkWidth: 14, Incident: 'None' },
+      { Date: '2026-08-06', Time: '08:30', Road: 'Road D - West',  Cars: 35, Bikes: 25, AutoRickshaw: 5,  Bus: 1, Truck: 0, Bicycle: 0, LeftTurn: 12, Through: 42, RightTurn: 12, IncomingLanes: 2, SpeedLimit: 50, PedestrianCount: 20, CrosswalkWidth: 14, Incident: 'None' }
     ];
 
-    const result = FlowGuard.parseTrafficCSV ? null : null;
     // Test processRawDatasetRows via demo ingestion
     return FlowGuard.executeDatasetIngestionPipeline(demoRows).then(res => {
       expect(res).toBeDefined();
-      const agg = res.aggregated;
-      expect(agg.north.pcuTotal).toBeGreaterThan(0);
-      expect(agg.east.pcuTotal).toBeGreaterThan(0);
-      expect(agg.south.pcuTotal).toBeGreaterThan(0);
-      expect(agg.west.pcuTotal).toBeGreaterThan(0);
+      const selectedRoads = res.selectedInterval ? res.selectedInterval.roads : res.aggregated;
+      expect(selectedRoads.north.convertedPCU).toBeGreaterThan(0);
+      expect(selectedRoads.east.convertedPCU).toBeGreaterThan(0);
+      expect(selectedRoads.south.convertedPCU).toBeGreaterThan(0);
+      expect(selectedRoads.west.convertedPCU).toBeGreaterThan(0);
 
       // Verify Road A (north) PCU is not 0
-      // Cars: 50*1.0 = 50, Bikes: 40*0.5 = 20, Auto: 10*0.8 = 8, Bus: 2*3.0 = 6, Truck: 1*3.0 = 3 -> Total = 87
-      expect(agg.north.pcuTotal).toEqual(87);
+      // Cars: 50*1.0 = 50, Bikes: 40*0.5 = 20, Auto: 10*0.8 = 8, Bus: 2*3.0 = 6, Truck: 1*3.0 = 3 -> Total = 87 PCU
+      expect(selectedRoads.north.convertedPCU).toEqual(87);
     });
   });
 

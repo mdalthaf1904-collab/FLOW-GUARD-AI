@@ -302,9 +302,9 @@ const AnalysisEngine = (function () {
     );
 
     const pedModel = calculatePedestrianCrossingTime(
-      intersectionConfig.crossingWidth,
-      intersectionConfig.walkingSpeed,
-      intersectionConfig.startUpTime
+      intersectionConfig.crosswalkWidth || intersectionConfig.crossingWidth || 14.0,
+      intersectionConfig.walkingSpeed || 1.2,
+      intersectionConfig.startupTime || intersectionConfig.startUpTime || 7.0
     );
 
     // Effective Minimum Green bound
