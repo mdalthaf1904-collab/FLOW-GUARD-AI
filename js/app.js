@@ -1791,24 +1791,48 @@ const FlowGuard = (function() {
         });
       });
 
-      // ── 4. Global Event Delegation on document.body for Dynamic Elements ──
-      document.body.addEventListener('click', (e) => {
-        const calcToggle = e.target.closest('[onclick*="calc_panel_"]');
-        if (calcToggle) {
-          console.log('Button clicked: Engineering Calculation Breakdown Panel Toggle');
-        }
+      // ── 5. File Upload & Drag-and-Drop Ingestion Bindings ──────────────────
+      const fileInput = document.getElementById('csvFileInput');
+      if (fileInput) {
+        fileInput.addEventListener('change', (e) => {
+          if (e.target.files && e.target.files[0]) {
+            console.log(`[File Selected]: ${e.target.files[0].name}`);
+            executeDatasetIngestionPipeline(e.target.files[0]);
+          }
+        });
+      }
 
-        const whyToggle = e.target.closest('.expandable-why-toggle');
-        if (whyToggle) {
-          console.log('Button clicked: Why Diagnosis Toggle');
-        }
+      const dropzone = document.getElementById('datasetDropzone');
+      if (dropzone) {
+        dropzone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          dropzone.style.borderColor = 'var(--accent-primary)';
+          dropzone.style.background = 'rgba(56,189,248,0.06)';
+        });
+        dropzone.addEventListener('dragleave', (e) => {
+          e.preventDefault();
+          dropzone.style.borderColor = 'var(--border-color)';
+          dropzone.style.background = 'transparent';
+        });
+        dropzone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          dropzone.style.borderColor = 'var(--border-color)';
+          dropzone.style.background = 'transparent';
+          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            console.log(`[File Dropped]: ${e.dataTransfer.files[0].name}`);
+            executeDatasetIngestionPipeline(e.dataTransfer.files[0]);
+          }
+        });
+      }
 
-        const dynamicBtn = e.target.closest('.btn, button, .btn-toolbar, .btn-sidebar-guide');
-        if (dynamicBtn) {
-          const btnName = dynamicBtn.innerText.trim() || dynamicBtn.id || 'Dynamic Button';
-          console.log(`Button clicked: [${btnName}]`);
-        }
-      });
+      const demoBtn = document.getElementById('btnEmptyStateLoadDemo');
+      if (demoBtn) {
+        demoBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          console.log('[Load Demo Dataset clicked]');
+          executeDatasetIngestionPipeline('demo');
+        });
+      }
     };
 
     if (document.readyState === 'loading') {
@@ -1816,6 +1840,259 @@ const FlowGuard = (function() {
     } else {
       bindEvents();
     }
+  }
+
+  /**
+   * Render Dataset Preview Table & Analysis Metrics Card
+   */
+  function renderDatasetPreviewTable(datasetResult, containerElId) {
+    const container = document.getElementById(containerElId || 'datasetPreviewContainer');
+    if (!container) return;
+
+    const records = datasetResult.records || [];
+    const aggregated = datasetResult.aggregated || {};
+    const roadKeys = ['north', 'east', 'south', 'west'];
+    const totalRecords = records.length;
+
+    let grandTotalPCU = 0;
+    roadKeys.forEach(k => {
+      grandTotalPCU += aggregated[k] ? (aggregated[k].pcuTotal || 0) : 0;
+    });
+
+    const activeRoadsCount = roadKeys.filter(k => aggregated[k] && aggregated[k].pcuTotal > 0).length;
+
+    const first50 = records.slice(0, 50);
+
+    container.innerHTML = `
+      <div class="card" style="padding: 1.5rem; margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <h3 style="color: var(--accent-primary); font-size: 1.1rem; margin: 0 0 0.25rem 0;">📊 Uploaded Dataset Preview & Summary</h3>
+            <p style="font-size: 0.78rem; color: var(--text-secondary); margin: 0;">Showing first ${first50.length} of ${totalRecords} records parsed across ${activeRoadsCount} active approaches.</p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <span class="badge badge-low" style="font-weight:700;">✓ VALIDATED</span>
+            <span class="badge" style="background: rgba(56,189,248,0.15); color: var(--accent-primary); border: 1px solid rgba(56,189,248,0.3); font-weight:700;">${totalRecords} ROWS</span>
+            <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3); font-weight:700;">${grandTotalPCU} TOTAL PCU</span>
+          </div>
+        </div>
+
+        <!-- Summary Metrics Row -->
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.25rem;">
+          ${roadKeys.map(k => {
+            const a = aggregated[k] || {};
+            const label = k === 'north' ? 'Road A (North)' : k === 'east' ? 'Road B (East)' : k === 'south' ? 'Road C (South)' : 'Road D (West)';
+            return `
+              <div style="background: var(--bg-input); border: 1px solid var(--border-color); padding: 0.75rem; border-radius: 6px;">
+                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">${label}</div>
+                <div style="font-size: 1.1rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;">${a.pcuTotal || 0} PCU/h</div>
+                <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.2rem;">Lanes: ${a.lanes || 2} | Turning: L${a.left || 0}/T${a.through || 0}/R${a.right || 0}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <!-- Scrollable Dataset Preview Table -->
+        <div class="table-responsive" style="max-height: 350px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+          <table class="data-table" style="font-size: 0.78rem;">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Time</th>
+                <th>Road / Approach</th>
+                <th>Cars</th>
+                <th>Bikes</th>
+                <th>Autos</th>
+                <th>Buses</th>
+                <th>Trucks</th>
+                <th>Bicycles</th>
+                <th>Total Veh</th>
+                <th>Left</th>
+                <th>Through</th>
+                <th>Right</th>
+                <th>Lanes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${first50.map((r, idx) => `
+                <tr>
+                  <td>${idx + 1}</td>
+                  <td><strong>${r.time}</strong></td>
+                  <td><span class="road-chip" style="font-size:0.7rem;">${r.road}</span></td>
+                  <td>${r.cars}</td>
+                  <td>${r.bikes}</td>
+                  <td>${r.autorickshaw}</td>
+                  <td>${r.bus}</td>
+                  <td>${r.truck}</td>
+                  <td>${r.bicycle}</td>
+                  <td><strong>${r.totalVehicles}</strong></td>
+                  <td>${r.leftTurn}</td>
+                  <td>${r.through}</td>
+                  <td>${r.rightTurn}</td>
+                  <td>${r.incomingLanes}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Execute End-to-End Ingestion & Engineering Pipeline
+   */
+  function executeDatasetIngestionPipeline(fileOrDemoData) {
+    const errorBanner = document.getElementById('uploadErrorBanner');
+    const errorText = document.getElementById('uploadErrorText');
+    const progressContainer = document.getElementById('uploadProgressContainer');
+    const progressBar = document.getElementById('uploadProgressBar');
+    const progressText = document.getElementById('uploadProgressText');
+    const progressPct = document.getElementById('uploadProgressPct');
+
+    if (errorBanner) errorBanner.style.display = 'none';
+
+    const setProgress = (text, pct) => {
+      if (progressContainer) progressContainer.style.display = 'block';
+      if (progressText) progressText.innerText = text;
+      if (progressPct) progressPct.innerText = `${pct}%`;
+      if (progressBar) progressBar.style.width = `${pct}%`;
+    };
+
+    const handleError = (errMessage) => {
+      if (progressContainer) progressContainer.style.display = 'none';
+      if (errorBanner && errorText) {
+        errorText.innerText = errMessage;
+        errorBanner.style.display = 'block';
+      }
+      console.error('[Dataset Pipeline Error]:', errMessage);
+    };
+
+    setProgress('Reading dataset file...', 20);
+
+    let parsePromise;
+    if (fileOrDemoData instanceof File) {
+      parsePromise = parseTrafficDataset(fileOrDemoData);
+    } else if (Array.isArray(fileOrDemoData)) {
+      parsePromise = Promise.resolve(processRawDatasetRows(fileOrDemoData));
+    } else {
+      // Demo dataset generator
+      const demoRows = generateDemoDatasetRows();
+      parsePromise = Promise.resolve(processRawDatasetRows(demoRows));
+    }
+
+    return parsePromise.then(result => {
+      setProgress('Validating columns & data integrity...', 50);
+
+      const aggregated = result.aggregated;
+      const currentState = getState();
+
+      const updatedApproaches = { ...currentState.approaches };
+
+      ['north', 'east', 'south', 'west'].forEach(k => {
+        const agg = aggregated[k];
+        if (agg) {
+          updatedApproaches[k] = {
+            id: k,
+            road: agg.road,
+            name: agg.name,
+            flow: agg.flow,
+            pcuTotal: agg.pcuTotal,
+            cars: agg.cars,
+            bikes: agg.bikes,
+            autorickshaw: agg.autorickshaw,
+            bus: agg.bus,
+            truck: agg.truck,
+            bicycle: agg.bicycle,
+            left: agg.left,
+            through: agg.through,
+            right: agg.right,
+            lanes: agg.lanes,
+            speedLimit: agg.speedLimit,
+            currentGreen: (currentState.approaches[k] ? currentState.approaches[k].currentGreen : 30),
+            uploaded: true,
+            fromCSV: true
+          };
+
+          // Update input elements on DOM if present
+          const flowEl = document.getElementById(`flow_${k}`);
+          if (flowEl) flowEl.value = agg.flow;
+
+          const leftEl = document.getElementById(`left_${k}`);
+          if (leftEl) leftEl.value = agg.left;
+
+          const thruEl = document.getElementById(`through_${k}`);
+          if (thruEl) thruEl.value = agg.through;
+
+          const rightEl = document.getElementById(`right_${k}`);
+          if (rightEl) rightEl.value = agg.right;
+
+          const lanesEl = document.getElementById(`lanes_${k}`);
+          if (lanesEl) lanesEl.value = agg.lanes;
+        }
+      });
+
+      setProgress('Calculating IRC:106 PCUs & Webster Green Splits...', 85);
+
+      const newState = {
+        ...currentState,
+        approaches: updatedApproaches,
+        dataUploaded: true
+      };
+
+      saveState(newState);
+      saveCSVRecords(result.records);
+
+      setProgress('Generating Preview Table...', 100);
+
+      setTimeout(() => {
+        if (progressContainer) progressContainer.style.display = 'none';
+        renderDatasetPreviewTable(result);
+        console.log('[Dataset Pipeline Complete] All modules synchronized successfully.');
+      }, 400);
+
+      return result;
+    }).catch(err => {
+      handleError(err.message || 'Dataset parsing failed.');
+    });
+  }
+
+  /**
+   * Helper to generate a 24-hr multi-approach demo dataset (96 rows)
+   */
+  function generateDemoDatasetRows() {
+    const rows = [];
+    const roads = [
+      { name: 'Road A - North', lanes: 2 },
+      { name: 'Road B - East',  lanes: 2 },
+      { name: 'Road C - South', lanes: 2 },
+      { name: 'Road D - West',  lanes: 2 }
+    ];
+
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        roads.forEach(r => {
+          const isPeak = (h >= 8 && h <= 10) || (h >= 17 && h <= 19);
+          const baseCars = isPeak ? 90 : 35;
+          rows.push({
+            Time: timeStr,
+            Road: r.name,
+            Cars: baseCars + Math.floor(Math.random() * 20),
+            Bikes: Math.floor(baseCars * 0.4),
+            Auto: Math.floor(baseCars * 0.2),
+            Bus: Math.floor(baseCars * 0.08),
+            Truck: Math.floor(baseCars * 0.05),
+            Bicycle: Math.floor(Math.random() * 5),
+            Left: Math.floor(baseCars * 0.2),
+            Through: Math.floor(baseCars * 0.6),
+            Right: Math.floor(baseCars * 0.2),
+            Lanes: r.lanes
+          });
+        });
+      }
+    }
+    return rows;
   }
 
   return {
@@ -1849,6 +2126,8 @@ const FlowGuard = (function() {
     analyzeTrafficAPI,
     renderEngineeringDashboard,
     setWizardStep,
+    executeDatasetIngestionPipeline,
+    renderDatasetPreviewTable,
     initAppEvents
   };
 })();
@@ -1857,6 +2136,8 @@ if (typeof window !== 'undefined') {
   window.renderEngineeringDashboard = FlowGuard.renderEngineeringDashboard;
   window.calculateTrafficPressureIndex = FlowGuard.calculateTrafficPressureIndex;
   window.setWizardStep = FlowGuard.setWizardStep;
+  window.executeDatasetIngestionPipeline = FlowGuard.executeDatasetIngestionPipeline;
+  window.renderDatasetPreviewTable = FlowGuard.renderDatasetPreviewTable;
   window.initAppEvents = FlowGuard.initAppEvents;
   FlowGuard.initAppEvents();
 }
