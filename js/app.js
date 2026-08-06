@@ -444,10 +444,17 @@ const FlowGuard = (function() {
     const pcuFactors = project.engineeringParameters.pcuFactors || DEFAULT_STATE.pcuFactors;
     const interConfig = project.engineeringParameters.intersection || {};
     const baseSat = parseFloat(interConfig.baseSaturationFlow || interConfig.saturationFlow) || 1800;
+    const surveyDur = parseFloat(project.geometry.surveyDuration) || 15;
+    const mult = 60 / surveyDur;
 
     let totalVehicles = 0;
     let totalPCUDemand = 0;
     const approachStats = {};
+
+    const movementPCUMap = {};
+    const approachPCUMap = {};
+    const hourlyDemandMap = {};
+    const criticalLaneInputsMap = {};
 
     // Category vehicle totals across all approaches
     const modalCounts = { car: 0, motorcycle: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, tractor: 0, cart: 0 };
@@ -470,6 +477,34 @@ const FlowGuard = (function() {
         pcuVal = Math.round(appVehTotal * 1.5);
       }
 
+      // Movement-Based PCU Calculation Model
+      const totTurnVeh = (left + through + right) || 1;
+      const pLeft = left / totTurnVeh;
+      const pThrough = through / totTurnVeh;
+      const pRight = right / totTurnVeh;
+
+      const leftPCU = Math.round(pcuVal * pLeft);
+      const throughPCU = Math.round(pcuVal * pThrough);
+      const rightPCU = Math.max(0, pcuVal - leftPCU - throughPCU);
+
+      const leftHourlyPCU = Math.round(leftPCU * mult);
+      const throughHourlyPCU = Math.round(throughPCU * mult);
+      const rightHourlyPCU = Math.round(rightPCU * mult);
+      const approachHourlyPCU = Math.round(pcuVal * mult);
+
+      movementPCUMap[k] = {
+        leftPCU: leftPCU,
+        throughPCU: throughPCU,
+        rightPCU: rightPCU,
+        totalPCU: pcuVal,
+        leftHourlyPCU: leftHourlyPCU,
+        throughHourlyPCU: throughHourlyPCU,
+        rightHourlyPCU: rightHourlyPCU,
+        totalHourlyPCU: approachHourlyPCU
+      };
+      approachPCUMap[k] = pcuVal;
+      hourlyDemandMap[k] = approachHourlyPCU;
+
       // Dominant movement detection
       let dominant = 'Through';
       let maxMoveVal = through;
@@ -481,8 +516,6 @@ const FlowGuard = (function() {
       const lanes = parseInt(project.geometry.laneCounts ? project.geometry.laneCounts[k] : 2, 10) || 2;
       const appSatFlow = lanes * baseSat;
       const flowRatioY = appSatFlow > 0 ? parseFloat((pcuVal / appSatFlow).toFixed(4)) : 0;
-      const surveyDur = parseFloat(project.geometry.surveyDuration) || 15;
-      const hourlyDemand = pcuVal * (60 / surveyDur);
 
       totalVehicles += appVehTotal;
       totalPCUDemand += pcuVal;
@@ -494,18 +527,26 @@ const FlowGuard = (function() {
         lanes: lanes,
         vehCount: appVehTotal,
         pcuVal: pcuVal,
-        hourlyDemand: hourlyDemand,
+        hourlyDemand: approachHourlyPCU,
         flowRatioY: flowRatioY,
         satFlow: appSatFlow,
         left: left,
         through: through,
         right: right,
+        leftPCU: leftPCU,
+        throughPCU: throughPCU,
+        rightPCU: rightPCU,
         dominantMovement: dominantText
+      };
+
+      criticalLaneInputsMap[k] = {
+        lanes: lanes,
+        satFlow: appSatFlow,
+        flowRatioY: flowRatioY
       };
     });
 
-    const surveyDur = parseFloat(project.geometry.surveyDuration) || 15;
-    const hourlyTotalDemand = Math.round(totalPCUDemand * (60 / surveyDur));
+    const hourlyTotalDemand = Math.round(totalPCUDemand * mult);
 
     let maxFlowRatioKey = activeKeys[0];
     activeKeys.forEach(k => {
@@ -582,6 +623,10 @@ const FlowGuard = (function() {
       totalPCUDemand: totalPCUDemand,
       hourlyTotalDemand: hourlyTotalDemand,
       criticalLaneKey: maxFlowRatioKey,
+      movementPCU: movementPCUMap,
+      approachPCU: approachPCUMap,
+      hourlyDemand: hourlyDemandMap,
+      criticalLaneInputs: criticalLaneInputsMap,
       pcuCategoryBreakdown: pcuCategoryBreakdown,
       sumModalVeh: sumModalVeh,
       sumModalPcu: sumModalPcu
@@ -3083,28 +3128,17 @@ const FlowGuard = (function() {
     renderTurningMovementStackedBarChart(activeKeys, approachStats);
     const turningBody = document.getElementById('turningSummaryTableBody');
     if (turningBody) {
+      const movementPCU = (state.project && state.project.processedTraffic && state.project.processedTraffic.movementPCU) || {};
       turningBody.innerHTML = activeKeys.map(k => {
         const stat = approachStats[k];
-        const totalDir = (stat.left + stat.through + stat.right) || 1;
-        const pLeft = Math.round((stat.left / totalDir) * 100);
-        const pThrough = Math.round((stat.through / totalDir) * 100);
-        const pRight = Math.round((stat.right / totalDir) * 100);
-
-        let dominant = 'Through';
-        let maxP = pThrough;
-        if (pLeft > maxP) { dominant = 'Left Turn'; maxP = pLeft; }
-        if (pRight > maxP) { dominant = 'Right Turn'; maxP = pRight; }
-
+        const m = movementPCU[k] || { leftPCU: stat.leftPCU || 0, throughPCU: stat.throughPCU || 0, rightPCU: stat.rightPCU || 0, totalPCU: stat.pcuVal || 0 };
         return `
           <tr>
             <td><strong>${stat.name}</strong></td>
-            <td style="text-align: right;">${stat.vehCount.toLocaleString()} veh</td>
-            <td style="text-align: right; color: var(--accent-primary); font-weight: 700;">${stat.pcuVal.toLocaleString()} PCU</td>
-            <td style="text-align: right;">${stat.left.toLocaleString()}</td>
-            <td style="text-align: right;">${stat.through.toLocaleString()}</td>
-            <td style="text-align: right;">${stat.right.toLocaleString()}</td>
-            <td style="text-align: center;"><span style="font-family: monospace; font-size: 0.78rem;">${pLeft}% / ${pThrough}% / ${pRight}%</span></td>
-            <td><span class="badge badge-low">${dominant} (${maxP}%)</span></td>
+            <td style="text-align: right;">${m.leftPCU.toLocaleString()} PCU</td>
+            <td style="text-align: right;">${m.throughPCU.toLocaleString()} PCU</td>
+            <td style="text-align: right;">${m.rightPCU.toLocaleString()} PCU</td>
+            <td style="text-align: right; color: var(--accent-primary); font-weight: 700;">${m.totalPCU.toLocaleString()} PCU</td>
           </tr>
         `;
       }).join('');
