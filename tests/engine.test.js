@@ -10,11 +10,28 @@ const ValidationEngine = require('../js/validation');
 
 describe('FlowGuard AI Civil Engineering Math Engines', () => {
 
-  test('IRC:106 PCU Conversion Math', () => {
-    const vehObj = { car: 100, bike: 200, auto: 50, bus: 10, hcv: 5, bicycle: 20 };
-    const pcu = FlowGuard.calculateApproachPCU(vehObj);
-    // (100*1.0) + (200*0.5) + (50*0.8) + (10*3.0) + (5*3.0) + (20*0.4) = 100 + 100 + 40 + 30 + 15 + 8 = 293
-    expect(pcu).toEqual(293);
+  test('Dataset Road Aggregation (Road A, B, C, D) & IRC:106 PCU Calculation', () => {
+    const demoRows = [
+      { Approach: 'Approach A', Cars: 50, Bikes: 40, Auto: 10, Bus: 2, Truck: 1, Left: 10, Through: 50, Right: 10 },
+      { Approach: 'Approach B', Cars: 40, Bikes: 30, Auto: 5, Bus: 1, Truck: 0, Left: 8, Through: 40, Right: 8 },
+      { Approach: 'Approach C', Cars: 30, Bikes: 20, Auto: 5, Bus: 1, Truck: 0, Left: 5, Through: 30, Right: 5 },
+      { Approach: 'Approach D', Cars: 35, Bikes: 25, Auto: 5, Bus: 1, Truck: 0, Left: 6, Through: 35, Right: 6 }
+    ];
+
+    const result = FlowGuard.parseTrafficCSV ? null : null;
+    // Test processRawDatasetRows via demo ingestion
+    return FlowGuard.executeDatasetIngestionPipeline(demoRows).then(res => {
+      expect(res).toBeDefined();
+      const agg = res.aggregated;
+      expect(agg.north.pcuTotal).toBeGreaterThan(0);
+      expect(agg.east.pcuTotal).toBeGreaterThan(0);
+      expect(agg.south.pcuTotal).toBeGreaterThan(0);
+      expect(agg.west.pcuTotal).toBeGreaterThan(0);
+
+      // Verify Road A (north) PCU is not 0
+      // Cars: 50*1.0 = 50, Bikes: 40*0.5 = 20, Auto: 10*0.8 = 8, Bus: 2*3.0 = 6, Truck: 1*3.0 = 3 -> Total = 87
+      expect(agg.north.pcuTotal).toEqual(87);
+    });
   });
 
   test('Webster Optimum Cycle Formula C = (1.5L + 5) / (1 - Y)', () => {

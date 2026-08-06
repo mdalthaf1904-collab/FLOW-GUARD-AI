@@ -510,6 +510,45 @@ const FlowGuard = (function() {
   }
 
   /**
+   * Determine approach key ('north' | 'east' | 'south' | 'west') from road header value cleanly.
+   * Prevents false-positive substring matches (e.g. "Approach A" containing letter 'c' inside "approach").
+   */
+  function determineApproachKey(roadVal) {
+    if (!roadVal) return 'north';
+    const str = String(roadVal).trim().toLowerCase();
+
+    // 1. Check for explicit compass direction
+    if (str.includes('north') || str === 'n') return 'north';
+    if (str.includes('east')  || str === 'e') return 'east';
+    if (str.includes('south') || str === 's') return 'south';
+    if (str.includes('west')  || str === 'w') return 'west';
+
+    // 2. Check for tokenized letter designations (e.g. "Road A", "Approach A", "Arm A", "Leg A", "A")
+    const words = str.split(/[\s_\-\/]+/);
+
+    if (words.includes('a') || words.includes('roada') || words.includes('arma') || words.includes('lega') || words.includes('1') || str === 'a') {
+      return 'north';
+    }
+    if (words.includes('b') || words.includes('roadb') || words.includes('armb') || words.includes('legb') || words.includes('2') || str === 'b') {
+      return 'east';
+    }
+    if (words.includes('c') || words.includes('roadc') || words.includes('armc') || words.includes('legc') || words.includes('3') || str === 'c') {
+      return 'south';
+    }
+    if (words.includes('d') || words.includes('roadd') || words.includes('armd') || words.includes('legd') || words.includes('4') || str === 'd') {
+      return 'west';
+    }
+
+    // 3. Fallback regex for "road a", "approach a", "section a", etc.
+    if (/\b(road|arm|leg|approach|direction|section)?\s*a\b/i.test(str) || str.endsWith(' a')) return 'north';
+    if (/\b(road|arm|leg|approach|direction|section)?\s*b\b/i.test(str) || str.endsWith(' b')) return 'east';
+    if (/\b(road|arm|leg|approach|direction|section)?\s*c\b/i.test(str) || str.endsWith(' c')) return 'south';
+    if (/\b(road|arm|leg|approach|direction|section)?\s*d\b/i.test(str) || str.endsWith(' d')) return 'west';
+
+    return 'north';
+  }
+
+  /**
    * Process raw dataset rows from CSV or Excel (.xlsx)
    * Engineering schema:
    * Time, Road, Cars, Bikes, AutoRickshaw, Bus, Truck, Bicycle, LeftTurn, Through, RightTurn, IncomingLanes, SpeedLimit(km/h), PedestrianCount, CrosswalkWidth(m), Incident
@@ -517,35 +556,35 @@ const FlowGuard = (function() {
   function processRawDatasetRows(rawRows) {
     const records = [];
     const aggregated = {
-      north: { road: 'Road A - North', name: 'Road A - North', key: 'north', cars: 0, bikes: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, left: 0, through: 0, right: 0, lanes: 2, speedLimit: 50, pedCount: 20, crosswalkWidth: 14, incident: 'None', recordsCount: 0 },
-      east:  { road: 'Road B - East',  name: 'Road B - East',  key: 'east',  cars: 0, bikes: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, left: 0, through: 0, right: 0, lanes: 2, speedLimit: 50, pedCount: 20, crosswalkWidth: 14, incident: 'None', recordsCount: 0 },
-      south: { road: 'Road C - South', name: 'Road C - South', key: 'south', cars: 0, bikes: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, left: 0, through: 0, right: 0, lanes: 2, speedLimit: 50, pedCount: 20, crosswalkWidth: 14, incident: 'None', recordsCount: 0 },
-      west:  { road: 'Road D - West',  name: 'Road D - West',  key: 'west',  cars: 0, bikes: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, left: 0, through: 0, right: 0, lanes: 2, speedLimit: 50, pedCount: 20, crosswalkWidth: 14, incident: 'None', recordsCount: 0 }
+      north: { road: 'Road A - North', name: 'Road A - North', key: 'north', cars: 0, bikes: 0, autorickshaw: 0, lcv: 0, bus: 0, truck: 0, bicycle: 0, left: 0, through: 0, right: 0, lanes: 2, speedLimit: 50, pedCount: 20, crosswalkWidth: 14, incident: 'None', recordsCount: 0 },
+      east:  { road: 'Road B - East',  name: 'Road B - East',  key: 'east',  cars: 0, bikes: 0, autorickshaw: 0, lcv: 0, bus: 0, truck: 0, bicycle: 0, left: 0, through: 0, right: 0, lanes: 2, speedLimit: 50, pedCount: 20, crosswalkWidth: 14, incident: 'None', recordsCount: 0 },
+      south: { road: 'Road C - South', name: 'Road C - South', key: 'south', cars: 0, bikes: 0, autorickshaw: 0, lcv: 0, bus: 0, truck: 0, bicycle: 0, left: 0, through: 0, right: 0, lanes: 2, speedLimit: 50, pedCount: 20, crosswalkWidth: 14, incident: 'None', recordsCount: 0 },
+      west:  { road: 'Road D - West',  name: 'Road D - West',  key: 'west',  cars: 0, bikes: 0, autorickshaw: 0, lcv: 0, bus: 0, truck: 0, bicycle: 0, left: 0, through: 0, right: 0, lanes: 2, speedLimit: 50, pedCount: 20, crosswalkWidth: 14, incident: 'None', recordsCount: 0 }
     };
 
     rawRows.forEach((row) => {
       const n = normalizeRow(row);
 
       const timeVal = n.time || n.timeofday || '00:00';
-      const roadVal = String(n.road || n.roadid || n.intersectionid || n.roadname || 'Road A').trim();
+      const roadVal = String(
+        n.road || n.roadname || n.roadid || n.intersectionid ||
+        n.approach || n.direction || n.arm || n.leg || n.location || 'Road A'
+      ).trim();
 
-      // Determine approach key
-      let key = 'north';
-      const rLower = roadVal.toLowerCase();
-      if (rLower.includes('b') || rLower.includes('east')) key = 'east';
-      else if (rLower.includes('c') || rLower.includes('south')) key = 'south';
-      else if (rLower.includes('d') || rLower.includes('west')) key = 'west';
+      // Determine approach key with token-based resolution
+      const key = determineApproachKey(roadVal);
 
-      const cars = parseInt(n.cars || n.car, 10) || 0;
-      const bikes = parseInt(n.bikes || n.bike || n.motorcycle || n.twowheeler || n.twowheeler, 10) || 0;
-      const autorickshaw = parseInt(n.autorickshaw || n.autorickshaws || n.auto || n.threewheeler, 10) || 0;
-      const bus = parseInt(n.bus || n.buses, 10) || 0;
-      const truck = parseInt(n.truck || n.trucks, 10) || 0;
-      const bicycle = parseInt(n.bicycle || n.bicycles || n.cycle, 10) || 0;
+      const cars = parseInt(n.cars || n.car || n.jeep || n.van || n.fourwheeler || n.paxcar, 10) || 0;
+      const bikes = parseInt(n.bikes || n.bike || n.motorcycle || n.twowheeler || n.scooter, 10) || 0;
+      const autorickshaw = parseInt(n.autorickshaw || n.autorickshaws || n.auto || n.threewheeler || n.rickshaw, 10) || 0;
+      const lcv = parseInt(n.lcv || n.lightcommercial || n.tempo || n.minitruck, 10) || 0;
+      const bus = parseInt(n.bus || n.buses || n.minibus, 10) || 0;
+      const truck = parseInt(n.truck || n.trucks || n.hcv || n.heavyvehicle, 10) || 0;
+      const bicycle = parseInt(n.bicycle || n.bicycles || n.cycle || n.pedalcycle, 10) || 0;
 
-      const leftTurn = parseInt(n.leftturn || n.left, 10) || 0;
-      const through = parseInt(n.through || n.thru || n.straight, 10) || 0;
-      const rightTurn = parseInt(n.rightturn || n.right, 10) || 0;
+      const leftTurn = parseInt(n.leftturn || n.left || n.leftmovement || n.l, 10) || 0;
+      const through = parseInt(n.through || n.thru || n.straight || n.throughmovement || n.t, 10) || 0;
+      const rightTurn = parseInt(n.rightturn || n.right || n.rightmovement || n.r, 10) || 0;
 
       const incomingLanes = parseInt(n.incominglanes || n.lanes, 10) || 2;
       const speedLimit = parseInt(n.speedlimitkmh || n.speedlimit, 10) || 50;
@@ -553,7 +592,7 @@ const FlowGuard = (function() {
       const crosswalkWidth = parseFloat(n.crosswalkwidthm || n.crosswalkwidth) || 14.0;
       const incident = String(n.incident || n.incidentevent || 'None').trim();
 
-      const totalVeh = cars + bikes + autorickshaw + bus + truck + bicycle;
+      const totalVeh = cars + bikes + autorickshaw + lcv + bus + truck + bicycle;
 
       const rec = {
         time: timeVal,
@@ -562,6 +601,7 @@ const FlowGuard = (function() {
         cars: cars,
         bikes: bikes,
         autorickshaw: autorickshaw,
+        lcv: lcv,
         bus: bus,
         truck: truck,
         bicycle: bicycle,
@@ -583,6 +623,7 @@ const FlowGuard = (function() {
       target.cars += cars;
       target.bikes += bikes;
       target.autorickshaw += autorickshaw;
+      target.lcv += lcv;
       target.bus += bus;
       target.truck += truck;
       target.bicycle += bicycle;
@@ -602,13 +643,15 @@ const FlowGuard = (function() {
     // Compute aggregated PCU, flow rate (veh/h), and turning percentages
     Object.keys(aggregated).forEach(k => {
       const a = aggregated[k];
-      a.totalVehicles = a.cars + a.bikes + a.autorickshaw + a.bus + a.truck + a.bicycle;
+      a.totalVehicles = a.cars + a.bikes + a.autorickshaw + a.lcv + a.bus + a.truck + a.bicycle;
       
-      // Calculate total PCU using exact IRC:106 PCU factors
+      // Calculate total PCU using exact IRC:106 PCU factors:
+      // Car (1.0), Bike (0.5), Auto (0.8), LCV (1.5), Bus (3.0), Truck (3.0), Bicycle (0.4)
       a.pcuTotal = Math.round(
         (a.cars * 1.0) +
         (a.bikes * 0.5) +
         (a.autorickshaw * 0.8) +
+        (a.lcv * 1.5) +
         (a.bus * 3.0) +
         (a.truck * 3.0) +
         (a.bicycle * 0.4)
@@ -633,6 +676,8 @@ const FlowGuard = (function() {
         a.throughPct = 0;
         a.rightPct = 0;
       }
+
+      console.log(`[FlowGuard Pipeline Log] ${k.toUpperCase()} (${a.name}): ${a.recordsCount} rows, ${a.totalVehicles} vehicles, ${a.pcuTotal} PCU/h`);
     });
 
     return {
@@ -1943,12 +1988,12 @@ const FlowGuard = (function() {
    * Execute End-to-End Ingestion & Engineering Pipeline
    */
   function executeDatasetIngestionPipeline(fileOrDemoData) {
-    const errorBanner = document.getElementById('uploadErrorBanner');
-    const errorText = document.getElementById('uploadErrorText');
-    const progressContainer = document.getElementById('uploadProgressContainer');
-    const progressBar = document.getElementById('uploadProgressBar');
-    const progressText = document.getElementById('uploadProgressText');
-    const progressPct = document.getElementById('uploadProgressPct');
+    const errorBanner = typeof document !== 'undefined' ? document.getElementById('uploadErrorBanner') : null;
+    const errorText = typeof document !== 'undefined' ? document.getElementById('uploadErrorText') : null;
+    const progressContainer = typeof document !== 'undefined' ? document.getElementById('uploadProgressContainer') : null;
+    const progressBar = typeof document !== 'undefined' ? document.getElementById('uploadProgressBar') : null;
+    const progressText = typeof document !== 'undefined' ? document.getElementById('uploadProgressText') : null;
+    const progressPct = typeof document !== 'undefined' ? document.getElementById('uploadProgressPct') : null;
 
     if (errorBanner) errorBanner.style.display = 'none';
 
