@@ -1626,96 +1626,173 @@ const FlowGuard = (function() {
     container.appendChild(wrapper);
 
     // Smooth scroll to the results
-    wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (typeof wrapper.scrollIntoView === 'function') {
+      wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
     return wrapper;
   }
 
   /**
-   * REPAIRED ANALYSIS WIZARD NAVIGATION ENGINE
-   * Manages active step state transitions, section visibility toggles,
-   * sidebar stepper highlights, checkmarks, progress titles, and action bar buttons.
+   * Set Active Sub-mode inside Step 2 (Traffic Input Mode)
+   * Options: 'manual' | 'upload' | 'ai'
    */
-  function setWizardStep(stepId) {
+  function setTrafficInputSubmode(submode) {
+    const validSubmodes = ['manual', 'upload', 'ai'];
+    const targetSubmode = validSubmodes.includes(submode) ? submode : 'manual';
+
+    if (typeof document !== 'undefined') {
+      // 1. Update submode switcher tabs inside Step 2
+      const tabs = document.querySelectorAll('.input-submode-tab');
+      tabs.forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.getAttribute('data-submode') === targetSubmode) {
+          tab.classList.add('active');
+        }
+      });
+
+      // 2. Update sidebar sub-item active highlights
+      const subItems = document.querySelectorAll('.wizard-sub-item');
+      subItems.forEach(item => {
+        item.classList.remove('active');
+        if (item.getAttribute('data-submode') === targetSubmode) {
+          item.classList.add('active');
+        }
+      });
+
+      // 3. Toggle visibility of subpanels
+      const manualPanel = document.getElementById('submode-manual');
+      const uploadPanel = document.getElementById('submode-upload');
+      const aiPanel     = document.getElementById('submode-ai');
+
+      if (manualPanel) manualPanel.style.display = targetSubmode === 'manual' ? 'block' : 'none';
+      if (uploadPanel) uploadPanel.style.display = targetSubmode === 'upload' ? 'block' : 'none';
+      if (aiPanel)     aiPanel.style.display     = targetSubmode === 'ai' ? 'block' : 'none';
+    }
+
+    const state = getState();
+    state.trafficInputSubmode = targetSubmode;
+    saveState(state);
+  }
+
+  /**
+   * CONSOLIDATED 6-STEP ANALYSIS WIZARD NAVIGATION ENGINE
+   * 1. Intersection Geometry
+   * 2. Traffic Input Mode (Manual, Dataset Upload, AI Detection)
+   * 3. Engineering Parameters
+   * 4. Traffic Summary
+   * 5. Run Analysis
+   * 6. Results & Reports
+   */
+  function setWizardStep(stepId, submode) {
     const numericId = parseInt(stepId, 10);
-    if (isNaN(numericId) || numericId < 1 || numericId > 9) return;
+    if (isNaN(numericId) || numericId < 1 || numericId > 6) return;
+
+    // Validation Guardrail before advancing from Step 2 to Step 3
+    const currentState = getState();
+    if (numericId > 2 && (currentState.wizardStep === 2 || !currentState.wizardStep)) {
+      const activeSubmode = submode || currentState.trafficInputSubmode || 'manual';
+      let isValidInput = false;
+
+      if (activeSubmode === 'upload' || currentState.dataUploaded) {
+        isValidInput = true;
+      } else {
+        const appKeys = getActiveApproachKeys(currentState.configType || '4CROSS');
+        isValidInput = appKeys.some(k => {
+          const app = currentState.approaches ? currentState.approaches[k] : null;
+          return app && (app.flow > 0 || app.left > 0 || app.through > 0 || app.right > 0);
+        });
+      }
+
+      if (!isValidInput) {
+        if (typeof alert !== 'undefined') {
+          alert("⚠️ Traffic Input Required: Please enter vehicle counts or upload a dataset before proceeding to Engineering Parameters.");
+        }
+        console.warn("Wizard Navigation Guard: Step 2 inputs incomplete.");
+        return setWizardStep(2, activeSubmode);
+      }
+    }
 
     console.log(`[FlowGuard AI] Navigating Wizard to Step ${numericId}`);
 
-    // 1. Update State & Local/Session Storage
-    const currentState = getState();
+    // Update State
     currentState.wizardStep = numericId;
+    if (submode) currentState.trafficInputSubmode = submode;
     saveState(currentState);
 
-    // 2. Hide all section panels, show only target step panel
-    const sections = document.querySelectorAll('.wizard-section-panel');
-    sections.forEach(sec => {
-      sec.style.display = 'none';
-    });
+    if (typeof document !== 'undefined') {
+      // Hide all section panels, show target step section
+      const sections = document.querySelectorAll('.wizard-section-panel');
+      sections.forEach(sec => {
+        sec.style.display = 'none';
+      });
 
-    const targetSection = document.getElementById(`wizard-section-${numericId}`);
-    if (targetSection) {
-      targetSection.style.display = 'block';
-    }
-
-    // 3. Update Sidebar Stepper Items
-    const stepperItems = document.querySelectorAll('.wizard-step-item, .wizard-sub-item');
-    stepperItems.forEach(item => {
-      item.classList.remove('active');
-      const itemStep = parseInt(item.getAttribute('data-step-id'), 10);
-      if (itemStep === numericId) {
-        item.classList.add('active');
+      const targetSection = document.getElementById(`wizard-section-${numericId}`);
+      if (targetSection) {
+        targetSection.style.display = 'block';
       }
-      if (itemStep < numericId) {
-        item.classList.add('completed');
+
+      // If Step 2, update active submode view
+      if (numericId === 2) {
+        setTrafficInputSubmode(submode || currentState.trafficInputSubmode || 'manual');
       }
-    });
 
-    // 4. Update Header Titles & Status Badges
-    const stepTitles = {
-      1: { title: '1. INTERSECTION GEOMETRY', subtitle: 'Configure intersection geometry, lane numbers, and approach orientation.' },
-      2: { title: '2. TRAFFIC INPUT MODE', subtitle: 'Select manual survey, dataset upload, or AI detection method.' },
-      3: { title: '3. MANUAL TRAFFIC SURVEY', subtitle: 'Enter 15-minute traffic counts and turning movements for active approaches.' },
-      4: { title: '4. DATASET UPLOAD', subtitle: 'Upload historical traffic count Excel (.xlsx) or CSV data sheet.' },
-      5: { title: '5. AI VIDEO DETECTION', subtitle: 'Upload traffic camera video footage for computer vision vehicle counting.' },
-      6: { title: '6. ENGINEERING PARAMETERS', subtitle: 'Configure signal timing constraints, clearance intervals, and crosswalk dimensions.' },
-      7: { title: '7. TRAFFIC SUMMARY', subtitle: 'Review converted PCU demands and turning movement distributions.' },
-      8: { title: '8. RUN ANALYSIS', subtitle: 'Execute Webster optimum cycle calculation & IRC:93 signal validation.' },
-      9: { title: '9. RESULTS & REPORTS', subtitle: 'View optimized signal timings, calculations, and generate printable PDF report.' }
-    };
+      // Update Sidebar Stepper Items (6 Top-level steps)
+      const stepperItems = document.querySelectorAll('.wizard-step-item');
+      stepperItems.forEach(item => {
+        item.classList.remove('active', 'completed');
+        const itemStep = parseInt(item.getAttribute('data-step-id'), 10);
+        if (itemStep === numericId) {
+          item.classList.add('active');
+        }
+        if (itemStep < numericId) {
+          item.classList.add('completed');
+        }
+      });
 
-    const headerTitle = document.getElementById('wizardHeaderTitle');
-    const headerSubtitle = document.getElementById('wizardHeaderSubtitle');
-    const statusBadge = document.getElementById('wizardStatusBadge');
+      // Update Header Titles & Badges
+      const stepTitles = {
+        1: { title: '1. INTERSECTION GEOMETRY', subtitle: 'Configure intersection geometry, lane numbers, and approach orientation.' },
+        2: { title: '2. TRAFFIC INPUT MODE', subtitle: 'Select manual survey, historical dataset upload, or AI video detection method.' },
+        3: { title: '3. ENGINEERING PARAMETERS', subtitle: 'Configure signal timing constraints, clearance intervals, and crosswalk dimensions.' },
+        4: { title: '4. TRAFFIC SUMMARY', subtitle: 'Review converted PCU demands and turning movement distributions.' },
+        5: { title: '5. RUN ANALYSIS', subtitle: 'Execute Webster optimum cycle calculation & IRC:93 signal validation.' },
+        6: { title: '6. RESULTS & REPORTS', subtitle: 'View optimized signal timings, calculations, and generate printable PDF report.' }
+      };
 
-    if (headerTitle && stepTitles[numericId]) headerTitle.innerText = stepTitles[numericId].title;
-    if (headerSubtitle && stepTitles[numericId]) headerSubtitle.innerText = stepTitles[numericId].subtitle;
-    if (statusBadge) statusBadge.innerText = `STEP ${numericId} / 9: ${stepTitles[numericId] ? stepTitles[numericId].title.split('.')[1].trim() : ''}`;
+      const headerTitle = document.getElementById('wizardHeaderTitle');
+      const headerSubtitle = document.getElementById('wizardHeaderSubtitle');
+      const statusBadge = document.getElementById('wizardStatusBadge');
 
-    // 5. Update Bottom Action Bar Buttons
-    const prevBtn = document.getElementById('btnWizardPrev');
-    const nextBtn = document.getElementById('btnWizardNext');
+      if (headerTitle && stepTitles[numericId]) headerTitle.innerText = stepTitles[numericId].title;
+      if (headerSubtitle && stepTitles[numericId]) headerSubtitle.innerText = stepTitles[numericId].subtitle;
+      if (statusBadge) statusBadge.innerText = `STEP ${numericId} / 6: ${stepTitles[numericId] ? stepTitles[numericId].title.split('.')[1].trim() : ''}`;
 
-    if (prevBtn) {
-      if (numericId === 1) {
-        prevBtn.style.display = 'none';
-      } else {
-        prevBtn.style.display = 'inline-block';
-        prevBtn.onclick = () => setWizardStep(numericId - 1);
+      // Update Bottom Action Bar Buttons
+      const prevBtn = document.getElementById('btnWizardPrev');
+      const nextBtn = document.getElementById('btnWizardNext');
+
+      if (prevBtn) {
+        if (numericId === 1) {
+          prevBtn.style.display = 'none';
+        } else {
+          prevBtn.style.display = 'inline-block';
+          prevBtn.onclick = () => setWizardStep(numericId - 1);
+        }
       }
-    }
 
-    if (nextBtn) {
-      if (numericId === 9) {
-        nextBtn.innerText = '🖨 Print PDF Report';
-        nextBtn.onclick = () => generateEngineeringReport();
-      } else {
-        nextBtn.innerText = 'Next Step →';
-        nextBtn.onclick = () => setWizardStep(numericId + 1);
+      if (nextBtn) {
+        if (numericId === 6) {
+          nextBtn.style.display = 'none';
+        } else {
+          nextBtn.style.display = 'inline-block';
+          nextBtn.innerText = numericId === 5 ? 'View Results & Reports →' : 'Next Step →';
+          nextBtn.onclick = () => setWizardStep(numericId + 1);
+        }
       }
     }
 
     // Smooth scroll to top of content area
-    const contentArea = document.querySelector('.main-content-scroll');
+    const contentArea = typeof document !== 'undefined' ? document.querySelector('.main-content-scroll') : null;
     if (contentArea) contentArea.scrollTop = 0;
   }
 
@@ -2174,6 +2251,7 @@ const FlowGuard = (function() {
     analyzeTrafficAPI,
     renderEngineeringDashboard,
     setWizardStep,
+    setTrafficInputSubmode,
     executeDatasetIngestionPipeline,
     renderDatasetPreviewTable,
     initAppEvents
@@ -2184,6 +2262,7 @@ if (typeof window !== 'undefined') {
   window.renderEngineeringDashboard = FlowGuard.renderEngineeringDashboard;
   window.calculateTrafficPressureIndex = FlowGuard.calculateTrafficPressureIndex;
   window.setWizardStep = FlowGuard.setWizardStep;
+  window.setTrafficInputSubmode = FlowGuard.setTrafficInputSubmode;
   window.executeDatasetIngestionPipeline = FlowGuard.executeDatasetIngestionPipeline;
   window.renderDatasetPreviewTable = FlowGuard.renderDatasetPreviewTable;
   window.initAppEvents = FlowGuard.initAppEvents;

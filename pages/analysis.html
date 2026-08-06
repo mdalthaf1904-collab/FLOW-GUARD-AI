@@ -60,7 +60,7 @@
         <div class="wizard-sidebar-header">ANALYSIS WIZARD</div>
         
         <ul class="wizard-stepper-list">
-          <li class="wizard-step-item completed">
+          <li class="wizard-step-item active" data-step-id="1" onclick="FlowGuard.setWizardStep(1)">
             <span class="wizard-step-num">1</span>
             <div class="wizard-step-content">
               <span class="wizard-step-title">Intersection Geometry</span>
@@ -69,7 +69,7 @@
             <span class="wizard-step-check">✓</span>
           </li>
 
-          <li class="wizard-step-item">
+          <li class="wizard-step-item" data-step-id="2" onclick="FlowGuard.setWizardStep(2)">
             <span class="wizard-step-num">2</span>
             <div class="wizard-step-content">
               <span class="wizard-step-title">Traffic Input Mode</span>
@@ -78,63 +78,40 @@
           </li>
 
           <ul class="wizard-sub-list">
-            <li class="wizard-sub-item active">i. Manual Traffic Survey</li>
-            <li class="wizard-sub-item">ii. Upload Data Sheet</li>
+            <li class="wizard-sub-item active" data-submode="manual" onclick="FlowGuard.setWizardStep(2, 'manual')">i. Manual Traffic Survey</li>
+            <li class="wizard-sub-item" data-submode="upload" onclick="FlowGuard.setWizardStep(2, 'upload')">ii. Historical Dataset Upload</li>
+            <li class="wizard-sub-item" data-submode="ai" onclick="FlowGuard.setWizardStep(2, 'ai')">iii. AI Vehicle Detection (Optional)</li>
           </ul>
 
-          <li class="wizard-step-item active">
+          <li class="wizard-step-item" data-step-id="3" onclick="FlowGuard.setWizardStep(3)">
             <span class="wizard-step-num">3</span>
             <div class="wizard-step-content">
-              <span class="wizard-step-title">Manual Traffic Survey</span>
-              <span class="wizard-step-subtitle">Enter traffic counts manually</span>
+              <span class="wizard-step-title">Engineering Parameters</span>
+              <span class="wizard-step-subtitle">Set analysis constraints</span>
             </div>
           </li>
 
-          <li class="wizard-step-item">
+          <li class="wizard-step-item" data-step-id="4" onclick="FlowGuard.setWizardStep(4)">
             <span class="wizard-step-num">4</span>
             <div class="wizard-step-content">
-              <span class="wizard-step-title">Dataset Upload</span>
-              <span class="wizard-step-subtitle">Upload historical traffic data</span>
+              <span class="wizard-step-title">Traffic Summary</span>
+              <span class="wizard-step-subtitle">Review PCU demand summary</span>
             </div>
           </li>
 
-          <li class="wizard-step-item">
+          <li class="wizard-step-item" data-step-id="5" onclick="FlowGuard.setWizardStep(5)">
             <span class="wizard-step-num">5</span>
             <div class="wizard-step-content">
-              <span class="wizard-step-title">AI Detection (Optional)</span>
-              <span class="wizard-step-subtitle">Upload video for AI detection</span>
+              <span class="wizard-step-title">Run Analysis</span>
+              <span class="wizard-step-subtitle">Execute Webster optimization</span>
             </div>
           </li>
 
-          <li class="wizard-step-item">
+          <li class="wizard-step-item" data-step-id="6" onclick="FlowGuard.setWizardStep(6)">
             <span class="wizard-step-num">6</span>
             <div class="wizard-step-content">
-              <span class="wizard-step-title">Engineering Parameters</span>
-              <span class="wizard-step-subtitle">Set analysis parameters</span>
-            </div>
-          </li>
-
-          <li class="wizard-step-item">
-            <span class="wizard-step-num">7</span>
-            <div class="wizard-step-content">
-              <span class="wizard-step-title">Traffic Summary</span>
-              <span class="wizard-step-subtitle">Review input summary</span>
-            </div>
-          </li>
-
-          <li class="wizard-step-item">
-            <span class="wizard-step-num">8</span>
-            <div class="wizard-step-content">
-              <span class="wizard-step-title">Run Analysis</span>
-              <span class="wizard-step-subtitle">Execute traffic engineering</span>
-            </div>
-          </li>
-
-          <li class="wizard-step-item">
-            <span class="wizard-step-num">9</span>
-            <div class="wizard-step-content">
               <span class="wizard-step-title">Results &amp; Reports</span>
-              <span class="wizard-step-subtitle">View analysis results</span>
+              <span class="wizard-step-subtitle">View results &amp; PDF report</span>
             </div>
           </li>
         </ul>
@@ -355,232 +332,355 @@
         </div>
       </section>
 
-      <!-- Section 2: MANUAL TRAFFIC SURVEY Cards -->
-      <section style="margin-bottom: 2rem;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem;">
-          <div>
-            <h2 class="section-header-title" style="font-size: 1.05rem; margin-bottom: 0.1rem;">3. MANUAL TRAFFIC SURVEY</h2>
-            <p style="font-size: 0.78rem; color: var(--text-secondary);">Enter traffic counts and turning movements for each active approach.</p>
+      <!-- STEP 2 SECTION: TRAFFIC INPUT MODE (CONSOLIDATED INPUT MODES) -->
+      <section id="wizard-section-2" class="wizard-section-panel" style="display: none;">
+        <div style="margin-bottom: 1.25rem;">
+          <h2 class="section-header-title" style="font-size: 1.05rem; margin-bottom: 0.2rem;">2. TRAFFIC INPUT MODE</h2>
+          <p style="font-size: 0.82rem; color: var(--text-secondary);">Select your preferred traffic data input method below.</p>
+        </div>
+
+        <!-- Submode Switcher Tab Bar -->
+        <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+          <button class="input-submode-tab active" data-submode="manual" onclick="FlowGuard.setTrafficInputSubmode('manual')" style="padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); font-weight: 600; cursor: pointer;">
+            ✍️ Manual Traffic Survey
+          </button>
+          <button class="input-submode-tab" data-submode="upload" onclick="FlowGuard.setTrafficInputSubmode('upload')" style="padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); font-weight: 600; cursor: pointer;">
+            📊 Historical Dataset Upload
+          </button>
+          <button class="input-submode-tab" data-submode="ai" onclick="FlowGuard.setTrafficInputSubmode('ai')" style="padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); font-weight: 600; cursor: pointer;">
+            🎥 AI Vehicle Detection (Optional)
+          </button>
+        </div>
+
+        <!-- SUBMODE 1: MANUAL TRAFFIC SURVEY -->
+        <div id="submode-manual" class="input-subpanel" style="display: block;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+            <h3 style="font-size: 0.95rem; color: var(--accent-primary); margin: 0;">Manual Traffic Count &amp; Turning Movement Forms</h3>
+            <div class="survey-action-toolbar">
+              <button class="btn-toolbar" onclick="FlowGuard.setTrafficInputSubmode('upload')">↑ Import from CSV</button>
+            </div>
           </div>
 
-          <div class="survey-action-toolbar">
-            <button class="btn-toolbar">↑ Import from CSV</button>
-            <button class="btn-toolbar">↓ Export Template</button>
-            <button class="btn-toolbar">Expand All</button>
-            <button class="btn-toolbar">Collapse All</button>
+          <div class="road-grid-2x2">
+            <!-- Road A -->
+            <div class="road-card-panel">
+              <div class="road-card-header">
+                <span class="road-card-title">Road A - North</span>
+                <select class="road-lane-select" id="lanes_north">
+                  <option value="1">1 Lane</option>
+                  <option value="2" selected>2 Lanes</option>
+                  <option value="3">3 Lanes</option>
+                </select>
+              </div>
+              <div class="road-card-body">
+                <div class="road-card-tables-split">
+                  <div>
+                    <div class="table-sub-title">Vehicle Composition (veh/15 min)</div>
+                    <table class="mini-data-table">
+                      <tbody>
+                        <tr><td>Car / Jeep / Van</td><td><input type="number" class="mini-input-field" id="veh_car_north" value="425"></td></tr>
+                        <tr><td>Two Wheeler</td><td><input type="number" class="mini-input-field" id="veh_bike_north" value="0"></td></tr>
+                        <tr><td>Auto Rickshaw</td><td><input type="number" class="mini-input-field" id="veh_auto_north" value="0"></td></tr>
+                        <tr><td>LCV</td><td><input type="number" class="mini-input-field" id="veh_lcv_north" value="0"></td></tr>
+                        <tr><td>Bus</td><td><input type="number" class="mini-input-field" id="veh_bus_north" value="0"></td></tr>
+                        <tr><td>HCV / Truck</td><td><input type="number" class="mini-input-field" id="veh_hcv_north" value="0"></td></tr>
+                        <tr><td>Bicycle</td><td><input type="number" class="mini-input-field" id="veh_bicycle_north" value="0"></td></tr>
+                        <tr><td><strong>Total Vehicles</strong></td><td><input type="number" class="mini-input-field" id="veh_total_north" value="425" readonly style="font-weight:700;"></td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div>
+                    <div class="table-sub-title">Turning Movements (veh/15 min)</div>
+                    <table class="mini-data-table">
+                      <tbody>
+                        <tr><td>Left Turn → East</td><td><input type="number" class="mini-input-field" id="left_north" value="120"></td></tr>
+                        <tr><td>Through → South</td><td><input type="number" class="mini-input-field" id="through_north" value="610"></td></tr>
+                        <tr><td>Right Turn → West</td><td><input type="number" class="mini-input-field" id="right_north" value="120"></td></tr>
+                        <tr><td><strong>Total Flow</strong></td><td><input type="number" class="mini-input-field" id="flow_north" value="850" readonly style="font-weight:700;color:var(--accent-primary);"></td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Road B -->
+            <div class="road-card-panel">
+              <div class="road-card-header">
+                <span class="road-card-title">Road B - East</span>
+                <select class="road-lane-select" id="lanes_east">
+                  <option value="1">1 Lane</option>
+                  <option value="2" selected>2 Lanes</option>
+                  <option value="3">3 Lanes</option>
+                </select>
+              </div>
+              <div class="road-card-body">
+                <div class="road-card-tables-split">
+                  <div>
+                    <div class="table-sub-title">Vehicle Composition (veh/15 min)</div>
+                    <table class="mini-data-table">
+                      <tbody>
+                        <tr><td>Car / Jeep / Van</td><td><input type="number" class="mini-input-field" id="veh_car_east" value="360"></td></tr>
+                        <tr><td>Two Wheeler</td><td><input type="number" class="mini-input-field" id="veh_bike_east" value="0"></td></tr>
+                        <tr><td>Auto Rickshaw</td><td><input type="number" class="mini-input-field" id="veh_auto_east" value="0"></td></tr>
+                        <tr><td>LCV</td><td><input type="number" class="mini-input-field" id="veh_lcv_east" value="0"></td></tr>
+                        <tr><td>Bus</td><td><input type="number" class="mini-input-field" id="veh_bus_east" value="0"></td></tr>
+                        <tr><td>HCV / Truck</td><td><input type="number" class="mini-input-field" id="veh_hcv_east" value="0"></td></tr>
+                        <tr><td>Bicycle</td><td><input type="number" class="mini-input-field" id="veh_bicycle_east" value="0"></td></tr>
+                        <tr><td><strong>Total Vehicles</strong></td><td><input type="number" class="mini-input-field" id="veh_total_east" value="360" readonly style="font-weight:700;"></td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div>
+                    <div class="table-sub-title">Turning Movements (veh/15 min)</div>
+                    <table class="mini-data-table">
+                      <tbody>
+                        <tr><td>Left Turn → South</td><td><input type="number" class="mini-input-field" id="left_east" value="100"></td></tr>
+                        <tr><td>Through → West</td><td><input type="number" class="mini-input-field" id="through_east" value="520"></td></tr>
+                        <tr><td>Right Turn → North</td><td><input type="number" class="mini-input-field" id="right_east" value="100"></td></tr>
+                        <tr><td><strong>Total Flow</strong></td><td><input type="number" class="mini-input-field" id="flow_east" value="720" readonly style="font-weight:700;color:var(--accent-primary);"></td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Road C -->
+            <div class="road-card-panel">
+              <div class="road-card-header">
+                <span class="road-card-title">Road C - South</span>
+                <select class="road-lane-select" id="lanes_south">
+                  <option value="1">1 Lane</option>
+                  <option value="2" selected>2 Lanes</option>
+                  <option value="3">3 Lanes</option>
+                </select>
+              </div>
+              <div class="road-card-body">
+                <div class="road-card-tables-split">
+                  <div>
+                    <div class="table-sub-title">Vehicle Composition (veh/15 min)</div>
+                    <table class="mini-data-table">
+                      <tbody>
+                        <tr><td>Car / Jeep / Van</td><td><input type="number" class="mini-input-field" id="veh_car_south" value="140"></td></tr>
+                        <tr><td>Two Wheeler</td><td><input type="number" class="mini-input-field" id="veh_bike_south" value="0"></td></tr>
+                        <tr><td>Auto Rickshaw</td><td><input type="number" class="mini-input-field" id="veh_auto_south" value="0"></td></tr>
+                        <tr><td>LCV</td><td><input type="number" class="mini-input-field" id="veh_lcv_south" value="0"></td></tr>
+                        <tr><td>Bus</td><td><input type="number" class="mini-input-field" id="veh_bus_south" value="0"></td></tr>
+                        <tr><td>HCV / Truck</td><td><input type="number" class="mini-input-field" id="veh_hcv_south" value="0"></td></tr>
+                        <tr><td>Bicycle</td><td><input type="number" class="mini-input-field" id="veh_bicycle_south" value="0"></td></tr>
+                        <tr><td><strong>Total Vehicles</strong></td><td><input type="number" class="mini-input-field" id="veh_total_south" value="140" readonly style="font-weight:700;"></td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div>
+                    <div class="table-sub-title">Turning Movements (veh/15 min)</div>
+                    <table class="mini-data-table">
+                      <tbody>
+                        <tr><td>Left Turn → West</td><td><input type="number" class="mini-input-field" id="left_south" value="40"></td></tr>
+                        <tr><td>Through → North</td><td><input type="number" class="mini-input-field" id="through_south" value="200"></td></tr>
+                        <tr><td>Right Turn → East</td><td><input type="number" class="mini-input-field" id="right_south" value="40"></td></tr>
+                        <tr><td><strong>Total Flow</strong></td><td><input type="number" class="mini-input-field" id="flow_south" value="280" readonly style="font-weight:700;color:var(--accent-primary);"></td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Road D -->
+            <div class="road-card-panel">
+              <div class="road-card-header">
+                <span class="road-card-title">Road D - West</span>
+                <select class="road-lane-select" id="lanes_west">
+                  <option value="1">1 Lane</option>
+                  <option value="2" selected>2 Lanes</option>
+                  <option value="3">3 Lanes</option>
+                </select>
+              </div>
+              <div class="road-card-body">
+                <div class="road-card-tables-split">
+                  <div>
+                    <div class="table-sub-title">Vehicle Composition (veh/15 min)</div>
+                    <table class="mini-data-table">
+                      <tbody>
+                        <tr><td>Car / Jeep / Van</td><td><input type="number" class="mini-input-field" id="veh_car_west" value="175"></td></tr>
+                        <tr><td>Two Wheeler</td><td><input type="number" class="mini-input-field" id="veh_bike_west" value="0"></td></tr>
+                        <tr><td>Auto Rickshaw</td><td><input type="number" class="mini-input-field" id="veh_auto_west" value="0"></td></tr>
+                        <tr><td>LCV</td><td><input type="number" class="mini-input-field" id="veh_lcv_west" value="0"></td></tr>
+                        <tr><td>Bus</td><td><input type="number" class="mini-input-field" id="veh_bus_west" value="0"></td></tr>
+                        <tr><td>HCV / Truck</td><td><input type="number" class="mini-input-field" id="veh_hcv_west" value="0"></td></tr>
+                        <tr><td>Bicycle</td><td><input type="number" class="mini-input-field" id="veh_bicycle_west" value="0"></td></tr>
+                        <tr><td><strong>Total Vehicles</strong></td><td><input type="number" class="mini-input-field" id="veh_total_west" value="175" readonly style="font-weight:700;"></td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div>
+                    <div class="table-sub-title">Turning Movements (veh/15 min)</div>
+                    <table class="mini-data-table">
+                      <tbody>
+                        <tr><td>Left Turn → North</td><td><input type="number" class="mini-input-field" id="left_west" value="50"></td></tr>
+                        <tr><td>Through → East</td><td><input type="number" class="mini-input-field" id="through_west" value="250"></td></tr>
+                        <tr><td>Right Turn → South</td><td><input type="number" class="mini-input-field" id="right_west" value="50"></td></tr>
+                        <tr><td><strong>Total Flow</strong></td><td><input type="number" class="mini-input-field" id="flow_west" value="350" readonly style="font-weight:700;color:var(--accent-primary);"></td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="road-grid-2x2">
+        <!-- SUBMODE 2: HISTORICAL DATASET UPLOAD -->
+        <div id="submode-upload" class="input-subpanel" style="display: none;">
+          <!-- Validation Error Banner -->
+          <div id="uploadErrorBanner" style="display: none; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.4); color: #fca5a5; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.85rem; line-height: 1.5;">
+            <strong>⚠️ Dataset Validation Alert:</strong> <span id="uploadErrorText">Error message goes here</span>
+          </div>
 
-          <!-- Road A - North Card -->
-          <div class="road-card-panel">
-            <div class="road-card-header">
-              <span class="road-card-title">Road A - North</span>
-              <select class="road-lane-select" id="lanes_north">
-                <option value="1">1 Lane</option>
-                <option value="2" selected>2 Lanes</option>
-                <option value="3">3 Lanes</option>
-              </select>
+          <!-- Upload Progress Indicator -->
+          <div id="uploadProgressContainer" style="display: none; background: var(--bg-panel); border: 1px solid var(--border-color); padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+              <span id="uploadProgressText">Processing dataset...</span>
+              <span id="uploadProgressPct">0%</span>
             </div>
-
-            <div class="road-card-body">
-              <div class="road-card-tables-split">
-                <div>
-                  <div class="table-sub-title">Vehicle Composition <span style="font-weight:400;">(veh/15 min)</span></div>
-                  <table class="mini-data-table">
-                    <thead><tr><th>Vehicle Type</th><th style="text-align:right;">Count</th></tr></thead>
-                    <tbody>
-                      <tr><td>Car / Jeep / Van</td><td><input type="number" class="mini-input-field" id="veh_car_north" value="425"></td></tr>
-                      <tr><td>Two Wheeler</td><td><input type="number" class="mini-input-field" id="veh_bike_north" value="0"></td></tr>
-                      <tr><td>Auto Rickshaw</td><td><input type="number" class="mini-input-field" id="veh_auto_north" value="0"></td></tr>
-                      <tr><td>LCV</td><td><input type="number" class="mini-input-field" id="veh_lcv_north" value="0"></td></tr>
-                      <tr><td>Bus</td><td><input type="number" class="mini-input-field" id="veh_bus_north" value="0"></td></tr>
-                      <tr><td>HCV / Truck</td><td><input type="number" class="mini-input-field" id="veh_hcv_north" value="0"></td></tr>
-                      <tr><td>Bicycle</td><td><input type="number" class="mini-input-field" id="veh_bicycle_north" value="0"></td></tr>
-                      <tr><td><strong>Total Vehicles</strong></td><td><input type="number" class="mini-input-field" id="veh_total_north" value="425" readonly style="font-weight:700;"></td></tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div>
-                  <div class="table-sub-title">Turning Movements <span style="font-weight:400;">(veh/15 min)</span></div>
-                  <table class="mini-data-table">
-                    <thead><tr><th>Movement</th><th style="text-align:right;">Count</th></tr></thead>
-                    <tbody>
-                      <tr><td>Left Turn → East</td><td><input type="number" class="mini-input-field" id="left_north" value="120"></td></tr>
-                      <tr><td>Through → South</td><td><input type="number" class="mini-input-field" id="through_north" value="610"></td></tr>
-                      <tr><td>Right Turn → West</td><td><input type="number" class="mini-input-field" id="right_north" value="120"></td></tr>
-                      <tr style="height: 25px;"><td></td><td></td></tr>
-                      <tr><td><strong>Total</strong></td><td><input type="number" class="mini-input-field" id="flow_north" value="850" readonly style="font-weight:700;color:var(--accent-primary);"></td></tr>
-                      <tr><td>Current Green (s)</td><td><input type="number" class="mini-input-field" id="green_north" value="30"></td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div class="road-card-footer-banner">
-              ✓ Turning matches total (850 = 850)
+            <div style="width: 100%; height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden;">
+              <div id="uploadProgressBar" style="width: 0%; height: 100%; background: var(--accent-primary); transition: width 0.2s ease;"></div>
             </div>
           </div>
 
-          <!-- Road B - East Card -->
-          <div class="road-card-panel">
-            <div class="road-card-header">
-              <span class="road-card-title">Road B - East</span>
-              <select class="road-lane-select" id="lanes_east">
-                <option value="1">1 Lane</option>
-                <option value="2" selected>2 Lanes</option>
-                <option value="3">3 Lanes</option>
-              </select>
-            </div>
-
-            <div class="road-card-body">
-              <div class="road-card-tables-split">
-                <div>
-                  <div class="table-sub-title">Vehicle Composition <span style="font-weight:400;">(veh/15 min)</span></div>
-                  <table class="mini-data-table">
-                    <thead><tr><th>Vehicle Type</th><th style="text-align:right;">Count</th></tr></thead>
-                    <tbody>
-                      <tr><td>Car / Jeep / Van</td><td><input type="number" class="mini-input-field" id="veh_car_east" value="360"></td></tr>
-                      <tr><td>Two Wheeler</td><td><input type="number" class="mini-input-field" id="veh_bike_east" value="0"></td></tr>
-                      <tr><td>Auto Rickshaw</td><td><input type="number" class="mini-input-field" id="veh_auto_east" value="0"></td></tr>
-                      <tr><td>LCV</td><td><input type="number" class="mini-input-field" id="veh_lcv_east" value="0"></td></tr>
-                      <tr><td>Bus</td><td><input type="number" class="mini-input-field" id="veh_bus_east" value="0"></td></tr>
-                      <tr><td>HCV / Truck</td><td><input type="number" class="mini-input-field" id="veh_hcv_east" value="0"></td></tr>
-                      <tr><td>Bicycle</td><td><input type="number" class="mini-input-field" id="veh_bicycle_east" value="0"></td></tr>
-                      <tr><td><strong>Total Vehicles</strong></td><td><input type="number" class="mini-input-field" id="veh_total_east" value="360" readonly style="font-weight:700;"></td></tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div>
-                  <div class="table-sub-title">Turning Movements <span style="font-weight:400;">(veh/15 min)</span></div>
-                  <table class="mini-data-table">
-                    <thead><tr><th>Movement</th><th style="text-align:right;">Count</th></tr></thead>
-                    <tbody>
-                      <tr><td>Left Turn → South</td><td><input type="number" class="mini-input-field" id="left_east" value="100"></td></tr>
-                      <tr><td>Through → West</td><td><input type="number" class="mini-input-field" id="through_east" value="520"></td></tr>
-                      <tr><td>Right Turn → North</td><td><input type="number" class="mini-input-field" id="right_east" value="100"></td></tr>
-                      <tr style="height: 25px;"><td></td><td></td></tr>
-                      <tr><td><strong>Total</strong></td><td><input type="number" class="mini-input-field" id="flow_east" value="720" readonly style="font-weight:700;color:var(--accent-primary);"></td></tr>
-                      <tr><td>Current Green (s)</td><td><input type="number" class="mini-input-field" id="green_east" value="30"></td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div class="road-card-footer-banner">
-              ✓ Turning matches total (720 = 720)
+          <!-- Drag & Drop Card -->
+          <div class="card" id="datasetDropzone" style="padding: 2.5rem 2rem; text-align: center; border: 2px dashed var(--border-color); cursor: pointer; transition: all 0.2s ease;">
+            <div style="font-size: 2.8rem; margin-bottom: 0.5rem;">📂</div>
+            <h3 style="color: var(--text-primary); font-size: 1.1rem; margin-bottom: 0.5rem;">Drag &amp; Drop CSV / Excel File Here</h3>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.25rem;">Supports .csv, .xlsx, .xls data files formatted with traffic count records.</p>
+            
+            <input type="file" id="csvFileInput" accept=".csv, .xlsx, .xls" style="display: none;">
+            <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+              <button class="btn-primary-cyan" onclick="document.getElementById('csvFileInput').click(); event.stopPropagation();">Browse File...</button>
+              <button class="btn-ghost-reset" id="btnEmptyStateLoadDemo" onclick="event.stopPropagation();">⚡ Load 24-Hr Demo Dataset</button>
             </div>
           </div>
 
-          <!-- Road C - South Card -->
-          <div class="road-card-panel">
-            <div class="road-card-header">
-              <span class="road-card-title">Road C - South</span>
-              <select class="road-lane-select" id="lanes_south">
-                <option value="1">1 Lane</option>
-                <option value="2" selected>2 Lanes</option>
-                <option value="3">3 Lanes</option>
-              </select>
+          <!-- Dataset Preview Container -->
+          <div id="datasetPreviewContainer" style="margin-top: 1.5rem;"></div>
+        </div>
+
+        <!-- SUBMODE 3: AI VEHICLE DETECTION -->
+        <div id="submode-ai" class="input-subpanel" style="display: none;">
+          <div class="card" style="padding: 2rem; text-align: center; border: 2px dashed var(--border-color);">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎥</div>
+            <h3 style="color: var(--text-primary); font-size: 1rem; margin-bottom: 0.5rem;">Upload Traffic Camera Video Footage</h3>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">Offline prototype AI detection simulates vehicle detection counts per approach.</p>
+            <button class="btn-primary-cyan">Select Video File (.mp4, .avi)...</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- STEP 3 SECTION: ENGINEERING PARAMETERS -->
+      <section id="wizard-section-3" class="wizard-section-panel" style="display: none;">
+        <div style="margin-bottom: 1.5rem;">
+          <h2 class="section-header-title" style="font-size: 1.05rem;">3. ENGINEERING PARAMETERS &amp; IRC:93 BOUNDS</h2>
+          <p style="font-size: 0.82rem; color: var(--text-secondary);">Configure signal timing constraints, clearance intervals, and crosswalk dimensions.</p>
+        </div>
+
+        <div class="card" style="padding: 1.5rem;">
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+            <div class="control-field-group">
+              <label class="control-field-label">Minimum Vehicular Green (s)</label>
+              <input type="number" class="control-field-select" value="7" min="7" max="30">
             </div>
 
-            <div class="road-card-body">
-              <div class="road-card-tables-split">
-                <div>
-                  <div class="table-sub-title">Vehicle Composition <span style="font-weight:400;">(veh/15 min)</span></div>
-                  <table class="mini-data-table">
-                    <thead><tr><th>Vehicle Type</th><th style="text-align:right;">Count</th></tr></thead>
-                    <tbody>
-                      <tr><td>Car / Jeep / Van</td><td><input type="number" class="mini-input-field" id="veh_car_south" value="140"></td></tr>
-                      <tr><td>Two Wheeler</td><td><input type="number" class="mini-input-field" id="veh_bike_south" value="0"></td></tr>
-                      <tr><td>Auto Rickshaw</td><td><input type="number" class="mini-input-field" id="veh_auto_south" value="0"></td></tr>
-                      <tr><td>LCV</td><td><input type="number" class="mini-input-field" id="veh_lcv_south" value="0"></td></tr>
-                      <tr><td>Bus</td><td><input type="number" class="mini-input-field" id="veh_bus_south" value="0"></td></tr>
-                      <tr><td>HCV / Truck</td><td><input type="number" class="mini-input-field" id="veh_hcv_south" value="0"></td></tr>
-                      <tr><td>Bicycle</td><td><input type="number" class="mini-input-field" id="veh_bicycle_south" value="0"></td></tr>
-                      <tr><td><strong>Total Vehicles</strong></td><td><input type="number" class="mini-input-field" id="veh_total_south" value="140" readonly style="font-weight:700;"></td></tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div>
-                  <div class="table-sub-title">Turning Movements <span style="font-weight:400;">(veh/15 min)</span></div>
-                  <table class="mini-data-table">
-                    <thead><tr><th>Movement</th><th style="text-align:right;">Count</th></tr></thead>
-                    <tbody>
-                      <tr><td>Left Turn → West</td><td><input type="number" class="mini-input-field" id="left_south" value="40"></td></tr>
-                      <tr><td>Through → North</td><td><input type="number" class="mini-input-field" id="through_south" value="200"></td></tr>
-                      <tr><td>Right Turn → East</td><td><input type="number" class="mini-input-field" id="right_south" value="40"></td></tr>
-                      <tr style="height: 25px;"><td></td><td></td></tr>
-                      <tr><td><strong>Total</strong></td><td><input type="number" class="mini-input-field" id="flow_south" value="280" readonly style="font-weight:700;color:var(--accent-primary);"></td></tr>
-                      <tr><td>Current Green (s)</td><td><input type="number" class="mini-input-field" id="green_south" value="25"></td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+            <div class="control-field-group">
+              <label class="control-field-label">Maximum Vehicular Green (s)</label>
+              <input type="number" class="control-field-select" value="90" min="40" max="120">
             </div>
 
-            <div class="road-card-footer-banner">
-              ✓ Turning matches total (280 = 280)
+            <div class="control-field-group">
+              <label class="control-field-label">Yellow Amber Interval (s)</label>
+              <input type="number" class="control-field-select" value="3" min="3" max="6">
+            </div>
+
+            <div class="control-field-group">
+              <label class="control-field-label">All-Red Clearance Interval (s)</label>
+              <input type="number" class="control-field-select" value="2" min="2" max="5">
+            </div>
+
+            <div class="control-field-group">
+              <label class="control-field-label">Crosswalk Width (m)</label>
+              <input type="number" class="control-field-select" value="14" min="8" max="25">
+            </div>
+
+            <div class="control-field-group">
+              <label class="control-field-label">Pedestrian Walk Speed (m/s)</label>
+              <input type="number" class="control-field-select" value="1.2" step="0.1">
             </div>
           </div>
+        </div>
+      </section>
 
-          <!-- Road D - West Card -->
-          <div class="road-card-panel">
-            <div class="road-card-header">
-              <span class="road-card-title">Road D - West</span>
-              <select class="road-lane-select" id="lanes_west">
-                <option value="1">1 Lane</option>
-                <option value="2" selected>2 Lanes</option>
-                <option value="3">3 Lanes</option>
-              </select>
-            </div>
+      <!-- STEP 4 SECTION: TRAFFIC SUMMARY -->
+      <section id="wizard-section-4" class="wizard-section-panel" style="display: none;">
+        <div style="margin-bottom: 1.5rem;">
+          <h2 class="section-header-title" style="font-size: 1.05rem;">4. TRAFFIC INPUT SUMMARY</h2>
+          <p style="font-size: 0.82rem; color: var(--text-secondary);">Review converted PCU demands and turning movement distributions before running optimization.</p>
+        </div>
 
-            <div class="road-card-body">
-              <div class="road-card-tables-split">
-                <div>
-                  <div class="table-sub-title">Vehicle Composition <span style="font-weight:400;">(veh/15 min)</span></div>
-                  <table class="mini-data-table">
-                    <thead><tr><th>Vehicle Type</th><th style="text-align:right;">Count</th></tr></thead>
-                    <tbody>
-                      <tr><td>Car / Jeep / Van</td><td><input type="number" class="mini-input-field" id="veh_car_west" value="175"></td></tr>
-                      <tr><td>Two Wheeler</td><td><input type="number" class="mini-input-field" id="veh_bike_west" value="0"></td></tr>
-                      <tr><td>Auto Rickshaw</td><td><input type="number" class="mini-input-field" id="veh_auto_west" value="0"></td></tr>
-                      <tr><td>LCV</td><td><input type="number" class="mini-input-field" id="veh_lcv_west" value="0"></td></tr>
-                      <tr><td>Bus</td><td><input type="number" class="mini-input-field" id="veh_bus_west" value="0"></td></tr>
-                      <tr><td>HCV / Truck</td><td><input type="number" class="mini-input-field" id="veh_hcv_west" value="0"></td></tr>
-                      <tr><td>Bicycle</td><td><input type="number" class="mini-input-field" id="veh_bicycle_west" value="0"></td></tr>
-                      <tr><td><strong>Total Vehicles</strong></td><td><input type="number" class="mini-input-field" id="veh_total_west" value="175" readonly style="font-weight:700;"></td></tr>
-                    </tbody>
-                  </table>
-                </div>
+        <div class="card" style="padding: 1.5rem;">
+          <table class="mini-data-table" style="width: 100%;">
+            <thead>
+              <tr><th>Approach</th><th>Lanes</th><th>Veh/15min</th><th>PCU/h Demand</th><th>Flow Ratio (y_i)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Road A - North</td><td>2</td><td>425</td><td>850 PCU/h</td><td>0.2313</td></tr>
+              <tr><td>Road B - East</td><td>2</td><td>360</td><td>720 PCU/h</td><td>0.1959</td></tr>
+              <tr><td>Road C - South</td><td>2</td><td>140</td><td>280 PCU/h</td><td>0.0762</td></tr>
+              <tr><td>Road D - West</td><td>2</td><td>175</td><td>350 PCU/h</td><td>0.0952</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-                <div>
-                  <div class="table-sub-title">Turning Movements <span style="font-weight:400;">(veh/15 min)</span></div>
-                  <table class="mini-data-table">
-                    <thead><tr><th>Movement</th><th style="text-align:right;">Count</th></tr></thead>
-                    <tbody>
-                      <tr><td>Left Turn → North</td><td><input type="number" class="mini-input-field" id="left_west" value="50"></td></tr>
-                      <tr><td>Through → East</td><td><input type="number" class="mini-input-field" id="through_west" value="250"></td></tr>
-                      <tr><td>Right Turn → South</td><td><input type="number" class="mini-input-field" id="right_west" value="50"></td></tr>
-                      <tr style="height: 25px;"><td></td><td></td></tr>
-                      <tr><td><strong>Total</strong></td><td><input type="number" class="mini-input-field" id="flow_west" value="350" readonly style="font-weight:700;color:var(--accent-primary);"></td></tr>
-                      <tr><td>Current Green (s)</td><td><input type="number" class="mini-input-field" id="green_west" value="25"></td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+      <!-- STEP 5 SECTION: RUN ANALYSIS -->
+      <section id="wizard-section-5" class="wizard-section-panel" style="display: none;">
+        <div style="margin-bottom: 1.5rem;">
+          <h2 class="section-header-title" style="font-size: 1.05rem;">5. RUN TRAFFIC ENGINEERING ANALYSIS</h2>
+          <p style="font-size: 0.82rem; color: var(--text-secondary);">Calculate Webster's Optimum Cycle length and validate signal timing against IRC:93 standards.</p>
+        </div>
 
-            <div class="road-card-footer-banner">
-              ✓ Turning matches total (350 = 350)
-            </div>
+        <div class="card" style="padding: 2rem; text-align: center;">
+          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">⚡</div>
+          <h3 style="color: var(--text-primary); font-size: 1.1rem; margin-bottom: 0.5rem;">Execute Webster Cycle Optimization &amp; IRC:93 Validation</h3>
+          <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.5rem;">Processes flow ratios, lost times, pedestrian crossing bounds, and phase clearance matrix.</p>
+          <button class="btn-primary-cyan" style="font-size: 1rem; padding: 12px 24px;" onclick="FlowGuard.setWizardStep(6)">▶ Run Webster Optimization &amp; IRC Validation</button>
+        </div>
+      </section>
+
+      <!-- STEP 6 SECTION: RESULTS & REPORTS -->
+      <section id="wizard-section-6" class="wizard-section-panel" style="display: none;">
+        <div style="margin-bottom: 1.5rem;">
+          <h2 class="section-header-title" style="font-size: 1.05rem;">6. RESULTS &amp; ENGINEERING REPORTS</h2>
+          <p style="font-size: 0.82rem; color: var(--text-secondary);">View optimized signal timings, engineering calculation panels, and generate printable PDF reports.</p>
+        </div>
+
+        <div class="card" style="padding: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="color: var(--accent-primary); font-size: 1rem; margin: 0;">Webster Signal Timing Optimization Results</h3>
+            <button class="btn-primary-cyan" onclick="FlowGuard.generateEngineeringReport()">🖨 Print 15-Section PDF Engineering Report</button>
           </div>
 
+          <table class="mini-data-table" style="width: 100%; margin-bottom: 1rem;">
+            <thead>
+              <tr><th>Approach</th><th>Baseline Green</th><th>Webster Green</th><th>IRC:93 Validated</th><th>v/c Ratio</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Road A - North</td><td>30s</td><td>42s</td><td><strong style="color: var(--success);">42s</strong></td><td>0.92</td><td><span class="badge badge-low">PASSED</span></td></tr>
+              <tr><td>Road B - East</td><td>30s</td><td>38s</td><td><strong style="color: var(--success);">38s</strong></td><td>0.78</td><td><span class="badge badge-low">PASSED</span></td></tr>
+              <tr><td>Road C - South</td><td>25s</td><td>20s</td><td><strong style="color: var(--success);">20s</strong></td><td>0.30</td><td><span class="badge badge-low">PASSED</span></td></tr>
+              <tr><td>Road D - West</td><td>25s</td><td>20s</td><td><strong style="color: var(--success);">20s</strong></td><td>0.38</td><td><span class="badge badge-low">PASSED</span></td></tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
