@@ -67,4 +67,28 @@ describe('FlowGuard AI - Data Synchronization & Cache Invalidation', () => {
     expect(proj.processedTraffic.validation.valid).toBe(true);
   });
 
+  test('Dataset ingestion pipeline persists all metadata into project state', async () => {
+    const mockDemoRows = [
+      { Date: '2026-08-06', Time: '11:45', Road: 'Road A - North', Cars: 120, Bikes: 40, AutoRickshaw: 15, Bus: 5, Truck: 5, Bicycle: 0, LeftTurn: 37, Through: 111, RightTurn: 37, IncomingLanes: 2, SpeedLimit: 50, PedestrianCount: 15, CrosswalkWidth: 14, Incident: 'None' },
+      { Date: '2026-08-06', Time: '11:45', Road: 'Road B - East', Cars: 100, Bikes: 30, AutoRickshaw: 10, Bus: 4, Truck: 4, Bicycle: 0, LeftTurn: 30, Through: 88, RightTurn: 30, IncomingLanes: 2, SpeedLimit: 50, PedestrianCount: 15, CrosswalkWidth: 14, Incident: 'None' },
+      { Date: '2026-08-06', Time: '11:45', Road: 'Road C - South', Cars: 60, Bikes: 20, AutoRickshaw: 5, Bus: 2, Truck: 2, Bicycle: 0, LeftTurn: 18, Through: 53, RightTurn: 18, IncomingLanes: 2, SpeedLimit: 50, PedestrianCount: 15, CrosswalkWidth: 14, Incident: 'None' },
+      { Date: '2026-08-06', Time: '11:45', Road: 'Road D - West', Cars: 70, Bikes: 25, AutoRickshaw: 8, Bus: 3, Truck: 3, Bicycle: 0, LeftTurn: 22, Through: 65, RightTurn: 22, IncomingLanes: 2, SpeedLimit: 50, PedestrianCount: 15, CrosswalkWidth: 14, Incident: 'None' }
+    ];
+
+    await FlowGuard.executeDatasetIngestionPipeline(mockDemoRows);
+
+    const proj = FlowGuard.getProject();
+    const state = FlowGuard.getState();
+
+    expect(proj.trafficInput.inputMode).toBe('EXCEL_UPLOAD');
+    expect(proj.trafficInput.excelUploaded).toBe(true);
+    expect(proj.trafficInput.surveyMethod).toBe('Historical Dataset Upload');
+    expect(state.surveyMethod).toBe('Historical Dataset Upload');
+    expect(proj.trafficInput.datasetStats).toBeDefined();
+    expect(proj.trafficInput.datasetStats.rowsRead).toBe(4);
+    expect(state.selectedPeakWindow).toBeDefined();
+    expect(state.selectedIntervalName).toBeDefined();
+  });
+
 });
+

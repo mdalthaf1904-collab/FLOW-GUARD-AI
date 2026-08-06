@@ -46,4 +46,36 @@ describe('FlowGuard AI - Centralized PCU Calculation Engine & Validation', () =>
     expect(processed.validation.errors).toHaveLength(0);
   });
 
+  test('Tasks 1-6: Master PCU identity, movement-wise PCU, hourly demand, and y=q/S flow ratio', () => {
+    const proj = FlowGuard.getProject();
+    proj.trafficInput.vehicleCounts.north = { car: 100, motorcycle: 100, autorickshaw: 50, bus: 10, truck: 10, bicycle: 0 };
+    proj.trafficInput.turningCounts.north = { left: 50, through: 170, right: 50, flow: 270 };
+    proj.geometry.surveyDuration = 15;
+    FlowGuard.saveProject(proj);
+
+    const processed = FlowGuard.getProject().processedTraffic;
+    const north = processed.north;
+
+    // Task 1: Master Total Converted PCU Identity
+    expect(processed.intersection.totalPCU).toEqual(processed.totalPCUDemand);
+    expect(processed.totalPCU).toEqual(processed.totalPCUDemand);
+
+    // Task 2: Movement-Wise PCUs stored on approachMovementPCU and movementPCU
+    expect(processed.approachMovementPCU.north).toBeDefined();
+    expect(processed.approachMovementPCU.north.leftPCU).toBeGreaterThan(0);
+    expect(processed.approachMovementPCU.north.throughPCU).toBeGreaterThan(0);
+    expect(processed.approachMovementPCU.north.rightPCU).toBeGreaterThan(0);
+
+    // Task 3: Road Total PCU = Left PCU + Through PCU + Right PCU
+    const moveSum = north.movementPCU.leftPCU + north.movementPCU.throughPCU + north.movementPCU.rightPCU;
+    expect(moveSum).toEqual(north.totalPCU);
+
+    // Task 4: Hourly Demand = Road Total PCU * (60 / surveyDuration)
+    expect(north.hourlyDemand).toEqual(north.totalPCU * 4);
+
+    // Task 5: Critical Lane Readiness y = q / S using displayed q (hourlyDemand)
+    const expectedY = parseFloat((north.hourlyDemand / north.satFlow).toFixed(4));
+    expect(north.flowRatioY).toEqual(expectedY);
+  });
+
 });
