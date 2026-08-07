@@ -313,7 +313,7 @@ const FlowGuard = (function () {
     );
   }
 
-  const PROJECT_STORAGE_KEY = 'FLOWGUARD_PROJECT_V7';
+  const PROJECT_STORAGE_KEY = 'FLOWGUARD_PROJECT_V8';
   const SESSION_STORAGE_KEY = 'FLOWGUARD_SESSION_STATE_V6';
   const CSV_RECORDS_KEY = 'FLOWGUARD_CSV_RECORDS_V6';
 
@@ -342,31 +342,32 @@ const FlowGuard = (function () {
         inputMode: 'HISTORICAL',
         trafficInputSubmode: 'upload',
         wizardStep: 1,
+        // ── Dataset Upload Status: authoritative flag. MUST be true before Traffic Summary renders. ──
+        datasetUploaded: false,
         excelUploaded: false,
-        selectedPeakWindow: '08:30 AM - 08:45 AM',
-        selectedIntervalName: 'Peak Interval #3',
+        selectedPeakWindow: null,
+        selectedIntervalName: null,
         rawDatasetRecords: [],
         intervals: [],
+        // All vehicle and turning counts start empty. Never seeded with demo values.
         vehicleCounts: {
-          north: { car: 520, motorcycle: 280, autorickshaw: 90, bus: 35, truck: 25, bicycle: 0, tractor: 0, cart: 0 },
-          east: { car: 420, motorcycle: 210, autorickshaw: 80, bus: 30, truck: 20, bicycle: 0, tractor: 0, cart: 0 },
-          south: { car: 180, motorcycle: 90, autorickshaw: 30, bus: 10, truck: 5, bicycle: 0, tractor: 0, cart: 0 },
-          west: { car: 220, motorcycle: 110, autorickshaw: 40, bus: 15, truck: 10, bicycle: 0, tractor: 0, cart: 0 }
+          north: { car: 0, motorcycle: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, tractor: 0, cart: 0 },
+          east:  { car: 0, motorcycle: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, tractor: 0, cart: 0 },
+          south: { car: 0, motorcycle: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, tractor: 0, cart: 0 },
+          west:  { car: 0, motorcycle: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, tractor: 0, cart: 0 }
         },
         turningCounts: {
-          north: { left: 120, through: 610, right: 120, flow: 850 },
-          east: { left: 100, through: 520, right: 100, flow: 720 },
-          south: { left: 40, through: 200, right: 40, flow: 280 },
-          west: { left: 50, through: 250, right: 50, flow: 350 }
+          north: { left: 0, through: 0, right: 0, flow: 0 },
+          east:  { left: 0, through: 0, right: 0, flow: 0 },
+          south: { left: 0, through: 0, right: 0, flow: 0 },
+          west:  { left: 0, through: 0, right: 0, flow: 0 }
         },
-        observedVehicles: 2200,
-        convertedPCU: 2340,
-        hourlyDemand: 9360,
-        aiDetection: {
-          selectedApproach: 'north',
-          detectedCounts: { car: 25, motorcycle: 12, bus: 3, truck: 4, autorickshaw: 3, bicycle: 0 },
-          totalDetected: 47
-        }
+        observedVehicles: 0,
+        convertedPCU: 0,
+        hourlyDemand: 0,
+        datasetStats: null,
+        selectedInterval: null,
+        peakInterval: null
       },
       engineeringParameters: {
         pcuFactors: {
@@ -427,6 +428,34 @@ const FlowGuard = (function () {
     if (!project.geometry) project.geometry = createInitialProject().geometry;
     if (!project.trafficInput) project.trafficInput = createInitialProject().trafficInput;
     if (!project.engineeringParameters) project.engineeringParameters = createInitialProject().engineeringParameters;
+
+    // ── DATASET GUARD: If no dataset has been uploaded, zero out processedTraffic and return early. ──
+    // This prevents stale/demo data from ever appearing in Traffic Summary.
+    const datasetUploaded = !!(project.trafficInput.datasetUploaded || project.trafficInput.excelUploaded);
+    if (!datasetUploaded) {
+      project.processedTraffic = {
+        approachStats: {},
+        totalVehicles: 0,
+        totalPCUDemand: 0,
+        totalPCU: 0,
+        hourlyTotalDemand: 0,
+        criticalLaneKey: null,
+        pcuCategoryBreakdown: [],
+        sumModalVeh: {},
+        sumModalPcu: {},
+        movementPCU: {},
+        approachPCU: {},
+        hourlyDemand: {},
+        metadata: {
+          surveyMethod: 'Awaiting Dataset Upload',
+          surveyDuration: '--',
+          selectedInterval: '--',
+          peakInterval: '--',
+          selectedIntervalVehicleCount: 0
+        }
+      };
+      return;
+    }
 
     const activeKeys = getActiveApproachKeys(project.geometry.configType || '4CROSS');
     const pcuFactors = project.engineeringParameters.pcuFactors || DEFAULT_STATE.pcuFactors;
@@ -736,6 +765,42 @@ const FlowGuard = (function () {
     project.processedTraffic.sumModalVeh = sumModalVeh;
     project.processedTraffic.sumModalPcu = sumModalPcu;
 
+    // ── Build project.processedTraffic.metadata (Centralized Read-Only SSoT for Survey Overview) ──
+    const datasetStats = project.trafficInput.datasetStats || {};
+    const selIntervalObj = project.trafficInput.selectedInterval || {};
+
+    let selectedIntervalStr = '08:00–08:15';
+    if (typeof selIntervalObj === 'string' && selIntervalObj.trim() !== '') {
+      selectedIntervalStr = selIntervalObj;
+    } else if (selIntervalObj.timeWindow) {
+      selectedIntervalStr = selIntervalObj.timeWindow;
+    } else if (selIntervalObj.time) {
+      selectedIntervalStr = selIntervalObj.time;
+    } else if (project.trafficInput.selectedIntervalName) {
+      selectedIntervalStr = project.trafficInput.selectedIntervalName;
+    } else if (project.trafficInput.selectedPeakWindow) {
+      selectedIntervalStr = project.trafficInput.selectedPeakWindow;
+    }
+
+    const peakIntervalStr = datasetStats.peakIntervalWindow || project.trafficInput.peakIntervalWindow || project.trafficInput.selectedPeakWindow || '08:30 AM - 08:45 AM';
+
+    const rawInputMode = project.trafficInput.inputMode || 'upload';
+    const surveyMethodStr = (rawInputMode === 'upload' || rawInputMode === 'HISTORICAL' || rawInputMode === 'EXCEL_UPLOAD' || rawInputMode === 'historical')
+      ? 'Historical Dataset Upload'
+      : rawInputMode;
+
+    const surveyDurationVal = project.geometry.surveyDuration || project.trafficInput.surveyDuration || 15;
+    const surveyDurationStr = surveyDurationVal === 60 ? '60 Minutes (1 Hour)' : `${surveyDurationVal} Minutes`;
+
+    project.processedTraffic.metadata = {
+      surveyMethod: surveyMethodStr,
+      surveyDuration: surveyDurationStr,
+      surveyDurationRaw: surveyDurationVal,
+      selectedInterval: selectedIntervalStr,
+      peakInterval: peakIntervalStr,
+      selectedIntervalVehicleCount: totalVehiclesSum
+    };
+
     // Publish roadSummary into processedTraffic so Traffic Summary reads it without recalculation.
     // Traffic Summary (Step 4) reads ONLY processedTraffic.roadSummary[road].totalPCU — never recalculates.
     if (project.trafficInput.roadSummary) {
@@ -836,6 +901,12 @@ const FlowGuard = (function () {
         const sess = sessionStorage.getItem(PROJECT_STORAGE_KEY);
         if (sess) {
           _projectStore = JSON.parse(sess);
+          // Ensure datasetUploaded is present (backwards compat for projects saved before this flag existed)
+          if (!_projectStore.trafficInput) _projectStore.trafficInput = createInitialProject().trafficInput;
+          if (_projectStore.trafficInput.datasetUploaded === undefined) {
+            // Infer from whether excelUploaded or datasetStats exist
+            _projectStore.trafficInput.datasetUploaded = !!(_projectStore.trafficInput.excelUploaded || _projectStore.trafficInput.datasetStats);
+          }
           recomputeProjectData(_projectStore);
           return _projectStore;
         }
@@ -844,6 +915,10 @@ const FlowGuard = (function () {
         const local = localStorage.getItem(PROJECT_STORAGE_KEY);
         if (local) {
           _projectStore = JSON.parse(local);
+          if (!_projectStore.trafficInput) _projectStore.trafficInput = createInitialProject().trafficInput;
+          if (_projectStore.trafficInput.datasetUploaded === undefined) {
+            _projectStore.trafficInput.datasetUploaded = !!(_projectStore.trafficInput.excelUploaded || _projectStore.trafficInput.datasetStats);
+          }
           recomputeProjectData(_projectStore);
           return _projectStore;
         }
@@ -853,7 +928,7 @@ const FlowGuard = (function () {
     }
 
     _projectStore = createInitialProject();
-    recomputeProjectData(_projectStore);
+    // No recomputeProjectData() on fresh project — dataset guard will short-circuit anyway
     return _projectStore;
   }
 
@@ -1053,11 +1128,83 @@ const FlowGuard = (function () {
 
   function resetToDefaults() {
     _projectStore = createInitialProject();
-    saveProject(_projectStore);
+    // Save directly without triggering recomputeProjectData (no dataset present)
+    try {
+      const serialized = JSON.stringify(_projectStore);
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(PROJECT_STORAGE_KEY, serialized);
+        sessionStorage.removeItem(CSV_RECORDS_KEY);
+      }
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(PROJECT_STORAGE_KEY, serialized);
+      }
+    } catch (err) {
+      console.warn('[FlowGuard AI] Error writing reset project to storage:', err);
+    }
+    return getState();
+  }
+
+  /**
+   * Clear the uploaded dataset from the project.
+   * Called when user starts a New Analysis, clears upload, or deletes the project.
+   * Wipes dataset, processedTraffic, analysisResults, and report.
+   */
+  function clearDataset() {
+    const proj = loadProject();
+    const initial = createInitialProject();
+
+    // Zero all traffic input data
+    proj.trafficInput.datasetUploaded = false;
+    proj.trafficInput.excelUploaded = false;
+    proj.trafficInput.datasetStats = null;
+    proj.trafficInput.selectedInterval = null;
+    proj.trafficInput.peakInterval = null;
+    proj.trafficInput.intervals = [];
+    proj.trafficInput.rawDatasetRecords = [];
+    proj.trafficInput.selectedPeakWindow = null;
+    proj.trafficInput.selectedIntervalName = null;
+    proj.trafficInput.totalVehicles = 0;
+    proj.trafficInput.totalConvertedPCU = 0;
+    proj.trafficInput.hourlyDemand = 0;
+    proj.trafficInput.rowsRead = 0;
+    proj.trafficInput.timeRange = '';
+    proj.trafficInput.roadSummary = null;
+    proj.trafficInput.observedVehicles = 0;
+    proj.trafficInput.convertedPCU = 0;
+    proj.trafficInput.vehicleCounts = initial.trafficInput.vehicleCounts;
+    proj.trafficInput.turningCounts = initial.trafficInput.turningCounts;
+
+    // Clear all computed results
+    proj.processedTraffic = {
+      approachStats: {},
+      totalVehicles: 0,
+      totalPCUDemand: 0,
+      totalPCU: 0,
+      hourlyTotalDemand: 0,
+      criticalLaneKey: null,
+      pcuCategoryBreakdown: [],
+      sumModalVeh: {},
+      sumModalPcu: {},
+      movementPCU: {},
+      approachPCU: {},
+      hourlyDemand: {},
+      metadata: {
+        surveyMethod: 'Awaiting Dataset Upload',
+        surveyDuration: '--',
+        selectedInterval: '--',
+        peakInterval: '--',
+        selectedIntervalVehicleCount: 0
+      }
+    };
+    proj.analysisResults = initial.analysisResults;
+    proj.report = initial.report;
+
+    saveProject(proj);
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.removeItem(CSV_RECORDS_KEY);
     }
-    return getState();
+    console.log('[FlowGuard AI] Dataset cleared. Traffic Summary reset to empty state.');
+    return proj;
   }
 
   function formatNum(val, decimals = 0) {
@@ -3257,9 +3404,99 @@ const FlowGuard = (function () {
   }
 
   /**
-   * Render Step 4 Traffic Summary Engineering Dashboard
-   * Read-only dashboard summarizing data from Steps 1, 2, and 3.
+   * Render Traffic Summary empty state when no dataset has been uploaded.
+   * Resets ALL sections to placeholder values so no stale data is ever visible.
    */
+  function renderTrafficSummaryEmptyState(proj) {
+    // ── SECTION 1: SURVEY OVERVIEW ──
+    const emptyText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    emptyText('sumDashMethod', 'Awaiting Dataset Upload');
+    emptyText('sumDashDuration', '--');
+    emptyText('sumDashSelectedInterval', '--');
+    emptyText('sumDashPeakHour', '--');
+    emptyText('sumDashObservedVehicles', '0 veh');
+    emptyText('sumDashGeometry', proj && proj.geometry ? getConfigLabel(proj.geometry.configType || '4CROSS') : '--');
+
+    // ── SECTION 2: ROAD CARDS GRID ──
+    const cardsGrid = document.getElementById('sumDashApproachCardsGrid');
+    if (cardsGrid) {
+      const activeKeys = proj ? getActiveApproachKeys(proj.geometry.configType || '4CROSS') : ['north', 'east', 'south', 'west'];
+      cardsGrid.innerHTML = activeKeys.map(k => {
+        const dir = k.charAt(0).toUpperCase() + k.slice(1);
+        return `
+          <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-color); padding: 1.25rem; border-radius: 10px; display: flex; flex-direction: column; gap: 0.75rem; opacity: 0.5;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.6rem;">
+              <div style="font-size: 0.95rem; font-weight: 800; color: var(--text-secondary);">Road ${k.toUpperCase().charAt(0)} — ${dir}</div>
+              <span class="badge badge-low" style="font-size: 0.7rem;">${k.toUpperCase()}BOUND</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; background: rgba(30, 41, 59, 0.4); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div>
+                <div style="font-size: 0.68rem; color: var(--text-secondary); text-transform: uppercase;">Vehicle Count</div>
+                <div style="font-size: 1rem; font-weight: 700; color: var(--text-secondary); margin-top: 2px;">0 <span style="font-size: 0.68rem;">veh</span></div>
+              </div>
+              <div>
+                <div style="font-size: 0.68rem; color: var(--text-secondary); text-transform: uppercase;">Converted PCU</div>
+                <div style="font-size: 1rem; font-weight: 700; color: var(--text-secondary); margin-top: 2px;">0 <span style="font-size: 0.68rem;">PCU</span></div>
+              </div>
+              <div style="grid-column: span 2; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 0.4rem; margin-top: 0.2rem;">
+                <div style="font-size: 0.68rem; color: var(--text-secondary); text-transform: uppercase;">Hourly Demand (PCU/hr)</div>
+                <div style="font-size: 1.2rem; font-weight: 800; color: var(--text-secondary); margin-top: 2px;">0 <span style="font-size: 0.75rem;">PCU/hr</span></div>
+              </div>
+            </div>
+            <div style="font-size: 0.76rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 4px;">
+              <div style="font-size: 0.68rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Turning Movements (Vehicles)</div>
+              <div style="font-family: var(--font-mono); font-size: 0.78rem; background: rgba(15, 23, 42, 0.5); padding: 0.4rem 0.6rem; border-radius: 4px; display: flex; justify-content: space-between;">
+                <span>Left: <strong style="color: var(--text-secondary);">0</strong></span>
+                <span>Thru: <strong style="color: var(--text-secondary);">0</strong></span>
+                <span>Right: <strong style="color: var(--text-secondary);">0</strong></span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ── SECTION 2 SUB: Selected Interval Label ──
+    emptyText('sumDashSelIntervalSub', '--');
+
+    // ── SECTION 3: VEHICLE COMPOSITION ──
+    const pieChart = document.getElementById('vehPieChartContainer');
+    if (pieChart) pieChart.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;width:220px;height:220px;color:var(--text-secondary);font-size:0.85rem;text-align:center;border:1px dashed var(--border-color);border-radius:8px;"><span>No Data<br><small style="font-size:0.72rem;opacity:0.6;">Upload a dataset to view composition</small></span></div>`;
+    const pieLegend = document.getElementById('vehPieLegendList');
+    if (pieLegend) pieLegend.innerHTML = '';
+    const vehCompositionTableBody = document.getElementById('vehCompositionTableBody');
+    if (vehCompositionTableBody) vehCompositionTableBody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-secondary);padding:1rem;">No dataset uploaded</td></tr>';
+
+    // ── SECTION 4: PCU SUMMARY TABLE ──
+    const pcuCatBody = document.getElementById('pcuSummaryCategoryTableBody');
+    if (pcuCatBody) pcuCatBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-secondary);padding:1rem;">No dataset uploaded</td></tr>';
+    emptyText('pcuSumTotalObserved', '0 veh');
+    emptyText('pcuSumTotalCalculated', '0 PCU');
+
+    // ── SECTION 5: ROAD DEMAND BAR CHART ──
+    const barChart = document.getElementById('roadDemandBarChartContainer');
+    if (barChart) barChart.innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--text-secondary);font-size:0.85rem;border:1px dashed var(--border-color);border-radius:8px;">No Data — Upload a dataset to view demand chart</div>`;
+
+    // ── SECTION: TURNING MOVEMENT CHART ──
+    const tmBar = document.getElementById('turningStackedBarContainer');
+    if (tmBar) tmBar.innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--text-secondary);font-size:0.85rem;border:1px dashed var(--border-color);border-radius:8px;">No Data — Upload a dataset to view turning movements</div>`;
+
+    // ── SECTION: TURNING MOVEMENT COMPACT PIE ──
+    const tmPie = document.getElementById('turningMovementPieContainer');
+    if (tmPie) tmPie.innerHTML = '';
+
+    // ── SECTION: CRITICAL APPROACH ──
+    emptyText('criticalApproachName', 'No Data');
+    emptyText('criticalApproachPCU', '--');
+    emptyText('criticalApproachDemand', '--');
+    emptyText('criticalLaneFlowRatio', '--');
+    const critCard = document.getElementById('criticalApproachCard');
+    if (critCard) critCard.style.opacity = '0.5';
+
+    // ── SECTION: ENGINEERING PARAMETERS SNAPSHOT ──
+    // Keep these readable — they are NOT dependent on dataset
+  }
+
   /**
    * Render Step 4 Traffic Summary Engineering Dashboard
    * Read-only dashboard summarizing data from Steps 1, 2, and 3.
@@ -3271,7 +3508,15 @@ const FlowGuard = (function () {
     const proj = getProject();
     recomputeProjectData(proj);
 
-    // Automatic 6-point Engine Validation
+    // ── DATASET GUARD: If no dataset has been uploaded, render empty state and stop. ──
+    const datasetUploaded = !!(proj.trafficInput && (proj.trafficInput.datasetUploaded || proj.trafficInput.excelUploaded));
+    if (!datasetUploaded) {
+      console.log('[FlowGuard AI] Traffic Summary: No dataset uploaded. Rendering empty state.');
+      renderTrafficSummaryEmptyState(proj);
+      return;
+    }
+
+    // Automatic 6-point Engine Validation (only runs when dataset exists)
     const valResult = validateProcessedTrafficData(proj);
     if (!valResult.valid) {
       console.warn('[Cache Invalidation] Traffic Summary validation mismatch detected. Force recomputing project data...', valResult.errors);
@@ -3392,30 +3637,26 @@ const FlowGuard = (function () {
       }).join('');
     }
 
-    // Card 3 Labels
+    // ── READ-ONLY SURVEY OVERVIEW METADATA BINDINGS ──
+    const meta = (processed && processed.metadata) || {};
+
     const sumGeoEl = document.getElementById('sumDashGeometry');
     if (sumGeoEl) sumGeoEl.textContent = geoLabel;
 
     const sumDurEl = document.getElementById('sumDashDuration');
-    if (sumDurEl) sumDurEl.textContent = durationLabel;
+    if (sumDurEl) sumDurEl.textContent = meta.surveyDuration || durationLabel;
 
     const sumMethodEl = document.getElementById('sumDashMethod');
-    if (sumMethodEl) sumMethodEl.textContent = surveyMethod;
+    if (sumMethodEl) sumMethodEl.textContent = meta.surveyMethod || surveyMethod;
 
     const sumPeakEl = document.getElementById('sumDashPeakHour');
-    if (sumPeakEl) sumPeakEl.textContent = peakIntervalText;
+    if (sumPeakEl) sumPeakEl.textContent = meta.peakInterval || peakIntervalText;
 
     const sumSelIntEl = document.getElementById('sumDashSelectedInterval');
-    if (sumSelIntEl) sumSelIntEl.textContent = selectedIntervalText;
+    if (sumSelIntEl) sumSelIntEl.textContent = meta.selectedInterval || selectedIntervalText;
 
     const sumObsVehEl = document.getElementById('sumDashObservedVehicles');
-    if (sumObsVehEl) sumObsVehEl.textContent = `${totalVehicles.toLocaleString()} veh`;
-
-    const sumObsPcuEl = document.getElementById('sumDashObservedPCU');
-    if (sumObsPcuEl) sumObsPcuEl.textContent = `${totalPCUDemand.toLocaleString()} PCU`;
-
-    const sumHourlyDemandEl = document.getElementById('sumDashHourlyDemand');
-    if (sumHourlyDemandEl) sumHourlyDemandEl.textContent = `${hourlyTotalDemand.toLocaleString()} PCU/hr`;
+    if (sumObsVehEl) sumObsVehEl.textContent = `${(meta.selectedIntervalVehicleCount !== undefined ? meta.selectedIntervalVehicleCount : totalVehicles).toLocaleString()} veh`;
 
     // SECTION 5: Road Demand Comparison Horizontal Bar Chart (Sorted highest to lowest demand)
     renderRoadDemandHorizontalBarChart(activeKeys, approachStats);
@@ -3580,46 +3821,11 @@ const FlowGuard = (function () {
         pcuVal: item.calculatedPcu
       })).filter(c => c.count > 0);
     } else {
-      // Fallback: aggregate from approaches (legacy path when processedTraffic not yet computed)
-      let car = 0, motorcycle = 0, autorickshaw = 0, bus = 0, truck = 0, bicycle = 0, tractor = 0, cart = 0;
-      Object.values(approaches).forEach(app => {
-        const v = app.vehicles || {};
-        car += parseFloat(v.car || app.car || app.veh_car) || 0;
-        motorcycle += parseFloat(v.motorcycle || v.twowheeler || app.motorcycle || app.bike) || 0;
-        autorickshaw += parseFloat(v.autorickshaw || v.auto || app.autorickshaw) || 0;
-        bus += parseFloat(v.bus || app.bus) || 0;
-        truck += parseFloat(v.truck || v.lcv || app.truck || app.lcv) || 0;
-        bicycle += parseFloat(v.bicycle || app.bicycle) || 0;
-        tractor += parseFloat(v.tractor || app.tractor) || 0;
-        cart += parseFloat(v.cart || app.cart) || 0;
-      });
-      let sumVeh = car + motorcycle + autorickshaw + bus + truck + bicycle + tractor + cart;
-      if (sumVeh === 0 && totalVehicles > 0) {
-        car = Math.round(totalVehicles * 0.48);
-        motorcycle = Math.round(totalVehicles * 0.32);
-        autorickshaw = Math.round(totalVehicles * 0.12);
-        bus = Math.round(totalVehicles * 0.05);
-        truck = Math.round(totalVehicles * 0.03);
-      }
-      const currentPcuFactors = (proj && proj.engineeringParameters && proj.engineeringParameters.pcuFactors) || pcuFactors || DEFAULT_STATE.pcuFactors;
-      const rawCategories = [
-        { name: 'Car / Jeep / Van', key: 'car', count: car },
-        { name: 'Two-Wheeler', key: 'motorcycle', count: motorcycle },
-        { name: 'Auto-Rickshaw', key: 'autorickshaw', count: autorickshaw },
-        { name: 'Bus / Coach', key: 'bus', count: bus },
-        { name: 'Truck / LCV', key: 'truck', count: truck },
-        { name: 'Bicycle', key: 'bicycle', count: bicycle },
-        { name: 'Tractor / Trailer', key: 'tractor', count: tractor },
-        { name: 'Animal Cart / Rickshaw', key: 'cart', count: cart }
-      ];
-      categories = rawCategories
-        .filter(c => c.count > 0)
-        .map(c => ({
-          ...c,
-          color: COLOR_MAP[c.key] || '#94a3b8',
-          factor: currentPcuFactors[c.key] || 1.0,
-          pcuVal: Math.round(c.count * (currentPcuFactors[c.key] || 1.0))
-        }));
+      // No dataset uploaded — do not invent values. Show empty state.
+      container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;width:220px;height:220px;color:var(--text-secondary);font-size:0.85rem;text-align:center;border:1px dashed var(--border-color);border-radius:8px;"><span>No Data<br><small style="font-size:0.72rem;opacity:0.6;">Upload a dataset to view composition</small></span></div>`;
+      legend.innerHTML = '';
+      tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-secondary);padding:1rem;">No dataset uploaded</td></tr>';
+      return;
     }
 
     const totalCount = categories.reduce((acc, c) => acc + c.count, 0) || 1;
@@ -3828,18 +4034,7 @@ const FlowGuard = (function () {
     });
 
     const totalVeh = car + motorcycle + autorickshaw + bus + truck + bicycle + tractor + cart;
-    if (totalVeh === 0) {
-      const state = getState();
-      let stateTotalVeh = 0;
-      Object.values(state.approaches || {}).forEach(a => stateTotalVeh += (parseFloat(a.flow) || 0));
-      if (stateTotalVeh > 0) {
-        car = Math.round(stateTotalVeh * 0.48);
-        motorcycle = Math.round(stateTotalVeh * 0.32);
-        autorickshaw = Math.round(stateTotalVeh * 0.12);
-        bus = Math.round(stateTotalVeh * 0.05);
-        truck = Math.round(stateTotalVeh * 0.03);
-      }
-    }
+    // Do NOT invent estimated values when no real data is available
 
     const items = [
       { name: 'Cars / Vans', key: 'car', count: car },
@@ -3910,33 +4105,9 @@ const FlowGuard = (function () {
           color: COLOR_MAP[item.key] || '#94a3b8'
         }));
     } else {
-      // Fallback: aggregate from approaches (legacy path)
-      let car = 0, motorcycle = 0, autorickshaw = 0, bus = 0, truck = 0, bicycle = 0;
-      Object.values(approaches).forEach(app => {
-        car += parseFloat(app.car || app.veh_car) || 0;
-        motorcycle += parseFloat(app.motorcycle || app.bike || app.veh_bike) || 0;
-        autorickshaw += parseFloat(app.autorickshaw || app.auto || app.veh_auto) || 0;
-        bus += parseFloat(app.bus || app.veh_bus) || 0;
-        truck += parseFloat(app.truck || app.hcv || app.veh_hcv) || 0;
-        bicycle += parseFloat(app.bicycle || app.veh_bicycle) || 0;
-      });
-      const sumVeh = car + motorcycle + autorickshaw + bus + truck + bicycle;
-      const rawCats = sumVeh > 0
-        ? [
-          { label: 'Cars / Vans', key: 'car', count: car },
-          { label: 'Two-Wheelers', key: 'motorcycle', count: motorcycle },
-          { label: 'Auto-Rickshaws', key: 'autorickshaw', count: autorickshaw },
-          { label: 'Buses / Coaches', key: 'bus', count: bus },
-          { label: 'Trucks / Freight', key: 'truck', count: truck },
-          { label: 'Bicycles', key: 'bicycle', count: bicycle }
-        ].filter(c => c.count > 0)
-        : [
-          { label: 'Cars (Estimated)', key: 'car', count: Math.round(totalVehicles * 0.45) },
-          { label: 'Two-Wheelers', key: 'motorcycle', count: Math.round(totalVehicles * 0.35) },
-          { label: 'Autos / 3W', key: 'autorickshaw', count: Math.round(totalVehicles * 0.12) },
-          { label: 'Buses & Trucks', key: 'bus', count: Math.round(totalVehicles * 0.08) }
-        ];
-      categories = rawCats.map(c => ({ ...c, color: COLOR_MAP[c.key] || '#94a3b8' }));
+      // No real vehicle data — do not fabricate estimated values.
+      // renderTrafficSummaryEmptyState already handles this container; just return.
+      categories = [];
     }
 
     const totalCount = categories.reduce((acc, c) => acc + c.count, 0) || 1;
@@ -4318,9 +4489,20 @@ const FlowGuard = (function () {
             }
           });
 
+          const intervalLabel = newInterval.timeWindow || newInterval.intervalLabel || newInterval.time;
+          const currentProj = loadProject();
+          currentProj.trafficInput.selectedInterval = newInterval;
+          currentProj.trafficInput.selectedIntervalName = intervalLabel;
+          currentProj.trafficInput.selectedPeakWindow = intervalLabel;
+          recomputeProjectData(currentProj);
+          saveProject(currentProj);
+
           saveState({
             ...currentState,
             approaches: updatedApproaches,
+            selectedInterval: newInterval,
+            selectedIntervalName: intervalLabel,
+            selectedPeakWindow: intervalLabel,
             dataUploaded: true
           });
 
@@ -4478,6 +4660,7 @@ const FlowGuard = (function () {
       const ingestionProj = loadProject();
       ingestionProj.trafficInput.inputMode = 'EXCEL_UPLOAD';
       ingestionProj.trafficInput.excelUploaded = true;
+      ingestionProj.trafficInput.datasetUploaded = true;  // ← authoritative dataset gate flag
       ingestionProj.trafficInput.surveyMethod = surveyMethodStr;
       ingestionProj.trafficInput.surveyDuration = surveyDur;
       ingestionProj.trafficInput.datasetStats = result.datasetStats;
@@ -5043,6 +5226,7 @@ const FlowGuard = (function () {
     saveCSVRecords,
     getCSVRecords,
     resetToDefaults,
+    clearDataset,
     formatNum,
     validateInput,
     getActiveApproachKeys,
@@ -5108,6 +5292,7 @@ if (typeof window !== 'undefined') {
   window.initAppEvents = FlowGuard.initAppEvents;
   window.initProjectInspector = FlowGuard.initProjectInspector;
   window.updateProjectInspector = FlowGuard.updateProjectInspector;
+  window.clearDataset = FlowGuard.clearDataset;
   FlowGuard.initAppEvents();
   FlowGuard.initProjectInspector();
 }
