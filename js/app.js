@@ -448,7 +448,6 @@ const FlowGuard = (function () {
         hourlyDemand: {},
         metadata: {
           surveyMethod: 'Awaiting Dataset Upload',
-          surveyDuration: '--',
           selectedInterval: '--',
           peakInterval: '--',
           selectedIntervalVehicleCount: 0
@@ -873,7 +872,7 @@ const FlowGuard = (function () {
       trafficInputSubmode: proj.trafficInput.trafficInputSubmode || 'upload',
       wizardStep: proj.trafficInput.wizardStep || 1,
       duration: proj.geometry.surveyDuration,
-      surveyDuration: proj.trafficInput.surveyDuration || proj.geometry.surveyDuration,
+      surveyDuration: proj.geometry.surveyDuration,
       surveyMethod: proj.trafficInput.surveyMethod || proj.geometry.surveyMethod,
       dayType: proj.geometry.dayType,
       excelUploaded: proj.trafficInput.excelUploaded,
@@ -905,17 +904,8 @@ const FlowGuard = (function () {
     const proj = loadProject();
 
     if (state.configType !== undefined) proj.geometry.configType = state.configType;
-    if (state.duration !== undefined) {
-      proj.geometry.surveyDuration = state.duration;
-      proj.trafficInput.surveyDuration = state.duration;
-    }
-    if (state.surveyDuration !== undefined) {
-      proj.geometry.surveyDuration = state.surveyDuration;
-      proj.trafficInput.surveyDuration = state.surveyDuration;
-    }
     if (state.surveyMethod !== undefined) {
       proj.geometry.surveyMethod = state.surveyMethod;
-      proj.trafficInput.surveyMethod = state.surveyMethod;
     }
     if (state.dayType !== undefined) proj.geometry.dayType = state.dayType;
     if (state.inputMode !== undefined) proj.trafficInput.inputMode = state.inputMode;
@@ -1057,7 +1047,6 @@ const FlowGuard = (function () {
       hourlyDemand: {},
       metadata: {
         surveyMethod: 'Awaiting Dataset Upload',
-        surveyDuration: '--',
         selectedInterval: '--',
         peakInterval: '--',
         selectedIntervalVehicleCount: 0
@@ -2975,8 +2964,31 @@ const FlowGuard = (function () {
         });
       }
 
-      const activeKeys = ['north', 'east', 'south', 'west'];
-      activeKeys.forEach(k => {
+      const durSel = document.getElementById('workflowDurationSelector');
+      if (durSel) {
+        durSel.addEventListener('change', (e) => {
+          const proj = loadProject();
+          if (proj && proj.geometry) {
+            proj.geometry.surveyDuration = e.target.value;
+            saveProject(proj);
+          }
+        });
+      }
+
+      const inputModeSel = document.getElementById('workflowInputModeSelector');
+      if (inputModeSel) {
+        inputModeSel.addEventListener('change', (e) => {
+          const proj = loadProject();
+          if (proj && proj.trafficInput) {
+            const selectedOpt = e.target.options ? e.target.options[e.target.selectedIndex] : null;
+            proj.trafficInput.inputMode = selectedOpt ? selectedOpt.text : e.target.value;
+            saveProject(proj);
+          }
+        });
+      }
+
+      const approachKeys = ['north', 'east', 'south', 'west'];
+      approachKeys.forEach(k => {
         ['left', 'through', 'right'].forEach(m => {
           const input = document.getElementById(`${m}_${k}`) || document.getElementById(`${m}_${k}_input`);
           if (input) {
@@ -3283,9 +3295,27 @@ const FlowGuard = (function () {
       if (el) el.textContent = text;
     };
 
-    // Survey Overview Metadata Placeholders
-    setText('sumDashMethod', '--');
-    setText('sumDashDuration', '--');
+    const proj = loadProject();
+
+    // Survey Overview Metadata Bindings (Read directly from Step 2 project.trafficInput & Step 1 project.geometry)
+    let rawInputMode = (proj && proj.trafficInput && proj.trafficInput.inputMode) ? proj.trafficInput.inputMode : 'Historical Dataset Upload';
+    if (rawInputMode === 'HISTORICAL' || rawInputMode === 'historical') {
+      rawInputMode = 'Historical Dataset Upload';
+    }
+    setText('sumDashMethod', rawInputMode);
+
+    const rawDuration = (proj && proj.geometry) ? proj.geometry.surveyDuration : undefined;
+    let formattedDuration = '--';
+    if (rawDuration !== null && rawDuration !== undefined && rawDuration !== '') {
+      const durStr = String(rawDuration).trim();
+      if (durStr === '15' || durStr === '15 Minutes') formattedDuration = '15 Minutes';
+      else if (durStr === '30' || durStr === '30 Minutes') formattedDuration = '30 Minutes';
+      else if (durStr === '60' || durStr === '60 Minutes' || durStr === '60 Minutes (1 Hour)') formattedDuration = '60 Minutes (1 Hour)';
+      else if (/^\d+$/.test(durStr)) formattedDuration = `${durStr} Minutes`;
+      else formattedDuration = durStr;
+    }
+    setText('sumDashDuration', formattedDuration);
+
     setText('sumDashSelectedInterval', '--');
     setText('sumDashPeakHour', '--');
     setText('sumDashObservedVehicles', '0');
@@ -3473,24 +3503,6 @@ const FlowGuard = (function () {
 
     container.innerHTML = `
       <div style="display: flex; flex-direction: column; gap: 1.25rem; margin-top: 1.5rem;">
-
-        <!-- ANALYSIS INTERVAL SELECTION (CLEAN DISPLAY ONLY, NO VEHICLE / PCU STATS) -->
-        <div class="card" style="padding: 1.25rem; border: 1px solid rgba(245, 158, 11, 0.4); background: rgba(30, 41, 59, 0.5);">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-            <div>
-              <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #f59e0b; font-weight: 700; margin-bottom: 0.3rem;">🎯 Analysis Interval Selection</div>
-              <h4 style="margin: 0; color: var(--text-primary); font-size: 0.95rem; font-weight: 600;">
-                Peak Window Detected: <span style="color: #f59e0b; font-weight: 700;">${peakWindowStr}</span> <span style="font-size: 0.78rem; font-weight: 400; color: var(--text-secondary);">(Automatically detected from uploaded dataset)</span>
-              </h4>
-            </div>
-            <div style="min-width: 260px;">
-              <label for="analysisIntervalSelect" style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.35rem;">Analysis Interval Window:</label>
-              <select id="analysisIntervalSelect" class="form-control" style="background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--accent-primary); font-weight: 600; padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer; width: 100%;">
-                ${intervalOptionsHTML}
-              </select>
-            </div>
-          </div>
-        </div>
 
         <!-- RAW DATASET RECORDS PREVIEW (13 COLUMNS, SEARCH, SORT, PAGINATION) -->
         <div class="card" style="padding: 1.25rem;">
@@ -3825,8 +3837,6 @@ const FlowGuard = (function () {
         excelUploaded: true,
         inputMode: 'EXCEL_UPLOAD',
         surveyMethod: surveyMethodStr,
-        duration: surveyDur,
-        surveyDuration: surveyDur,
         datasetStats: result.datasetStats,
         selectedInterval: selectedInterval,
         peakInterval: result.peakInterval,
@@ -3847,7 +3857,6 @@ const FlowGuard = (function () {
       ingestionProj.trafficInput.excelUploaded = true;
       ingestionProj.trafficInput.datasetUploaded = true;  // ← authoritative dataset gate flag
       ingestionProj.trafficInput.surveyMethod = surveyMethodStr;
-      ingestionProj.trafficInput.surveyDuration = surveyDur;
       ingestionProj.trafficInput.datasetStats = result.datasetStats;
       ingestionProj.trafficInput.selectedInterval = selectedInterval;
       ingestionProj.trafficInput.peakInterval = result.peakInterval;
