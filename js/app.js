@@ -339,8 +339,8 @@ const FlowGuard = (function () {
         dayType: 'Weekday'
       },
       trafficInput: {
-        inputMode: 'TURNING_MOVEMENTS',
-        trafficInputSubmode: 'manual',
+        inputMode: 'HISTORICAL',
+        trafficInputSubmode: 'upload',
         wizardStep: 1,
         excelUploaded: false,
         selectedPeakWindow: '08:30 AM - 08:45 AM',
@@ -928,7 +928,7 @@ const FlowGuard = (function () {
     return {
       configType: proj.geometry.configType,
       inputMode: proj.trafficInput.inputMode,
-      trafficInputSubmode: proj.trafficInput.trafficInputSubmode || 'manual',
+      trafficInputSubmode: proj.trafficInput.trafficInputSubmode || 'upload',
       wizardStep: proj.trafficInput.wizardStep || 1,
       duration: proj.geometry.surveyDuration,
       surveyDuration: proj.trafficInput.surveyDuration || proj.geometry.surveyDuration,
@@ -2718,39 +2718,19 @@ const FlowGuard = (function () {
 
   /**
    * Set Active Sub-mode inside Step 2 (Traffic Input Mode)
-   * Options: 'manual' | 'upload' | 'ai'
+   * Historical Dataset Upload is the single supported mode.
    */
   function setTrafficInputSubmode(submode) {
-    const validSubmodes = ['manual', 'upload', 'ai'];
-    const targetSubmode = validSubmodes.includes(submode) ? submode : 'manual';
+    const targetSubmode = 'upload';
 
     if (typeof document !== 'undefined') {
-      // 1. Update submode switcher tabs inside Step 2
-      const tabs = document.querySelectorAll('.input-submode-tab');
-      tabs.forEach(tab => {
-        tab.classList.remove('active');
-        if (tab.getAttribute('data-submode') === targetSubmode) {
-          tab.classList.add('active');
-        }
-      });
+      const uploadPanel = document.getElementById('submode-upload');
+      if (uploadPanel) uploadPanel.style.display = 'block';
 
-      // 2. Update sidebar sub-item active highlights
       const subItems = document.querySelectorAll('.wizard-sub-item');
       subItems.forEach(item => {
-        item.classList.remove('active');
-        if (item.getAttribute('data-submode') === targetSubmode) {
-          item.classList.add('active');
-        }
+        item.classList.add('active');
       });
-
-      // 3. Toggle visibility of subpanels
-      const manualPanel = document.getElementById('submode-manual');
-      const uploadPanel = document.getElementById('submode-upload');
-      const aiPanel = document.getElementById('submode-ai');
-
-      if (manualPanel) manualPanel.style.display = targetSubmode === 'manual' ? 'block' : 'none';
-      if (uploadPanel) uploadPanel.style.display = targetSubmode === 'upload' ? 'block' : 'none';
-      if (aiPanel) aiPanel.style.display = targetSubmode === 'ai' ? 'block' : 'none';
     }
 
     const state = getState();
@@ -2761,7 +2741,7 @@ const FlowGuard = (function () {
   /**
    * CONSOLIDATED 6-STEP ANALYSIS WIZARD NAVIGATION ENGINE
    * 1. Intersection Geometry
-   * 2. Traffic Input Mode (Manual, Dataset Upload, AI Detection)
+   * 2. Traffic Input Mode (Historical Dataset Upload)
    * 3. Engineering Parameters
    * 4. Traffic Summary
    * 5. Run Analysis
@@ -2774,33 +2754,15 @@ const FlowGuard = (function () {
     // Validation Guardrail before advancing from Step 2 to Step 3
     const currentState = getState();
     if (numericId > 2 && (currentState.wizardStep === 2 || !currentState.wizardStep)) {
-      const activeSubmode = submode || currentState.trafficInputSubmode || 'manual';
-      let isValidInput = false;
-
-      if (activeSubmode === 'upload' || currentState.dataUploaded) {
-        isValidInput = true;
-      } else {
-        const appKeys = getActiveApproachKeys(currentState.configType || '4CROSS');
-        isValidInput = appKeys.some(k => {
-          const app = currentState.approaches ? currentState.approaches[k] : null;
-          return app && (app.flow > 0 || app.left > 0 || app.through > 0 || app.right > 0);
-        });
-      }
-
-      if (!isValidInput) {
-        if (typeof alert !== 'undefined') {
-          alert("⚠️ Traffic Input Required: Please enter vehicle counts or upload a dataset before proceeding to Engineering Parameters.");
-        }
-        console.warn("Wizard Navigation Guard: Step 2 inputs incomplete.");
-        return setWizardStep(2, activeSubmode);
-      }
+      const activeSubmode = 'upload';
+      const isValidInput = true; // Historical dataset upload is default mode
     }
 
     console.log(`[FlowGuard AI] Navigating Wizard to Step ${numericId}`);
 
     // Update State
     currentState.wizardStep = numericId;
-    if (submode) currentState.trafficInputSubmode = submode;
+    currentState.trafficInputSubmode = 'upload';
     saveState(currentState);
 
     if (typeof document !== 'undefined') {
@@ -2821,7 +2783,7 @@ const FlowGuard = (function () {
 
       // If Step 2, update active submode view
       if (numericId === 2) {
-        setTrafficInputSubmode(submode || currentState.trafficInputSubmode || 'manual');
+        setTrafficInputSubmode('upload');
       }
 
       // If Step 3, initialize engineering parameters panel UI and calculations
@@ -2860,7 +2822,7 @@ const FlowGuard = (function () {
       // Update Header Titles & Badges
       const stepTitles = {
         1: { title: '1. INTERSECTION GEOMETRY', subtitle: 'Configure intersection geometry, lane numbers, and approach orientation.' },
-        2: { title: '2. TRAFFIC INPUT MODE', subtitle: 'Select manual survey, historical dataset upload, or AI video detection method.' },
+        2: { title: '2. TRAFFIC INPUT MODE', subtitle: 'Historical dataset upload for traffic analysis.' },
         3: { title: '3. ENGINEERING PARAMETERS', subtitle: 'Configure signal timing constraints, clearance intervals, and crosswalk dimensions.' },
         4: { title: '4. TRAFFIC SUMMARY', subtitle: 'Review converted PCU demands and turning movement distributions.' },
         5: { title: '5. RUN ANALYSIS', subtitle: 'Execute 15-stage Webster optimum cycle calculation & IRC:93 signal validation.' },
@@ -4815,7 +4777,7 @@ const FlowGuard = (function () {
           crosswalkWidth: engParams.crosswalkWidth || 14.0,
           walkingSpeed: engParams.walkSpeed || 1.2,
           startupTime: engParams.pedStartupTime || 7.0
-        }, state.configType || '4CROSS', state.trafficInputSubmode === 'upload' ? 'HISTORICAL' : 'TURNING_MOVEMENTS');
+        }, state.configType || '4CROSS', 'HISTORICAL');
       }
     } catch (e) {
       console.warn("AnalysisEngine call fallback:", e);

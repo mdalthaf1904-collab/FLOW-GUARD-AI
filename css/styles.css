@@ -568,77 +568,14 @@ input:focus {
 }
 
 /* --------------------------------------------------------------------------
-   9. 4-Grid Layout (Manual Traffic Survey Cards)
+   9. Data Tables & Card Utilities
    -------------------------------------------------------------------------- */
-.survey-action-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.grid-2x2,
-.road-grid-2x2 {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
-@media (max-width: 1100px) {
-
-  .grid-2x2,
-  .road-grid-2x2 {
-    grid-template-columns: 1fr;
-  }
-}
-
-.road-card,
-.road-card-panel {
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-lg);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.road-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 10px;
-}
-
-.road-card-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--accent-primary);
-}
-
-.road-card-tables-split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.table-sub-title {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-}
-
-.mini-data-table,
 .data-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.8rem;
 }
 
-.mini-data-table th,
 .data-table th {
   text-align: left;
   color: var(--text-secondary);
@@ -647,7 +584,6 @@ input:focus {
   border-bottom: 1px solid var(--border-color);
 }
 
-.mini-data-table td,
 .data-table td {
   padding: 6px 4px;
   border-bottom: 1px solid var(--border-color);
@@ -658,29 +594,6 @@ input:focus {
   justify-content: space-between;
   padding: 8px 0;
   border-bottom: 1px solid var(--border-color);
-}
-
-.mini-input-field {
-  width: 100%;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  border-radius: var(--border-radius-sm);
-  padding: 4px 8px;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  text-align: right;
-}
-
-.road-card-footer-banner {
-  background-color: rgba(16, 185, 129, 0.12);
-  color: var(--success);
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 8px;
-  text-align: center;
-  border-radius: var(--border-radius-sm);
-  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 /* --------------------------------------------------------------------------
