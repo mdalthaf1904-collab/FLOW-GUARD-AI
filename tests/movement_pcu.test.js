@@ -4,6 +4,14 @@
  */
 
 const FlowGuard = require('../js/app');
+p.trafficInput.turningCounts = {
+  north: { left: 5, through: 10, right: 5, flow: 20 },
+  east: { left: 5, through: 10, right: 5, flow: 20 },
+  south: { left: 5, through: 10, right: 5, flow: 20 },
+  west: { left: 5, through: 10, right: 5, flow: 20 }
+};
+FlowGuard.saveProject(p);
+};
 
 describe('FlowGuard AI - Movement-Based PCU Engine', () => {
 
@@ -49,8 +57,6 @@ describe('FlowGuard AI - Movement-Based PCU Engine', () => {
 
   test('processedTraffic stores approachPCU, hourlyDemand, and criticalLaneInputs', () => {
     const proj = FlowGuard.getProject();
-    if (!proj.trafficInput.vehicleCounts) proj.trafficInput.vehicleCounts = {};
-    proj.trafficInput.vehicleCounts.north = { car: 100 };
     FlowGuard.saveProject(proj);
 
     const processed = FlowGuard.getProject().processedTraffic;
@@ -63,11 +69,6 @@ describe('FlowGuard AI - Movement-Based PCU Engine', () => {
   });
 
   test('Webster Engine consumes movement PCU model without errors', () => {
-    const proj = FlowGuard.getProject();
-    if (!proj.trafficInput.vehicleCounts) proj.trafficInput.vehicleCounts = {};
-    proj.trafficInput.vehicleCounts.north = { car: 100 };
-    proj.trafficInput.turningCounts.north = { left: 10, through: 10, right: 10, flow: 30 };
-    FlowGuard.saveProject(proj);
     const state = FlowGuard.getState();
     const result = FlowGuard.calculateWebsterEngine(state.approaches);
 

@@ -63,7 +63,7 @@ describe('Flexible Excel Import Engine', () => {
 
     expect(() => {
       FlowGuard.processRawDatasetRows(missingColRows);
-    }).toThrow(/Dataset Validation Failed: Missing required column\(s\): AutoRickshaw, Bus, Truck, Bicycle, LeftTurn, Through, RightTurn/i);
+    }).toThrow(/Dataset Validation Failed: Missing required column\(s\): Movement, Vehicle Type, Count, Pedestrian Count, Incident, Road Width \(m\), Left Lanes, Through Lanes, Right Lanes, Lane Width \(m\)/i);
   });
 
   test('Displays Row Number, Road, Time, Expected Total, Turning Total, and Difference on turning mismatch', () => {

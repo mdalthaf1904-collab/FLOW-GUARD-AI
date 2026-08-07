@@ -3,14 +3,14 @@
  * Data-Driven LHT Geometry, Configurable Lanes (1-3 Lanes), and Input Validation
  */
 
-const FlowGuard = (function() {
+const FlowGuard = (function () {
   'use strict';
 
   const STORAGE_KEY = 'FLOWGUARD_STATE_V5_DATA_DRIVEN';
 
   // API Backend Base URL Gateway
-  const API_BASE_URL = (typeof window !== 'undefined' && window.location.port === '3000') 
-    ? '/api' 
+  const API_BASE_URL = (typeof window !== 'undefined' && window.location.port === '3000')
+    ? '/api'
     : 'http://localhost:3000/api';
 
   /**
@@ -95,10 +95,10 @@ const FlowGuard = (function() {
 
   // Central Data-Driven Movement Destination Mapping Matrix (Indian LHT)
   const MOVEMENT_MAP = {
-    north: { left: 'east',  through: 'south', right: 'west'  },
-    east:  { left: 'south', through: 'west',  right: 'north' },
-    south: { left: 'west',  through: 'north', right: 'east'  },
-    west:  { left: 'north', through: 'east',  right: 'south' }
+    north: { left: 'east', through: 'south', right: 'west' },
+    east: { left: 'south', through: 'west', right: 'north' },
+    south: { left: 'west', through: 'north', right: 'east' },
+    west: { left: 'north', through: 'east', right: 'south' }
   };
 
   // Standard Demonstration Defaults
@@ -144,16 +144,16 @@ const FlowGuard = (function() {
         id: 'north', road: 'A', name: 'Road A - North', flow: 850, currentGreen: 30, left: 120, through: 610, right: 120,
         lanes: 2, inboundDirection: 'south', outboundDirection: 'north'
       },
-      east:  {
-        id: 'east',  road: 'B', name: 'Road B - East',  flow: 720, currentGreen: 30, left: 100, through: 520, right: 100,
+      east: {
+        id: 'east', road: 'B', name: 'Road B - East', flow: 720, currentGreen: 30, left: 100, through: 520, right: 100,
         lanes: 2, inboundDirection: 'west', outboundDirection: 'east'
       },
       south: {
-        id: 'south', road: 'C', name: 'Road C - South', flow: 280, currentGreen: 30, left: 40,  through: 200, right: 40,
+        id: 'south', road: 'C', name: 'Road C - South', flow: 280, currentGreen: 30, left: 40, through: 200, right: 40,
         lanes: 2, inboundDirection: 'north', outboundDirection: 'south'
       },
-      west:  {
-        id: 'west',  road: 'D', name: 'Road D - West',  flow: 350, currentGreen: 30, left: 50,  through: 250, right: 50,
+      west: {
+        id: 'west', road: 'D', name: 'Road D - West', flow: 350, currentGreen: 30, left: 50, through: 250, right: 50,
         lanes: 2, inboundDirection: 'east', outboundDirection: 'west'
       }
     },
@@ -172,11 +172,11 @@ const FlowGuard = (function() {
   function getActiveApproachKeys(configType) {
     switch (configType) {
       case '3NO_NORTH': return ['east', 'south', 'west'];
-      case '3NO_EAST':  return ['north', 'south', 'west'];
+      case '3NO_EAST': return ['north', 'south', 'west'];
       case '3NO_SOUTH': return ['north', 'east', 'west'];
-      case '3NO_WEST':  return ['north', 'east', 'south'];
+      case '3NO_WEST': return ['north', 'east', 'south'];
       case '4CROSS':
-      default:          return ['north', 'east', 'south', 'west'];
+      default: return ['north', 'east', 'south', 'west'];
     }
   }
 
@@ -186,11 +186,11 @@ const FlowGuard = (function() {
   function getConfigLabel(configType) {
     switch (configType) {
       case '3NO_NORTH': return '3-Arm \u2014 No North';
-      case '3NO_EAST':  return '3-Arm \u2014 No East';
+      case '3NO_EAST': return '3-Arm \u2014 No East';
       case '3NO_SOUTH': return '3-Arm \u2014 No South';
-      case '3NO_WEST':  return '3-Arm \u2014 No West';
+      case '3NO_WEST': return '3-Arm \u2014 No West';
       case '4CROSS':
-      default:          return '4-Arm Cross';
+      default: return '4-Arm Cross';
     }
   }
 
@@ -207,7 +207,7 @@ const FlowGuard = (function() {
   function isMovementValid(originKey, movementType, configType) {
     const activeKeys = getActiveApproachKeys(configType);
     if (!activeKeys.includes(originKey)) return false;
-    
+
     const destKey = getMovementDestination(originKey, movementType);
     return activeKeys.includes(destKey);
   }
@@ -268,14 +268,14 @@ const FlowGuard = (function() {
    */
   function calculateTrafficPressureIndex(volume, queue, delay, vcRatio) {
     const vol = Math.max(0, parseFloat(volume) || 0);
-    const q   = Math.max(0, parseFloat(queue) || 0);
-    const d   = Math.max(0, parseFloat(delay) || 0);
-    const vc  = Math.max(0, parseFloat(vcRatio) || 0);
+    const q = Math.max(0, parseFloat(queue) || 0);
+    const d = Math.max(0, parseFloat(delay) || 0);
+    const vc = Math.max(0, parseFloat(vcRatio) || 0);
 
     const normVolume = Math.min(100, (vol / 2500) * 100);
-    const normQueue  = Math.min(100, (q / 200) * 100);
-    const normDelay  = Math.min(100, (d / 150) * 100);
-    const normVC     = Math.min(100, (vc / 1.5) * 100);
+    const normQueue = Math.min(100, (q / 200) * 100);
+    const normDelay = Math.min(100, (d / 150) * 100);
+    const normVC = Math.min(100, (vc / 1.5) * 100);
 
     const score = Math.min(100, Math.round(
       0.30 * normVC +
@@ -315,92 +315,9 @@ const FlowGuard = (function() {
 
   const PROJECT_STORAGE_KEY = 'FLOWGUARD_PROJECT_V7';
   const SESSION_STORAGE_KEY = 'FLOWGUARD_SESSION_STATE_V6';
-  const CSV_RECORDS_KEY     = 'FLOWGUARD_CSV_RECORDS_V6';
+  const CSV_RECORDS_KEY = 'FLOWGUARD_CSV_RECORDS_V6';
 
   let _projectStore = null;
-
-  
-  function createNewProject() {
-    const newId = 'FG-PROJ-' + Date.now();
-    console.log('[FlowGuard AI] Created brand-new project ID:', newId);
-
-    // Preserve engineering parameters if previously set
-    let preservedParams = null;
-    try {
-      const currentStore = getProject();
-      if (currentStore && currentStore.engineeringParameters) {
-        preservedParams = JSON.parse(JSON.stringify(currentStore.engineeringParameters));
-      }
-    } catch (e) {
-      console.warn('[FlowGuard AI] Could not extract existing parameters:', e);
-    }
-
-    // Create brand-new project instance
-    const freshProj = createInitialProject();
-    freshProj.projectInfo = {
-      id: newId,
-      name: 'Signalized Intersection Optimization Project',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      version: '2.0.0'
-    };
-
-    if (preservedParams) {
-      freshProj.engineeringParameters = preservedParams;
-    }
-
-    // Force clear all transient traffic data & analysis state
-    freshProj.geometry = createInitialProject().geometry;
-    freshProj.trafficInput = createInitialProject().trafficInput;
-    freshProj.trafficInput.wizardStep = 1;
-    freshProj.trafficInput.excelUploaded = false;
-    freshProj.trafficInput.rawDatasetRecords = [];
-    freshProj.trafficInput.intervals = [];
-    freshProj.trafficInput.datasetStats = null;
-    freshProj.trafficInput.selectedInterval = null;
-    freshProj.trafficInput.peakInterval = null;
-    freshProj.trafficInput.roadSummary = null;
-
-    freshProj.processedTraffic = {};
-    freshProj.analysisResults = {
-      pipelineStageResults: [],
-      optResult: null,
-      proposedTiming: null,
-      websterResults: null,
-      capacity: null,
-      delay: null,
-      queue: null,
-      los: null
-    };
-    freshProj.report = { generatedAt: null, summary: null };
-
-    // Clear internal memory reference and local/session storage
-    _projectStore = freshProj;
-
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(freshProj));
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ configType: freshProj.geometry.configType, wizardStep: 1 }));
-    }
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(freshProj));
-      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ configType: freshProj.geometry.configType, wizardStep: 1 }));
-      sessionStorage.removeItem(CSV_RECORDS_KEY);
-    }
-
-    // ALWAYS log new Project ID to console
-    console.log('[FlowGuard AI] Created brand-new project ID:', freshProj.projectInfo.id);
-
-    // Re-render empty state for Traffic Summary Dashboard if present
-    const dashContainer = typeof document !== 'undefined' ? document.getElementById('trafficSummaryDashboardContainer') : null;
-    if (dashContainer && typeof TrafficSummaryDashboard !== 'undefined') {
-      TrafficSummaryDashboard.renderEmptyState(dashContainer);
-    }
-
-    // Navigate to Step 1
-    setWizardStep(1);
-
-    return freshProj;
-  }
 
   function createInitialProject() {
     return {
@@ -424,27 +341,27 @@ const FlowGuard = (function() {
       trafficInput: {
         inputMode: 'TURNING_MOVEMENTS',
         trafficInputSubmode: 'manual',
-        wizardStep: 0,
+        wizardStep: 1,
         excelUploaded: false,
         selectedPeakWindow: '08:30 AM - 08:45 AM',
         selectedIntervalName: 'Peak Interval #3',
         rawDatasetRecords: [],
         intervals: [],
         vehicleCounts: {
-          north: { car: 0, motorcycle: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, lcv: 0 },
-          east:  { car: 0, motorcycle: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, lcv: 0 },
-          south: { car: 0, motorcycle: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, lcv: 0 },
-          west:  { car: 0, motorcycle: 0, autorickshaw: 0, bus: 0, truck: 0, bicycle: 0, lcv: 0 }
+          north: { car: 520, motorcycle: 280, autorickshaw: 90, bus: 35, truck: 25, bicycle: 0, tractor: 0, cart: 0 },
+          east: { car: 420, motorcycle: 210, autorickshaw: 80, bus: 30, truck: 20, bicycle: 0, tractor: 0, cart: 0 },
+          south: { car: 180, motorcycle: 90, autorickshaw: 30, bus: 10, truck: 5, bicycle: 0, tractor: 0, cart: 0 },
+          west: { car: 220, motorcycle: 110, autorickshaw: 40, bus: 15, truck: 10, bicycle: 0, tractor: 0, cart: 0 }
         },
         turningCounts: {
-          north: { left: 0, through: 0, right: 0, flow: 0 },
-          east:  { left: 0, through: 0, right: 0, flow: 0 },
-          south: { left: 0, through: 0, right: 0, flow: 0 },
-          west:  { left: 0, through: 0, right: 0, flow: 0 }
+          north: { left: 120, through: 610, right: 120, flow: 850 },
+          east: { left: 100, through: 520, right: 100, flow: 720 },
+          south: { left: 40, through: 200, right: 40, flow: 280 },
+          west: { left: 50, through: 250, right: 50, flow: 350 }
         },
-        observedVehicles: 0,
-        convertedPCU: 0,
-        hourlyDemand: 0,
+        observedVehicles: 2200,
+        convertedPCU: 2340,
+        hourlyDemand: 9360,
         aiDetection: {
           selectedApproach: 'north',
           detectedCounts: { car: 25, motorcycle: 12, bus: 3, truck: 4, autorickshaw: 3, bicycle: 0 },
@@ -528,11 +445,7 @@ const FlowGuard = (function() {
     const interConfig = project.engineeringParameters.intersection || {};
     const baseSat = parseFloat(interConfig.baseSaturationFlow || interConfig.saturationFlow) || 1800;
     const surveyDur = parseFloat(project.geometry.surveyDuration) || 15;
-    let mult = 1;
-    if (surveyDur === 15) mult = 4;
-    else if (surveyDur === 30) mult = 2;
-    else if (surveyDur >= 60) mult = 1;
-    else mult = 60 / surveyDur;
+    const mult = 60 / surveyDur;
 
     let totalVehiclesSum = 0;
     let totalPCUSum = 0;
@@ -645,19 +558,9 @@ const FlowGuard = (function() {
       // This is the authoritative Road Total PCU for Traffic Summary.
       // The per-category totals above are still kept for movement PCU distribution.
       const datasetRoadSummary = project.trafficInput.roadSummary && project.trafficInput.roadSummary[k];
-      if (datasetRoadSummary && datasetRoadSummary.vehicles) {
-        const dv = datasetRoadSummary.vehicles;
-        roadTotalPCU = Math.round(
-          dv.car * (pcuFactors.car || 1.0) +
-          dv.motorcycle * (pcuFactors.motorcycle || 0.5) +
-          dv.autorickshaw * (pcuFactors.autorickshaw || 0.8) +
-          dv.lcv * (pcuFactors.lcv || 1.0) +
-          dv.bus * (pcuFactors.bus || 3.0) +
-          dv.truck * (pcuFactors.truck || 3.0) +
-          dv.bicycle * (pcuFactors.bicycle || 0.4)
-        );
-      } else if (datasetRoadSummary && datasetRoadSummary.totalPCU > 0) {
+      if (datasetRoadSummary && datasetRoadSummary.totalPCU > 0) {
         roadTotalPCU = datasetRoadSummary.totalPCU;
+        console.log(`[FlowGuard AI] Road ${k.toUpperCase()} PCU from roadSummary: ${roadTotalPCU}`);
       }
 
 
@@ -892,18 +795,7 @@ const FlowGuard = (function() {
 
       // If dataset was uploaded, expected PCU comes from dataset total (roadSummary), not the peak interval counts
       const datasetRoadSummary = project.trafficInput.roadSummary && project.trafficInput.roadSummary[k];
-      if (datasetRoadSummary && datasetRoadSummary.vehicles) {
-        const dv = datasetRoadSummary.vehicles;
-        expectedRoadPCU = Math.round(
-          dv.car * (pcuFactors.car || 1.0) +
-          dv.motorcycle * (pcuFactors.motorcycle || 0.5) +
-          dv.autorickshaw * (pcuFactors.autorickshaw || 0.8) +
-          dv.lcv * (pcuFactors.lcv || 1.0) +
-          dv.bus * (pcuFactors.bus || 3.0) +
-          dv.truck * (pcuFactors.truck || 3.0) +
-          dv.bicycle * (pcuFactors.bicycle || 0.4)
-        );
-      } else if (datasetRoadSummary && datasetRoadSummary.totalPCU > 0) {
+      if (datasetRoadSummary && datasetRoadSummary.totalPCU > 0) {
         expectedRoadPCU = datasetRoadSummary.totalPCU;
       }
 
@@ -1072,7 +964,7 @@ const FlowGuard = (function() {
       pipelineStageResults: proj.analysisResults.pipelineStageResults,
       optResults: proj.analysisResults.optResult,
       proposedTiming: proj.analysisResults.proposedTiming,
-      
+
       // Direct reference to single source of truth project
       project: proj
     };
@@ -1172,11 +1064,7 @@ const FlowGuard = (function() {
   }
 
   function resetToDefaults() {
-    const oldParams = _projectStore ? _projectStore.engineeringParameters : null;
     _projectStore = createInitialProject();
-    if (oldParams) {
-      _projectStore.engineeringParameters = oldParams;
-    }
     saveProject(_projectStore);
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.removeItem(CSV_RECORDS_KEY);
@@ -1213,7 +1101,7 @@ const FlowGuard = (function() {
   }
 
   if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
       initNavigation();
     });
   }
@@ -1229,24 +1117,24 @@ const FlowGuard = (function() {
     const wrapper = document.createElement('div');
     wrapper.className = 'simulation-results-wrapper';
     wrapper.style.marginTop = '2rem';
-    
+
     // Header
     const headerRow = document.createElement('div');
     headerRow.style.display = 'flex';
     headerRow.style.justifyContent = 'space-between';
     headerRow.style.alignItems = 'center';
     headerRow.style.marginBottom = '1rem';
-    
+
     const header = document.createElement('h3');
     header.innerText = 'Simulation Results: Before vs. After';
     header.style.margin = '0';
     header.style.color = 'var(--primary)';
-    
+
     const printBtn = document.createElement('button');
     printBtn.innerText = 'Download/Print Report';
     printBtn.className = 'btn btn-primary no-print';
-    printBtn.onclick = function() { FlowGuard.generateEngineeringReport(); };
-    
+    printBtn.onclick = function () { FlowGuard.generateEngineeringReport(); };
+
     headerRow.appendChild(header);
     headerRow.appendChild(printBtn);
     wrapper.appendChild(headerRow);
@@ -1256,10 +1144,10 @@ const FlowGuard = (function() {
     tableContainer.className = 'table-responsive card';
     tableContainer.style.marginBottom = '2rem';
     tableContainer.style.padding = '0'; // Let the table fill the card
-    
+
     const delayDiff = (afterMetrics.avg_delay_sec - beforeMetrics.avg_delay_sec).toFixed(2);
     const queueDiff = (afterMetrics.avg_queue_length - beforeMetrics.avg_queue_length).toFixed(2);
-    
+
     // Improvements are negative values (less delay, less queue)
     const delayColor = parseFloat(delayDiff) > 0 ? '#ef4444' : '#10b981';
     const queueColor = parseFloat(queueDiff) > 0 ? '#ef4444' : '#10b981';
@@ -1304,7 +1192,7 @@ const FlowGuard = (function() {
     guardrails.style.padding = '1.5rem';
     guardrails.style.borderLeft = '4px solid #f59e0b';
     guardrails.style.backgroundColor = 'rgba(245, 158, 11, 0.05)';
-    
+
     guardrails.innerHTML = `
       <h4 style="color: #f59e0b; margin-top: 0; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1327,34 +1215,37 @@ const FlowGuard = (function() {
    * Helper to normalize dataset row keys flexibly
    */
   const COLUMN_SYNONYM_MAP = {
-    // Cars
-    'cars': 'cars', 'car': 'cars', 'carscount': 'cars', 'carcount': 'cars', 'jeep': 'cars', 'van': 'cars', 'fourwheeler': 'cars', 'paxcar': 'cars',
-    // Bikes
-    'bikes': 'bikes', 'bike': 'bikes', 'twowheeler': 'bikes', 'two-wheeler': 'bikes', 'motorcycle': 'bikes', 'bikescount': 'bikes', 'bikecount': 'bikes', 'scooter': 'bikes',
-    // AutoRickshaw
-    'auto': 'autorickshaw', 'autocount': 'autorickshaw', 'autorickshaw': 'autorickshaw', 'autorickshaws': 'autorickshaw', 'autorickshawcount': 'autorickshaw', 'threewheeler': 'autorickshaw', 'rickshaw': 'autorickshaw',
-    // LCV
-    'lcv': 'lcv', 'lcvcount': 'lcv', 'lightcommercial': 'lcv', 'tempo': 'lcv', 'minitruck': 'lcv',
-    // Bus
-    'bus': 'bus', 'buscount': 'bus', 'buses': 'bus', 'minibus': 'bus',
-    // HCV / Truck
-    'hcv': 'truck', 'truck': 'truck', 'truckcount': 'truck', 'trucks': 'truck', 'heavyvehicle': 'truck',
-    // Bicycle
-    'bicycle': 'bicycle', 'bicycles': 'bicycle', 'cycle': 'bicycle', 'cyclecount': 'bicycle', 'pedalcycle': 'bicycle',
-    // Turning Movements
-    'leftturn': 'leftturn', 'left': 'leftturn', 'leftmovement': 'leftturn', 'l': 'leftturn',
-    'through': 'through', 'thru': 'through', 'straight': 'through', 'throughmovement': 'through', 't': 'through',
-    'rightturn': 'rightturn', 'right': 'rightturn', 'rightmovement': 'rightturn', 'r': 'rightturn',
-    // Geometry & Parameters
-    'incominglanes': 'incominglanes', 'lanes': 'incominglanes', 'numlanes': 'incominglanes', 'numberoflanes': 'incominglanes',
-    'speedlimit': 'speedlimit', 'speedlimitkmh': 'speedlimit', 'speed': 'speedlimit',
-    'pedestrian': 'pedestriancount', 'pedestriancount': 'pedestriancount', 'pedestrians': 'pedestriancount', 'peds': 'pedestriancount',
-    'crosswalkwidth': 'crosswalkwidth', 'crosswalkwidthm': 'crosswalkwidth', 'crosswalk': 'crosswalkwidth',
-    // Survey Metadata
-    'date': 'date',
-    'time': 'time', 'timeofday': 'time', 'timestamp': 'time',
-    'road': 'road', 'roadname': 'road', 'roadid': 'road', 'intersectionid': 'road', 'approach': 'road', 'direction': 'road', 'arm': 'road', 'leg': 'road', 'location': 'road',
-    'incident': 'incident', 'incidentevent': 'incident', 'incidents': 'incident'
+    // 1. Survey Date
+    'surveydate': 'surveydate', 'date': 'surveydate', 'timestamp': 'surveydate',
+    // 2. Time Interval
+    'timeinterval': 'timeinterval', 'time': 'timeinterval', 'timeofday': 'timeinterval',
+    // 3. Road Direction
+    'roaddirection': 'roaddirection', 'road': 'roaddirection', 'direction': 'roaddirection', 'approach': 'roaddirection', 'roadname': 'roaddirection', 'arm': 'roaddirection', 'leg': 'roaddirection',
+    // 4. Movement
+    'movement': 'movement', 'turningmovement': 'movement', 'turn': 'movement',
+    // 5. Vehicle Type
+    'vehicletype': 'vehicletype', 'vehicleclass': 'vehicletype', 'vehiclecategory': 'vehicletype',
+    // 6. Count
+    'count': 'count', 'vehiclecount': 'count', 'volume': 'count',
+    // 7. Pedestrian Count
+    'pedestriancount': 'pedestriancount', 'pedestrian': 'pedestriancount', 'pedestrians': 'pedestriancount', 'peds': 'pedestriancount',
+    // 8. Incident
+    'incident': 'incident', 'incidents': 'incident', 'incidentevent': 'incident',
+    // 9. Road Width (m)
+    'roadwidth': 'roadwidth', 'roadwidthm': 'roadwidth', 'width': 'roadwidth', 'crosswalkwidth': 'roadwidth',
+    // 10. Left Lanes
+    'leftlanes': 'leftlanes', 'lanesleft': 'leftlanes',
+    // 11. Through Lanes
+    'throughlanes': 'throughlanes', 'lanesthrough': 'throughlanes', 'thrulanes': 'throughlanes',
+    // 12. Right Lanes
+    'rightlanes': 'rightlanes', 'lanesright': 'rightlanes',
+    // 13. Lane Width (m)
+    'lanewidth': 'lanewidth', 'lanewidthm': 'lanewidth',
+    // Legacy Synonym mappings for unrolling wide rows
+    'cars': 'cars', 'car': 'cars', 'bikes': 'bikes', 'bike': 'bikes', 'autorickshaw': 'autorickshaw', 'auto': 'autorickshaw',
+    'lcv': 'lcv', 'bus': 'bus', 'truck': 'truck', 'hcv': 'truck', 'bicycle': 'bicycle', 'cycle': 'bicycle',
+    'leftturn': 'leftturn', 'left': 'leftturn', 'through': 'through', 'thru': 'through', 'rightturn': 'rightturn', 'right': 'rightturn',
+    'incominglanes': 'incominglanes', 'speedlimit': 'speedlimit'
   };
 
   /**
@@ -1372,7 +1263,65 @@ const FlowGuard = (function() {
         norm[cleanKey] = row[k];
       }
     });
+
+    // Synthesize new normalized schema keys if legacy wide columns are provided
+    if (norm.surveydate === undefined && norm.date !== undefined) norm.surveydate = norm.date;
+    if (norm.timeinterval === undefined && norm.time !== undefined) norm.timeinterval = norm.time;
+    if (norm.roaddirection === undefined && norm.road !== undefined) norm.roaddirection = norm.road;
+
+    if (norm.movement === undefined) {
+      if (norm.leftturn !== undefined || norm.through !== undefined || norm.rightturn !== undefined) {
+        norm.movement = 'Mixed';
+      }
+    }
+    if (norm.vehicletype === undefined) {
+      if (norm.cars !== undefined || norm.bikes !== undefined || norm.autorickshaw !== undefined || norm.bus !== undefined || norm.truck !== undefined) {
+        norm.vehicletype = 'Mixed Fleet';
+      }
+    }
+    if (norm.count === undefined) {
+      const c = (parseInt(norm.cars, 10) || 0) + (parseInt(norm.bikes, 10) || 0) + (parseInt(norm.autorickshaw, 10) || 0) +
+                (parseInt(norm.lcv, 10) || 0) + (parseInt(norm.bus, 10) || 0) + (parseInt(norm.truck, 10) || 0) + (parseInt(norm.bicycle, 10) || 0);
+      const m = (parseInt(norm.leftturn, 10) || 0) + (parseInt(norm.through, 10) || 0) + (parseInt(norm.rightturn, 10) || 0);
+      if (c > 0 || m > 0) norm.count = Math.max(c, m);
+    }
+    if (norm.roadwidth === undefined && norm.crosswalkwidth !== undefined) norm.roadwidth = norm.crosswalkwidth;
+    if (norm.leftlanes === undefined && norm.incominglanes !== undefined) norm.leftlanes = 1;
+    if (norm.throughlanes === undefined && norm.incominglanes !== undefined) norm.throughlanes = Math.max(1, (parseInt(norm.incominglanes, 10) || 2) - 1);
+    if (norm.rightlanes === undefined && norm.incominglanes !== undefined) norm.rightlanes = 1;
+    if (norm.lanewidth === undefined) norm.lanewidth = 3.5;
+
     return norm;
+  }
+
+  function getVehicleCategoryAndFactor(vehTypeStr, pf) {
+    const v = String(vehTypeStr || 'Car').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (v.includes('bike') || v.includes('twowheeler') || v.includes('motorcycle') || v.includes('scooter')) {
+      return { catKey: 'bikes', factor: pf.motorcycle || 0.5 };
+    }
+    if (v.includes('auto') || v.includes('rickshaw') || v.includes('threewheeler')) {
+      return { catKey: 'autorickshaw', factor: pf.autorickshaw || 0.8 };
+    }
+    if (v.includes('lcv') || v.includes('lightcommercial') || v.includes('tempo') || v.includes('minitruck')) {
+      return { catKey: 'lcv', factor: pf.lcv || 1.0 };
+    }
+    if (v.includes('bus') || v.includes('minibus')) {
+      return { catKey: 'bus', factor: pf.bus || 3.0 };
+    }
+    if (v.includes('truck') || v.includes('hcv') || v.includes('heavyvehicle')) {
+      return { catKey: 'truck', factor: pf.truck || 3.0 };
+    }
+    if (v.includes('bicycle') || v.includes('cycle') || v.includes('pedalcycle')) {
+      return { catKey: 'bicycle', factor: pf.bicycle || 0.4 };
+    }
+    return { catKey: 'cars', factor: pf.car || 1.0 };
+  }
+
+  function normalizeMovementKey(movStr) {
+    const m = String(movStr || 'Through').trim().toLowerCase();
+    if (m.includes('left') || m === 'l') return 'left';
+    if (m.includes('right') || m === 'r') return 'right';
+    return 'through';
   }
 
   /**
@@ -1385,9 +1334,9 @@ const FlowGuard = (function() {
 
     // 1. Check for explicit compass direction
     if (str.includes('north') || str === 'n') return 'north';
-    if (str.includes('east')  || str === 'e') return 'east';
+    if (str.includes('east') || str === 'e') return 'east';
     if (str.includes('south') || str === 's') return 'south';
-    if (str.includes('west')  || str === 'w') return 'west';
+    if (str.includes('west') || str === 'w') return 'west';
 
     // 2. Check for tokenized letter designations (e.g. "Road A", "Approach A", "Arm A", "Leg A", "A")
     const words = str.split(/[\s_\-\/]+/);
@@ -1422,7 +1371,7 @@ const FlowGuard = (function() {
     const parts = String(timeStr).trim().split(':').map(Number);
     const startMins = (parts[0] || 0) * 60 + (parts[1] || 0);
     const endMins = (startMins + intervalMinutes) % 1440;
-    
+
     const pad = (n) => String(n).padStart(2, '0');
     const startFormatted = `${pad(Math.floor(startMins / 60))}:${pad(startMins % 60)}`;
     const endFormatted = `${pad(Math.floor(endMins / 60))}:${pad(endMins % 60)}`;
@@ -1460,14 +1409,12 @@ const FlowGuard = (function() {
   }
 
   /**
-   * Universal Traffic Dataset Processing Engine (IRC-93 + Webster Method)
-   * Enforces flexible column normalization, required column validation,
-   * turning movement verification, interval grouping, peak window detection.
+   * Universal Traffic Dataset Processing Engine (Normalized Survey Schema)
+   * Enforces 13-column normalized survey schema validation, record aggregation by
+   * Road Direction, Time Interval, Vehicle Type, Movement, Count, interval grouping, peak window detection.
    *
    * @param {Array} rawRows - Raw parsed rows from the uploaded dataset
    * @param {Object} [pcuFactorsOverride] - Optional configured PCU factors from engineeringParameters.
-   *   When provided, per-row PCU is computed using these factors instead of hardcoded defaults.
-   *   This ensures roadSummary.totalPCU reflects the user's configured IRC:106 PCU weights exactly.
    */
   function processRawDatasetRows(rawRows, pcuFactorsOverride) {
     // Resolve PCU factors: use override from engineeringParameters, or fall back to standard IRC:106 defaults
@@ -1476,25 +1423,21 @@ const FlowGuard = (function() {
       throw new Error("Dataset Validation Failed: The uploaded file contains no data rows.");
     }
 
-    // STEP 1: Required Column Validation (17 Canonical Fields)
+    // STEP 1: Required Column Validation for NEW Normalized Survey Dataset (13 Columns ONLY)
     const requiredColumns = [
-      { key: 'date', label: 'Date', aliases: ['date'] },
-      { key: 'time', label: 'Time', aliases: ['time', 'timeofday', 'timestamp'] },
-      { key: 'road', label: 'Road', aliases: ['road', 'roadname', 'roadid', 'intersectionid', 'approach', 'direction', 'arm', 'leg', 'location'] },
-      { key: 'cars', label: 'Cars', aliases: ['cars', 'car', 'carscount', 'carcount', 'jeep', 'van', 'fourwheeler', 'paxcar'] },
-      { key: 'bikes', label: 'Bikes', aliases: ['bikes', 'bike', 'bikescount', 'bikecount', 'motorcycle', 'twowheeler', 'scooter'] },
-      { key: 'autorickshaw', label: 'AutoRickshaw', aliases: ['autorickshaw', 'autorickshaws', 'autocount', 'auto', 'threewheeler', 'rickshaw'] },
-      { key: 'bus', label: 'Bus', aliases: ['bus', 'buses', 'buscount', 'minibus'] },
-      { key: 'truck', label: 'Truck', aliases: ['truck', 'trucks', 'truckcount', 'hcv', 'heavyvehicle'] },
-      { key: 'bicycle', label: 'Bicycle', aliases: ['bicycle', 'bicycles', 'cycle', 'cyclecount', 'pedalcycle'] },
-      { key: 'leftturn', label: 'LeftTurn', aliases: ['leftturn', 'left', 'leftmovement', 'l'] },
-      { key: 'through', label: 'Through', aliases: ['through', 'thru', 'straight', 'throughmovement', 't'] },
-      { key: 'rightturn', label: 'RightTurn', aliases: ['rightturn', 'right', 'rightmovement', 'r'] },
-      { key: 'incominglanes', label: 'IncomingLanes', aliases: ['incominglanes', 'lanes', 'numlanes'] },
-      { key: 'speedlimit', label: 'SpeedLimit', aliases: ['speedlimit', 'speedlimitkmh', 'speed'] },
-      { key: 'pedestriancount', label: 'PedestrianCount', aliases: ['pedestriancount', 'pedestrians', 'peds', 'pedestrian'] },
-      { key: 'crosswalkwidth', label: 'CrosswalkWidth', aliases: ['crosswalkwidth', 'crosswalkwidthm', 'crosswalk'] },
-      { key: 'incident', label: 'Incident', aliases: ['incident', 'incidentevent', 'incidents'] }
+      { key: 'surveydate', label: 'Survey Date', aliases: ['surveydate', 'date', 'timestamp'] },
+      { key: 'timeinterval', label: 'Time Interval', aliases: ['timeinterval', 'time', 'timeofday', 'timestamp'] },
+      { key: 'roaddirection', label: 'Road Direction', aliases: ['roaddirection', 'road', 'direction', 'approach', 'roadname', 'arm', 'leg'] },
+      { key: 'movement', label: 'Movement', aliases: ['movement', 'turningmovement', 'turn'] },
+      { key: 'vehicletype', label: 'Vehicle Type', aliases: ['vehicletype', 'vehicleclass', 'vehiclecategory'] },
+      { key: 'count', label: 'Count', aliases: ['count', 'vehiclecount', 'volume'] },
+      { key: 'pedestriancount', label: 'Pedestrian Count', aliases: ['pedestriancount', 'pedestrian', 'pedestrians', 'peds'] },
+      { key: 'incident', label: 'Incident', aliases: ['incident', 'incidents', 'incidentevent'] },
+      { key: 'roadwidth', label: 'Road Width (m)', aliases: ['roadwidth', 'roadwidthm', 'width', 'crosswalkwidth'] },
+      { key: 'leftlanes', label: 'Left Lanes', aliases: ['leftlanes', 'lanesleft'] },
+      { key: 'throughlanes', label: 'Through Lanes', aliases: ['throughlanes', 'lanesthrough', 'thrulanes'] },
+      { key: 'rightlanes', label: 'Right Lanes', aliases: ['rightlanes', 'lanesright'] },
+      { key: 'lanewidth', label: 'Lane Width (m)', aliases: ['lanewidth', 'lanewidthm'] }
     ];
 
     const sampleNormalizedRow = normalizeRow(rawRows[0]);
@@ -1510,93 +1453,132 @@ const FlowGuard = (function() {
       throw new Error(`Dataset Validation Failed: Missing required column(s): ${missingColumns.join(', ')}.`);
     }
 
-    // Parse records and validate turning movements (STEP 9)
+    // Unroll or extract normalized records
     const records = [];
-    const mismatchedRows = [];
 
     rawRows.forEach((row, idx) => {
       const n = normalizeRow(row);
 
-      const dateVal = String(n.date || '2026-08-06').trim();
-      const timeVal = String(n.time || '00:00').trim();
-      const roadVal = String(n.road || 'Road A').trim();
-
+      const dateVal = String(n.surveydate || n.date || '2026-08-06').trim();
+      const timeVal = String(n.timeinterval || n.time || '00:00').trim();
+      const roadVal = String(n.roaddirection || n.road || 'Road A').trim();
       const key = determineApproachKey(roadVal);
 
-      const cars = parseInt(n.cars, 10) || 0;
-      const bikes = parseInt(n.bikes, 10) || 0;
-      const autorickshaw = parseInt(n.autorickshaw, 10) || 0;
-      const lcv = parseInt(n.lcv, 10) || 0;
-      const bus = parseInt(n.bus, 10) || 0;
-      const truck = parseInt(n.truck, 10) || 0;
-      const bicycle = parseInt(n.bicycle, 10) || 0;
-
-      const leftTurn = parseInt(n.leftturn, 10) || 0;
-      const through = parseInt(n.through, 10) || 0;
-      const rightTurn = parseInt(n.rightturn, 10) || 0;
-
-      const incomingLanes = parseInt(n.incominglanes, 10) || 2;
-      const speedLimit = parseInt(n.speedlimit, 10) || 50;
-      const pedCount = parseInt(n.pedestriancount, 10) || 20;
-      const crosswalkWidth = parseFloat(n.crosswalkwidth) || 14.0;
+      const pedCount = parseInt(n.pedestriancount !== undefined ? n.pedestriancount : (n.pedestrian !== undefined ? n.pedestrian : 0), 10) || 0;
       const incident = String(n.incident || 'None').trim();
+      const roadWidth = parseFloat(n.roadwidth || n.crosswalkwidth) || 14.0;
+      const leftLanes = parseInt(n.leftlanes, 10) || 1;
+      const throughLanes = parseInt(n.throughlanes, 10) || 1;
+      const rightLanes = parseInt(n.rightlanes, 10) || 1;
+      const laneWidth = parseFloat(n.lanewidth) || 3.5;
 
-      const expectedTotal = cars + bikes + autorickshaw + lcv + bus + truck + bicycle;
-      const turningTotal = leftTurn + through + rightTurn;
-      const difference = Math.abs(expectedTotal - turningTotal);
+      if (n.movement !== undefined && n.vehicletype !== undefined && n.count !== undefined && !n.cars && !n.leftturn) {
+        // Narrow Normalized Survey Record
+        const movementVal = String(n.movement || 'Through').trim();
+        const vehTypeVal = String(n.vehicletype || 'Car').trim();
+        const cnt = parseInt(n.count, 10) || 0;
 
-      // STEP 9: Verify Left + Through + Right == Total Vehicles
-      if (turningTotal !== expectedTotal) {
-        mismatchedRows.push({
-          rowNumber: idx + 1,
+        const { catKey, factor } = getVehicleCategoryAndFactor(vehTypeVal, pf);
+        const rowPCU = cnt * factor;
+
+        records.push({
+          date: dateVal,
           time: timeVal,
           road: roadVal,
-          left: leftTurn,
-          through: through,
-          right: rightTurn,
-          turningTotal: turningTotal,
-          expectedTotal: expectedTotal,
-          difference: difference
+          key: key,
+          movement: movementVal,
+          vehicleType: vehTypeVal,
+          count: cnt,
+          pedestrians: pedCount,
+          incident: incident,
+          roadWidth: roadWidth,
+          leftLanes: leftLanes,
+          throughLanes: throughLanes,
+          rightLanes: rightLanes,
+          laneWidth: laneWidth,
+          catKey: catKey,
+          pcuFactor: factor,
+          rawPCU: rowPCU,
+          totalVehicles: cnt,
+          cars: catKey === 'cars' ? cnt : 0,
+          bikes: catKey === 'bikes' ? cnt : 0,
+          autorickshaw: catKey === 'autorickshaw' ? cnt : 0,
+          lcv: catKey === 'lcv' ? cnt : 0,
+          bus: catKey === 'bus' ? cnt : 0,
+          truck: catKey === 'truck' ? cnt : 0,
+          bicycle: catKey === 'bicycle' ? cnt : 0,
+          leftTurn: normalizeMovementKey(movementVal) === 'left' ? cnt : 0,
+          through: normalizeMovementKey(movementVal) === 'through' ? cnt : 0,
+          rightTurn: normalizeMovementKey(movementVal) === 'right' ? cnt : 0,
+          incomingLanes: leftLanes + throughLanes + rightLanes,
+          speedLimit: 50,
+          crosswalkWidth: roadWidth
+        });
+      } else {
+        // Wide Legacy Record Unrolling
+        const vehMap = [
+          { type: 'Car', count: parseInt(n.cars, 10) || 0 },
+          { type: 'Two-Wheeler', count: parseInt(n.bikes, 10) || 0 },
+          { type: 'Auto-Rickshaw', count: parseInt(n.autorickshaw, 10) || 0 },
+          { type: 'LCV', count: parseInt(n.lcv, 10) || 0 },
+          { type: 'Bus', count: parseInt(n.bus, 10) || 0 },
+          { type: 'Truck', count: parseInt(n.truck, 10) || 0 },
+          { type: 'Bicycle', count: parseInt(n.bicycle, 10) || 0 }
+        ];
+
+        const leftCnt = parseInt(n.leftturn, 10) || 0;
+        const thruCnt = parseInt(n.through, 10) || 0;
+        const rightCnt = parseInt(n.rightturn, 10) || 0;
+        const expectedTotal = vehMap.reduce((s, v) => s + v.count, 0);
+        const turningTotal = leftCnt + thruCnt + rightCnt;
+
+        if (turningTotal !== expectedTotal && expectedTotal > 0 && turningTotal > 0) {
+          throw new Error(
+            `Turning Movement Mismatch: Row ${idx + 1} | Road: ${roadVal} | Time: ${timeVal} | ` +
+            `Expected Total: ${expectedTotal} | Turning Total: ${turningTotal} | Difference: ${Math.abs(expectedTotal - turningTotal)} ` +
+            `(Left: ${leftCnt} + Through: ${thruCnt} + Right: ${rightCnt} = ${turningTotal} vs Vehicles Total: ${expectedTotal}).`
+          );
+        }
+
+        vehMap.forEach(v => {
+          if (v.count > 0 || expectedTotal === 0) {
+            const propLeft = expectedTotal > 0 ? Math.round((leftCnt / expectedTotal) * v.count) : 0;
+            const propRight = expectedTotal > 0 ? Math.round((rightCnt / expectedTotal) * v.count) : 0;
+            const propThru = v.count - propLeft - propRight;
+
+            const addRec = (movName, c) => {
+              const { catKey, factor } = getVehicleCategoryAndFactor(v.type, pf);
+              const rowPCU = c * factor;
+              records.push({
+                date: dateVal, time: timeVal, road: roadVal, key: key,
+                movement: movName, vehicleType: v.type, count: c,
+                pedestrians: pedCount, incident: incident, roadWidth: roadWidth,
+                leftLanes: leftLanes, throughLanes: throughLanes, rightLanes: rightLanes, laneWidth: laneWidth,
+                catKey: catKey, pcuFactor: factor, rawPCU: rowPCU,
+                totalVehicles: c,
+                cars: catKey === 'cars' ? c : 0,
+                bikes: catKey === 'bikes' ? c : 0,
+                autorickshaw: catKey === 'autorickshaw' ? c : 0,
+                lcv: catKey === 'lcv' ? c : 0,
+                bus: catKey === 'bus' ? c : 0,
+                truck: catKey === 'truck' ? c : 0,
+                bicycle: catKey === 'bicycle' ? c : 0,
+                leftTurn: movName === 'Left' ? c : 0,
+                through: movName === 'Through' ? c : 0,
+                rightTurn: movName === 'Right' ? c : 0,
+                incomingLanes: leftLanes + throughLanes + rightLanes,
+                speedLimit: 50,
+                crosswalkWidth: roadWidth
+              });
+            };
+
+            if (propLeft > 0) addRec('Left', propLeft);
+            if (propThru > 0 || v.count === 0) addRec('Through', Math.max(0, propThru));
+            if (propRight > 0) addRec('Right', propRight);
+          }
         });
       }
-
-      
-
-      // Debug Mode Log
-      console.log(`[DEBUG] Road: ${roadVal} | Time: ${timeVal} | Counts: [C:${cars}, B:${bikes}, AR:${autorickshaw}, LCV:${lcv}, Bus:${bus}, Trk:${truck}, Cyc:${bicycle}]`);
-
-      records.push({
-        date: dateVal,
-        time: timeVal,
-        road: roadVal,
-        key: key,
-        cars: cars,
-        bikes: bikes,
-        autorickshaw: autorickshaw,
-        lcv: lcv,
-        bus: bus,
-        truck: truck,
-        bicycle: bicycle,
-        totalVehicles: expectedTotal,
-        leftTurn: leftTurn,
-        through: through,
-        rightTurn: rightTurn,
-        incomingLanes: incomingLanes,
-        speedLimit: speedLimit,
-        pedestrianCount: pedCount,
-        crosswalkWidth: crosswalkWidth,
-        incident: incident
-      });
     });
-
-    if (mismatchedRows.length > 0) {
-      const m = mismatchedRows[0];
-      throw new Error(
-        `Turning Movement Mismatch: Row ${m.rowNumber} | Road: ${m.road} | Time: ${m.time} | ` +
-        `Expected Total: ${m.expectedTotal} | Turning Total: ${m.turningTotal} | Difference: ${m.difference} ` +
-        `(Left: ${m.left} + Through: ${m.through} + Right: ${m.right} = ${m.turningTotal} vs Vehicles Total: ${m.expectedTotal}).`
-      );
-    }
 
     // STEP 2: Detect Survey Interval (15 Min, 30 Min, 1 Hour, or Custom)
     const timeStrings = Array.from(new Set(records.map(r => r.time))).sort();
@@ -1648,9 +1630,9 @@ const FlowGuard = (function() {
           timeWindow: formatIntervalWindow(timeKey, surveyIntervalMinutes),
           roads: {
             north: createEmptyApproachSummary('Road A - North', 'north'),
-            east:  createEmptyApproachSummary('Road B - East',  'east'),
+            east: createEmptyApproachSummary('Road B - East', 'east'),
             south: createEmptyApproachSummary('Road C - South', 'south'),
-            west:  createEmptyApproachSummary('Road D - West',  'west')
+            west: createEmptyApproachSummary('Road D - West', 'west')
           },
           totalVehicles: 0,
           totalPCU: 0,
@@ -1661,36 +1643,25 @@ const FlowGuard = (function() {
       const inv = intervalMap[timeKey];
       const app = inv.roads[r.key];
       if (app) {
-        app.cars += r.cars;
-        app.bikes += r.bikes;
-        app.autorickshaw += r.autorickshaw;
-        app.lcv += r.lcv;
-        app.bus += r.bus;
-        app.truck += r.truck;
-        app.bicycle += r.bicycle;
-        app.totalVehicles += r.totalVehicles;
-        app.left += r.leftTurn;
-        app.through += r.through;
-        app.right += r.rightTurn;
-        app.lanes = r.incomingLanes;
-        app.speedLimit = r.speedLimit;
-        app.pedCount += r.pedestrianCount;
-        app.crosswalkWidth = r.crosswalkWidth;
+        if (app[r.catKey] !== undefined) {
+          app[r.catKey] += r.count;
+        } else {
+          app.cars += r.count;
+        }
+
+        const movKey = normalizeMovementKey(r.movement);
+        app[movKey] += r.count;
+
+        app.totalVehicles += r.count;
+        app.lanes = r.leftLanes + r.throughLanes + r.rightLanes;
+        app.pedCount = Math.max(app.pedCount, r.pedestrians);
+        app.crosswalkWidth = r.roadWidth;
         if (r.incident && r.incident.toLowerCase() !== 'none') {
           app.incident = r.incident;
         }
-        const rowPcu = Math.round(
-          r.cars * (pf.car || 1.0) +
-          r.bikes * (pf.motorcycle || 0.5) +
-          r.autorickshaw * (pf.autorickshaw || 0.8) +
-          r.lcv * (pf.lcv || 1.0) +
-          r.bus * (pf.bus || 3.0) +
-          r.truck * (pf.truck || 3.0) +
-          r.bicycle * (pf.bicycle || 0.4)
-        );
-        app.convertedPCU += rowPcu;
+        app.convertedPCU += r.rawPCU;
         app.hourlyDemandPCU = Math.round(app.convertedPCU * hourlyMultiplier);
-        app.flow = app.hourlyDemandPCU; // Hourly Equivalent Demand PCU/h for Webster!
+        app.flow = app.hourlyDemandPCU;
         app.pcuTotal = app.hourlyDemandPCU;
       }
     });
@@ -1717,7 +1688,7 @@ const FlowGuard = (function() {
       }
     });
 
-    // STEP 10: Compute Dataset Statistics
+    // Dataset Statistics
     let grandTotalVehicles = 0;
     let grandTotalPCU = 0;
     let maxIntervalVehicles = 0;
@@ -1755,44 +1726,36 @@ const FlowGuard = (function() {
       totalPCU: grandTotalPCU
     };
 
-    // STEP 11: Compute Road Summary — SUM of all per-row PCUs per road across ALL rows
-    // This is the canonical Road Total PCU used by Traffic Summary (Step 4).
-    // It does NOT depend on which interval is selected — it sums the entire dataset.
-    
-    // Calculate dataset hourly multiplier based on total survey duration
+    // Road Summary Calculation
     const totalSurveyDurationMinutes = (timeStrings.length || 1) * surveyIntervalMinutes;
     const datasetHourlyMultiplier = 60 / totalSurveyDurationMinutes;
 
     const roadSummary = {
-      north: { totalVehicles: 0, vehicles: { car: 0, motorcycle: 0, autorickshaw: 0, lcv: 0, bus: 0, truck: 0, bicycle: 0 }, leftTurn: 0, through: 0, rightTurn: 0, laneCount: 0, speedLimit: 0, rowCount: 0 },
-      east:  { totalVehicles: 0, vehicles: { car: 0, motorcycle: 0, autorickshaw: 0, lcv: 0, bus: 0, truck: 0, bicycle: 0 }, leftTurn: 0, through: 0, rightTurn: 0, laneCount: 0, speedLimit: 0, rowCount: 0 },
-      south: { totalVehicles: 0, vehicles: { car: 0, motorcycle: 0, autorickshaw: 0, lcv: 0, bus: 0, truck: 0, bicycle: 0 }, leftTurn: 0, through: 0, rightTurn: 0, laneCount: 0, speedLimit: 0, rowCount: 0 },
-      west:  { totalVehicles: 0, vehicles: { car: 0, motorcycle: 0, autorickshaw: 0, lcv: 0, bus: 0, truck: 0, bicycle: 0 }, leftTurn: 0, through: 0, rightTurn: 0, laneCount: 0, speedLimit: 0, rowCount: 0 }
+      north: { totalVehicles: 0, totalPCU: 0, hourlyDemand: 0, leftTurn: 0, through: 0, rightTurn: 0, laneCount: 0, speedLimit: 50, rowCount: 0 },
+      east: { totalVehicles: 0, totalPCU: 0, hourlyDemand: 0, leftTurn: 0, through: 0, rightTurn: 0, laneCount: 0, speedLimit: 50, rowCount: 0 },
+      south: { totalVehicles: 0, totalPCU: 0, hourlyDemand: 0, leftTurn: 0, through: 0, rightTurn: 0, laneCount: 0, speedLimit: 50, rowCount: 0 },
+      west: { totalVehicles: 0, totalPCU: 0, hourlyDemand: 0, leftTurn: 0, through: 0, rightTurn: 0, laneCount: 0, speedLimit: 50, rowCount: 0 }
     };
 
     records.forEach(r => {
       const rs = roadSummary[r.key];
       if (rs) {
-        rs.totalVehicles += r.totalVehicles;
-        rs.vehicles.car += r.cars;
-        rs.vehicles.motorcycle += r.bikes;
-        rs.vehicles.autorickshaw += r.autorickshaw;
-        rs.vehicles.lcv += r.lcv;
-        rs.vehicles.bus += r.bus;
-        rs.vehicles.truck += r.truck;
-        rs.vehicles.bicycle += r.bicycle;
-        rs.leftTurn += r.leftTurn;
-        rs.through += r.through;
-        rs.rightTurn += r.rightTurn;
-        rs.laneCount = r.incomingLanes || rs.laneCount;
-        rs.speedLimit = r.speedLimit || rs.speedLimit;
+        rs.totalVehicles += r.count;
+        rs.totalPCU += r.rawPCU;
+        const movKey = normalizeMovementKey(r.movement);
+        if (movKey === 'left') rs.leftTurn += r.count;
+        else if (movKey === 'right') rs.rightTurn += r.count;
+        else rs.through += r.count;
+        rs.laneCount = r.leftLanes + r.throughLanes + r.rightLanes;
         rs.rowCount += 1;
       }
     });
 
-    
+    Object.keys(roadSummary).forEach(k => {
+      roadSummary[k].totalPCU = Math.round(roadSummary[k].totalPCU * 10) / 10;
+      roadSummary[k].hourlyDemand = Math.round(roadSummary[k].totalPCU * datasetHourlyMultiplier);
+    });
 
-    // Default selected interval to peak interval
     const selectedInterval = peakInterval;
 
     return {
@@ -1827,7 +1790,7 @@ const FlowGuard = (function() {
           return reject(new Error("SheetJS (xlsx) library is not loaded. Please ensure script tag is included."));
         }
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = function (e) {
           try {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
@@ -1853,7 +1816,7 @@ const FlowGuard = (function() {
       } else {
         // CSV Parser
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = function (e) {
           try {
             let text = e.target.result;
             if (!text || text.trim() === '') {
@@ -1917,7 +1880,7 @@ const FlowGuard = (function() {
       const demandPCU = parseFloat(app.flow || app.pcuTotal) || 0;
       const lanes = parseInt(app.lanes, 10) || 2;
       const approachWidthM = lanes * 3.5;
-      
+
       // Saturation Flow S = 525 * width (IRC:93 / Webster standard formula)
       const SatFlowS = Math.round(525 * approachWidthM);
       const flowRatioY = SatFlowS > 0 ? parseFloat((demandPCU / SatFlowS).toFixed(4)) : 0;
@@ -1938,7 +1901,7 @@ const FlowGuard = (function() {
     // Step 3 & 4: Compute Webster Optimum Cycle C = (1.5L + 5) / (1 - Y)
     const Y_calc = Math.min(0.95, totalFlowRatioY);
     let websterCycle = Math.round((1.5 * totalLostTimeL + 5) / (1 - Y_calc));
-    
+
     // IRC:93 Cycle Length Bounds: Minimum 40s, Maximum 180s
     websterCycle = Math.max(40, Math.min(180, websterCycle));
 
@@ -2126,7 +2089,7 @@ const FlowGuard = (function() {
 
     const createBar = (timings, label) => {
       const { green, yellow, red, cycleLength } = timings;
-      
+
       const pGreen = (green / cycleLength) * 100;
       const pYellow = (yellow / cycleLength) * 100;
       const pRed = (red / cycleLength) * 100;
@@ -2171,7 +2134,7 @@ const FlowGuard = (function() {
     const state = stateData || getState();
     const activeKeys = getActiveApproachKeys(state.configType || '4CROSS');
     const approaches = state.approaches || DEFAULT_STATE.approaches;
-    
+
     if (typeof window === 'undefined') return;
 
     const reportWindow = window.open('', '_blank');
@@ -2214,9 +2177,9 @@ const FlowGuard = (function() {
     <thead><tr><th>Approach</th><th>Traffic Volume (PCU/h)</th><th>Lanes</th><th>Turning Share (L / T / R)</th></tr></thead>
     <tbody>
       ${activeKeys.map(k => {
-        const a = approaches[k] || {};
-        return `<tr><td>${a.name || k.toUpperCase()}</td><td>${a.flow || 0}</td><td>${a.lanes || 2}</td><td>${a.left||0} / ${a.through||0} / ${a.right||0}</td></tr>`;
-      }).join('')}
+      const a = approaches[k] || {};
+      return `<tr><td>${a.name || k.toUpperCase()}</td><td>${a.flow || 0}</td><td>${a.lanes || 2}</td><td>${a.left || 0} / ${a.through || 0} / ${a.right || 0}</td></tr>`;
+    }).join('')}
     </tbody>
   </table>
 
@@ -2237,14 +2200,14 @@ const FlowGuard = (function() {
     <thead><tr><th>Approach</th><th>Traffic Volume</th><th>Queue Length</th><th>Average Delay</th><th>V/C Ratio</th><th>Pressure Rank</th></tr></thead>
     <tbody>
       ${activeKeys.map(k => {
-        const a = approaches[k] || {};
-        const flow = a.flow || 400;
-        const q = Math.round((flow / 3600) * 40);
-        const d = 35;
-        const vc = (flow / 1000).toFixed(2);
-        const rank = calculateTrafficPressureIndex(flow, q, d, vc);
-        return `<tr><td>${a.name || k.toUpperCase()}</td><td>${flow} PCU/h</td><td>${q} veh</td><td>${d} s</td><td>${vc}</td><td><strong>${rank}</strong></td></tr>`;
-      }).join('')}
+      const a = approaches[k] || {};
+      const flow = a.flow || 400;
+      const q = Math.round((flow / 3600) * 40);
+      const d = 35;
+      const vc = (flow / 1000).toFixed(2);
+      const rank = calculateTrafficPressureIndex(flow, q, d, vc);
+      return `<tr><td>${a.name || k.toUpperCase()}</td><td>${flow} PCU/h</td><td>${q} veh</td><td>${d} s</td><td>${vc}</td><td><strong>${rank}</strong></td></tr>`;
+    }).join('')}
     </tbody>
   </table>
 
@@ -2299,16 +2262,16 @@ const FlowGuard = (function() {
    */
   function initWhatIfSlider(syntheticRecord, baselineTimings, resultsContainerId, phaseDiagramContainerId) {
     if (typeof document === 'undefined') return;
-    
+
     const slider = document.getElementById('manualGreenOverride');
     const sliderValueDisplay = document.getElementById('slider-value');
-    
+
     if (!slider || !sliderValueDisplay) return;
 
-    slider.addEventListener('input', function(e) {
+    slider.addEventListener('input', function (e) {
       const newGreenSplit = parseInt(e.target.value, 10);
       sliderValueDisplay.textContent = newGreenSplit;
-      
+
       const newCandidateTimings = {
         cycleLength: baselineTimings.cycleLength,
         greenSplit: newGreenSplit
@@ -2334,11 +2297,11 @@ const FlowGuard = (function() {
 
       renderPhaseDiagram(
         baselineTimings,
-        { 
-          green: newGreenSplit, 
-          yellow: yellowTime, 
-          red: redTime, 
-          cycleLength: baselineTimings.cycleLength 
+        {
+          green: newGreenSplit,
+          yellow: yellowTime,
+          red: redTime,
+          cycleLength: baselineTimings.cycleLength
         },
         phaseDiagramContainerId
       );
@@ -2406,9 +2369,9 @@ const FlowGuard = (function() {
         demoBtn.addEventListener('click', () => {
           const demoApproaches = {
             north: { id: 'north', road: 'A', name: 'Road A - North', flow: 3300, currentGreen: 30, left: 495, through: 2310, right: 495, lanes: 2, uploaded: true, fromCSV: true },
-            east:  { id: 'east',  road: 'B', name: 'Road B - East',  flow: 720,  currentGreen: 30, left: 100, through: 520,  right: 100, lanes: 2, uploaded: true, fromCSV: true },
-            south: { id: 'south', road: 'C', name: 'Road C - South', flow: 280,  currentGreen: 30, left: 40,  through: 200,  right: 40,  lanes: 2, uploaded: true, fromCSV: true },
-            west:  { id: 'west',  road: 'D', name: 'Road D - West',  flow: 350,  currentGreen: 30, left: 50,  through: 250,  right: 50,  lanes: 2, uploaded: true, fromCSV: true }
+            east: { id: 'east', road: 'B', name: 'Road B - East', flow: 720, currentGreen: 30, left: 100, through: 520, right: 100, lanes: 2, uploaded: true, fromCSV: true },
+            south: { id: 'south', road: 'C', name: 'Road C - South', flow: 280, currentGreen: 30, left: 40, through: 200, right: 40, lanes: 2, uploaded: true, fromCSV: true },
+            west: { id: 'west', road: 'D', name: 'Road D - West', flow: 350, currentGreen: 30, left: 50, through: 250, right: 50, lanes: 2, uploaded: true, fromCSV: true }
           };
           const newState = { ...state, approaches: demoApproaches };
           saveState(newState);
@@ -2692,9 +2655,9 @@ const FlowGuard = (function() {
             </thead>
             <tbody>
               ${roadKeys.map(k => {
-                const r = roadData[k];
-                const valInfo = (valRes.validations || []).find(v => v.key === k) || {};
-                return `
+      const r = roadData[k];
+      const valInfo = (valRes.validations || []).find(v => v.key === k) || {};
+      return `
                   <tr>
                     <td><strong>${r.name}</strong></td>
                     <td>${r.green}s</td>
@@ -2705,7 +2668,7 @@ const FlowGuard = (function() {
                     <td><span class="badge ${valInfo.status === 'PASSED' ? 'badge-low' : 'badge-medium'}">${valInfo.status || 'PASSED'}</span></td>
                   </tr>
                 `;
-              }).join('')}
+    }).join('')}
             </tbody>
           </table>
         </div>
@@ -2795,11 +2758,11 @@ const FlowGuard = (function() {
       // 3. Toggle visibility of subpanels
       const manualPanel = document.getElementById('submode-manual');
       const uploadPanel = document.getElementById('submode-upload');
-      const aiPanel     = document.getElementById('submode-ai');
+      const aiPanel = document.getElementById('submode-ai');
 
       if (manualPanel) manualPanel.style.display = targetSubmode === 'manual' ? 'block' : 'none';
       if (uploadPanel) uploadPanel.style.display = targetSubmode === 'upload' ? 'block' : 'none';
-      if (aiPanel)     aiPanel.style.display     = targetSubmode === 'ai' ? 'block' : 'none';
+      if (aiPanel) aiPanel.style.display = targetSubmode === 'ai' ? 'block' : 'none';
     }
 
     const state = getState();
@@ -2818,12 +2781,7 @@ const FlowGuard = (function() {
    */
   function setWizardStep(stepId, submode) {
     const numericId = parseInt(stepId, 10);
-    if (isNaN(numericId) || numericId < 0 || numericId > 6) return;
-
-    const proj = getProject();
-    if (numericId >= 1 && (!proj || !proj.trafficInput || proj.trafficInput.wizardStep === 0)) {
-      console.log('[FlowGuard AI] Guard: Active project missing or at Step 0.');
-    }
+    if (isNaN(numericId) || numericId < 1 || numericId > 6) return;
 
     // Validation Guardrail before advancing from Step 2 to Step 3
     const currentState = getState();
@@ -2881,33 +2839,10 @@ const FlowGuard = (function() {
       // If Step 3, initialize engineering parameters panel UI and calculations
       if (numericId === 3) {
         initEngineeringParametersUI();
-
-      const newAnalysisBtn = document.getElementById('btnStartNewAnalysis');
-      if (newAnalysisBtn) {
-        newAnalysisBtn.addEventListener('click', () => {
-          console.log('[FlowGuard AI] Creating a clean project workspace...');
-          resetToDefaults();
-          
-          const freshProj = getProject();
-          if (freshProj && freshProj.projectInfo) {
-            freshProj.projectInfo.id = 'FG-PROJ-' + Date.now();
-          }
-          
-          const state = getState();
-          state.wizardStep = 1;
-          saveState(state);
-          saveProject(freshProj);
-          
-          setWizardStep(1);
-        });
-      }
       }
 
       // If Step 4, render traffic summary engineering dashboard
       if (numericId === 4) {
-      if (typeof TrafficSummaryDashboard !== 'undefined') {
-        TrafficSummaryDashboard.render();
-      }
         renderTrafficSummaryDashboard();
       }
 
@@ -2936,7 +2871,6 @@ const FlowGuard = (function() {
 
       // Update Header Titles & Badges
       const stepTitles = {
-        0: { title: '0. NEW ANALYSIS', subtitle: 'Start a new project workspace.' },
         1: { title: '1. INTERSECTION GEOMETRY', subtitle: 'Configure intersection geometry, lane numbers, and approach orientation.' },
         2: { title: '2. TRAFFIC INPUT MODE', subtitle: 'Select manual survey, historical dataset upload, or AI video detection method.' },
         3: { title: '3. ENGINEERING PARAMETERS', subtitle: 'Configure signal timing constraints, clearance intervals, and crosswalk dimensions.' },
@@ -2951,14 +2885,14 @@ const FlowGuard = (function() {
 
       if (headerTitle && stepTitles[numericId]) headerTitle.innerText = stepTitles[numericId].title;
       if (headerSubtitle && stepTitles[numericId]) headerSubtitle.innerText = stepTitles[numericId].subtitle;
-      if (statusBadge) statusBadge.innerText = numericId === 0 ? 'STEP 0: NEW ANALYSIS' : `STEP ${numericId} / 6: ${stepTitles[numericId] ? stepTitles[numericId].title.split('.')[1].trim() : ''}`;
+      if (statusBadge) statusBadge.innerText = `STEP ${numericId} / 6: ${stepTitles[numericId] ? stepTitles[numericId].title.split('.')[1].trim() : ''}`;
 
       // Update Bottom Action Bar Buttons
       const prevBtn = document.getElementById('btnWizardPrev');
       const nextBtn = document.getElementById('btnWizardNext');
 
       if (prevBtn) {
-        if (numericId <= 0) {
+        if (numericId === 1) {
           prevBtn.style.display = 'none';
         } else {
           prevBtn.style.display = 'inline-block';
@@ -3144,26 +3078,6 @@ const FlowGuard = (function() {
 
       // ── 6. Initialize Engineering Parameters Panel UI & Real-Time Calculation Handlers ──
       initEngineeringParametersUI();
-
-      const newAnalysisBtn = document.getElementById('btnStartNewAnalysis');
-      if (newAnalysisBtn) {
-        newAnalysisBtn.addEventListener('click', () => {
-          console.log('[FlowGuard AI] Creating a clean project workspace...');
-          resetToDefaults();
-          
-          const freshProj = getProject();
-          if (freshProj && freshProj.projectInfo) {
-            freshProj.projectInfo.id = 'FG-PROJ-' + Date.now();
-          }
-          
-          const state = getState();
-          state.wizardStep = 1;
-          saveState(state);
-          saveProject(freshProj);
-          
-          setWizardStep(1);
-        });
-      }
     };
 
     if (document.readyState === 'loading') {
@@ -3482,30 +3396,783 @@ const FlowGuard = (function() {
   }
 
   /**
+   * Render Step 4 Traffic Summary Engineering Dashboard
+   * Read-only dashboard summarizing data from Steps 1, 2, and 3.
+   */
   /**
    * Render Step 4 Traffic Summary Engineering Dashboard
-   * Delegates rendering to the standalone TrafficSummaryDashboard class.
+   * Read-only dashboard summarizing data from Steps 1, 2, and 3.
    */
   function renderTrafficSummaryDashboard() {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
-    
-    // Centralized recomputation to ensure standard state
+
+    // ── CENTRALIZED STATE RECOMPUTATION & CACHE INVALIDATION ──
     const proj = getProject();
     recomputeProjectData(proj);
-    
-    // Validate engine state
+
+    // Automatic 6-point Engine Validation
     const valResult = validateProcessedTrafficData(proj);
     if (!valResult.valid) {
       console.warn('[Cache Invalidation] Traffic Summary validation mismatch detected. Force recomputing project data...', valResult.errors);
       recomputeProjectData(proj);
     }
-    
-    if (typeof TrafficSummaryDashboard !== 'undefined') {
-      TrafficSummaryDashboard.render(proj);
-    } else {
-      console.error("TrafficSummaryDashboard module not loaded.");
+
+    const state = getState();
+    const processed = proj.processedTraffic || {};
+    const activeKeys = getActiveApproachKeys(proj.geometry.configType || state.configType || '4CROSS');
+    const approaches = state.approaches || {};
+    const approachStats = processed.approachStats || {};
+    const interConfig = proj.engineeringParameters.intersection || state.intersection || {};
+    const pcuFactors = proj.engineeringParameters.pcuFactors || state.pcuFactors || DEFAULT_STATE.pcuFactors;
+
+    const totalVehicles = processed.totalVehicles || 0;
+    const totalPCUDemand = processed.totalPCUDemand || 0;
+    const hourlyTotalDemand = processed.hourlyTotalDemand || 0;
+
+    // 1. Intersection & Survey Summary Metadata (Strictly bound to proj.trafficInput & proj.geometry)
+    const geoLabel = getConfigLabel(proj.geometry.configType || state.configType || '4CROSS');
+    const durationLabel = `${proj.geometry.surveyDuration || state.duration || 15} Minutes`;
+
+    const isExcelUploaded = !!(proj.trafficInput.inputMode === 'EXCEL_UPLOAD' || proj.trafficInput.excelUploaded || state.excelUploaded || proj.trafficInput.datasetStats);
+    const surveyMethod = proj.trafficInput.surveyMethod || state.surveyMethod || (isExcelUploaded ? 'Uploaded Excel Data' : 'Automated Video Survey');
+
+    const datasetStats = proj.trafficInput.datasetStats || state.datasetStats || null;
+    const peakIntervalText = (datasetStats && datasetStats.peakIntervalWindow) || proj.trafficInput.selectedPeakWindow || state.selectedPeakWindow || '08:30 AM - 08:45 AM';
+    const selectedIntervalText = proj.trafficInput.selectedIntervalName || state.selectedIntervalName || 'Peak Interval #3';
+
+    console.log('=== TRAFFIC SUMMARY VALIDATION ===');
+    console.log('Current Survey Method:', surveyMethod);
+    console.log('Current Peak Interval:', peakIntervalText);
+    console.log('Current Selected Interval:', selectedIntervalText);
+    console.log('Current Total Vehicles:', totalVehicles);
+    console.log('Current Total Converted PCU:', totalPCUDemand);
+    console.log('Current Hourly Demand:', hourlyTotalDemand);
+    console.log('=================================');
+
+    // CARD 1: FULL DATASET STATISTICS (POPULATED IF DATASET LOADED)
+    const fullDatasetCard = document.getElementById('sumDashFullDatasetCard');
+    if (fullDatasetCard) {
+      if (datasetStats && datasetStats.rowsRead) {
+        fullDatasetCard.style.display = 'block';
+        const rowsEl = document.getElementById('sumStatRowsRead');
+        if (rowsEl) rowsEl.textContent = datasetStats.rowsRead.toLocaleString();
+        const invEl = document.getElementById('sumStatInterval');
+        if (invEl) invEl.textContent = datasetStats.surveyIntervalLabel || durationLabel;
+        const timeRangeEl = document.getElementById('sumStatTimeRange');
+        if (timeRangeEl) timeRangeEl.textContent = `${datasetStats.startTime || '08:00'} – ${datasetStats.endTime || '09:00'}`;
+        const peakEl = document.getElementById('sumStatPeakInterval');
+        if (peakEl) peakEl.textContent = datasetStats.peakIntervalWindow || peakIntervalText;
+        const avgDemandEl = document.getElementById('sumStatAvgDemand');
+        if (avgDemandEl) avgDemandEl.textContent = `${(datasetStats.averageHourlyDemand || 0).toLocaleString()} PCU/h`;
+        const totalVehEl = document.getElementById('sumStatTotalVeh');
+        if (totalVehEl) totalVehEl.textContent = `${(datasetStats.totalVehicles || totalVehicles).toLocaleString()} Vehicles`;
+        const totalPcuEl = document.getElementById('sumStatTotalPCU');
+        if (totalPcuEl) totalPcuEl.textContent = `${(datasetStats.totalPCU || totalPCUDemand).toLocaleString()} PCU`;
+      } else {
+        fullDatasetCard.style.display = 'none';
+      }
     }
+
+    // CARD 2: SELECTED INTERVAL TRAFFIC SUMMARY (APPROACH CARDS GRID)
+    const selSubEl = document.getElementById('sumDashSelIntervalSub');
+    if (selSubEl) selSubEl.textContent = selectedIntervalText;
+
+    // SECTION 2: 4 INDEPENDENT ROAD-WISE ENGINEERING CARDS
+    const cardsGrid = document.getElementById('sumDashApproachCardsGrid');
+    if (cardsGrid) {
+      cardsGrid.innerHTML = activeKeys.map(k => {
+        const stat = approachStats[k] || { name: k, hourlyDemand: 0, vehCount: 0, pcuVal: 0, left: 0, through: 0, right: 0, lanes: 2, satFlow: 3600, dominantMovement: 'Car / Jeep' };
+        const trafficShare = totalVehicles > 0 ? Math.round((stat.vehCount / totalVehicles) * 100) : 25;
+        const laneWidthStr = `${((stat.lanes || 2) * 3.5).toFixed(1)} m`;
+
+        return `
+          <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); padding: 1.25rem; border-radius: 10px; display: flex; flex-direction: column; gap: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.6rem;">
+              <div style="font-size: 0.95rem; font-weight: 800; color: var(--text-primary);">${stat.name}</div>
+              <span class="badge badge-low" style="font-size: 0.7rem;">${k.toUpperCase()}BOUND</span>
+            </div>
+
+            <!-- Key Metrics Summary Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; background: rgba(30, 41, 59, 0.4); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div>
+                <div style="font-size: 0.68rem; color: var(--text-secondary); text-transform: uppercase;">Vehicle Count</div>
+                <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${stat.vehCount.toLocaleString()} <span style="font-size: 0.68rem; font-weight: 500;">veh</span></div>
+              </div>
+              <div>
+                <div style="font-size: 0.68rem; color: var(--text-secondary); text-transform: uppercase;">Converted PCU</div>
+                <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${stat.pcuVal.toLocaleString()} <span style="font-size: 0.68rem; font-weight: 500;">PCU</span></div>
+              </div>
+              <div style="grid-column: span 2; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 0.4rem; margin-top: 0.2rem;">
+                <div style="font-size: 0.68rem; color: var(--text-secondary); text-transform: uppercase;">Hourly Demand (PCU/hr)</div>
+                <div style="font-size: 1.2rem; font-weight: 800; color: var(--accent-primary); margin-top: 2px;">${Math.round(stat.hourlyDemand).toLocaleString()} <span style="font-size: 0.75rem; font-weight: 600;">PCU/hr</span></div>
+              </div>
+            </div>
+
+            <!-- Turning Movements Vehicles Breakdown -->
+            <div style="font-size: 0.76rem; color: var(--text-primary); display: flex; flex-direction: column; gap: 4px;">
+              <div style="font-size: 0.68rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Turning Movements (Vehicles)</div>
+              <div style="font-family: var(--font-mono); font-size: 0.78rem; background: rgba(15, 23, 42, 0.5); padding: 0.4rem 0.6rem; border-radius: 4px; display: flex; justify-content: space-between;">
+                <span>Left: <strong style="color:#10b981;">${(stat.left || 0).toLocaleString()}</strong></span>
+                <span>Thru: <strong style="color:#38bdf8;">${(stat.through || 0).toLocaleString()}</strong></span>
+                <span>Right: <strong style="color:#f59e0b;">${(stat.right || 0).toLocaleString()}</strong></span>
+              </div>
+            </div>
+
+            <!-- Geometry & Saturation Capacity Parameters -->
+            <div style="font-size: 0.76rem; color: var(--text-primary); display: flex; flex-direction: column; gap: 5px; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 0.6rem;">
+              <div style="display: flex; justify-content: space-between;"><span>Number of Lanes:</span> <strong>${stat.lanes || 2} Lanes</strong></div>
+              <div style="display: flex; justify-content: space-between;"><span>Lane Width:</span> <strong>${laneWidthStr}</strong></div>
+              <div style="display: flex; justify-content: space-between;"><span>Saturation Flow:</span> <strong>${(stat.satFlow || 3600).toLocaleString()} PCU/hr</strong></div>
+              <div style="display: flex; justify-content: space-between;"><span>Dominant Vehicle Type:</span> <strong>${stat.dominantMovement || 'Car / Jeep'}</strong></div>
+              <div style="display: flex; justify-content: space-between;"><span>Traffic Share (%):</span> <strong style="color: var(--accent-primary);">${trafficShare}%</strong></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Card 3 Labels
+    const sumGeoEl = document.getElementById('sumDashGeometry');
+    if (sumGeoEl) sumGeoEl.textContent = geoLabel;
+
+    const sumDurEl = document.getElementById('sumDashDuration');
+    if (sumDurEl) sumDurEl.textContent = durationLabel;
+
+    const sumMethodEl = document.getElementById('sumDashMethod');
+    if (sumMethodEl) sumMethodEl.textContent = surveyMethod;
+
+    const sumPeakEl = document.getElementById('sumDashPeakHour');
+    if (sumPeakEl) sumPeakEl.textContent = peakIntervalText;
+
+    const sumSelIntEl = document.getElementById('sumDashSelectedInterval');
+    if (sumSelIntEl) sumSelIntEl.textContent = selectedIntervalText;
+
+    const sumObsVehEl = document.getElementById('sumDashObservedVehicles');
+    if (sumObsVehEl) sumObsVehEl.textContent = `${totalVehicles.toLocaleString()} veh`;
+
+    const sumObsPcuEl = document.getElementById('sumDashObservedPCU');
+    if (sumObsPcuEl) sumObsPcuEl.textContent = `${totalPCUDemand.toLocaleString()} PCU`;
+
+    const sumHourlyDemandEl = document.getElementById('sumDashHourlyDemand');
+    if (sumHourlyDemandEl) sumHourlyDemandEl.textContent = `${hourlyTotalDemand.toLocaleString()} PCU/hr`;
+
+    // SECTION 5: Road Demand Comparison Horizontal Bar Chart (Sorted highest to lowest demand)
+    renderRoadDemandHorizontalBarChart(activeKeys, approachStats);
+
+    // SECTION 3: Vehicle Composition Distribution - Interactive Doughnut & Dynamic Table
+    renderVehicleCompositionPieChart(approaches, pcuFactors, totalVehicles);
+
+    // SECTION 4: PCU Summary Table
+    const pcuCategoryBody = document.getElementById('pcuSummaryCategoryTableBody');
+    const pcuCategoryBreakdown = processed.pcuCategoryBreakdown || [];
+
+    if (pcuCategoryBody) {
+      if (pcuCategoryBreakdown.length > 0) {
+        let totalObs = 0;
+        let totalCalc = 0;
+        pcuCategoryBody.innerHTML = pcuCategoryBreakdown.map(item => {
+          totalObs += item.count;
+          totalCalc += item.calculatedPcu;
+          return `
+            <tr>
+              <td><strong>${item.name}</strong></td>
+              <td style="text-align: right;">${item.count.toLocaleString()}</td>
+              <td style="text-align: right; font-family: var(--font-mono);">${item.factor.toFixed(1)}</td>
+              <td style="text-align: right; color: var(--accent-primary); font-weight: 700;">${item.calculatedPcu.toLocaleString()} PCU</td>
+            </tr>
+          `;
+        }).join('');
+
+        const totObsEl = document.getElementById('pcuSumTotalObserved');
+        if (totObsEl) totObsEl.textContent = `${totalObs.toLocaleString()} veh`;
+
+        const totCalcEl = document.getElementById('pcuSumTotalCalculated');
+        if (totCalcEl) totCalcEl.textContent = `${totalCalc.toLocaleString()} PCU`;
+      } else {
+        // Fallback approach-wise rendering
+        pcuCategoryBody.innerHTML = activeKeys.map(k => {
+          const stat = approachStats[k];
+          return `
+            <tr>
+              <td><strong>${stat.name}</strong> (${stat.lanes} lanes)</td>
+              <td style="text-align: right;">${stat.vehCount.toLocaleString()}</td>
+              <td style="text-align: right;">-</td>
+              <td style="text-align: right; color: var(--accent-primary); font-weight: 700;">${stat.pcuVal.toLocaleString()} PCU</td>
+            </tr>
+          `;
+        }).join('');
+
+        const totObsEl = document.getElementById('pcuSumTotalObserved');
+        if (totObsEl) totObsEl.textContent = `${totalVehicles.toLocaleString()} veh`;
+
+        const totCalcEl = document.getElementById('pcuSumTotalCalculated');
+        if (totCalcEl) totCalcEl.textContent = `${totalPCUDemand.toLocaleString()} PCU`;
+      }
+    }
+
+    // SECTION 6: Engineering Parameters Snapshot
+    const ctrlEl = document.getElementById('sumDashController');
+    if (ctrlEl) ctrlEl.textContent = interConfig.controllerType || 'Fixed Time';
+
+    const phasesEl = document.getElementById('sumDashPhases');
+    if (phasesEl) phasesEl.textContent = `${activeKeys.length} Phases`;
+
+    const minGEl = document.getElementById('sumDashMinGreen');
+    if (minGEl) minGEl.textContent = `${interConfig.minGreen || 7} s`;
+
+    const maxGEl = document.getElementById('sumDashMaxGreen');
+    if (maxGEl) maxGEl.textContent = `${interConfig.maxGreen || 90} s`;
+
+    const ambEl = document.getElementById('sumDashAmber');
+    if (ambEl) ambEl.textContent = `${interConfig.yellowTime || 3.0} s`;
+
+    const allRedEl = document.getElementById('sumDashAllRed');
+    if (allRedEl) allRedEl.textContent = `${interConfig.allRedTime || 2.0} s`;
+
+    const baseSatEl = document.getElementById('sumDashBaseSat');
+    if (baseSatEl) baseSatEl.textContent = `${interConfig.baseSaturationFlow || 1800} PCU/h/lane`;
+
+    const pedDistEl = document.getElementById('sumDashPedDistance');
+    if (pedDistEl) pedDistEl.textContent = `${(interConfig.crosswalkWidth || 7.0).toFixed(1)} m`;
+
+    const pedWalkEl = document.getElementById('sumDashPedWalkSpeed');
+    if (pedWalkEl) pedWalkEl.textContent = `${(interConfig.walkingSpeed || 1.2).toFixed(1)} m/s`;
   }
+
+  function renderRoadDemandHorizontalBarChart(activeKeys, approachStats) {
+    const container = document.getElementById('roadDemandBarChartContainer');
+    if (!container) return;
+
+    // Sort approach keys from highest hourly demand to lowest hourly demand
+    const sortedKeys = [...activeKeys].sort((a, b) => {
+      const demandA = (approachStats[a] && approachStats[a].hourlyDemand) || 0;
+      const demandB = (approachStats[b] && approachStats[b].hourlyDemand) || 0;
+      return demandB - demandA;
+    });
+
+    let maxDemand = 1;
+    sortedKeys.forEach(k => {
+      const dem = (approachStats[k] && approachStats[k].hourlyDemand) || 0;
+      if (dem > maxDemand) maxDemand = dem;
+    });
+
+    const barsHTML = sortedKeys.map(k => {
+      const stat = approachStats[k] || { name: k, hourlyDemand: 0 };
+      const pct = Math.min(100, Math.round((stat.hourlyDemand / maxDemand) * 100));
+      const isMax = (stat.hourlyDemand === maxDemand && maxDemand > 0);
+
+      const barColor = isMax ? 'linear-gradient(90deg, #f59e0b, #fbbf24)' : 'linear-gradient(90deg, #0284c7, #38bdf8)';
+
+      return `
+        <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.76rem;">
+            <span style="font-weight: 700; color: var(--text-primary);">${stat.name} ${isMax ? '<span style="font-size: 0.68rem; color: #f59e0b; font-weight: 700;">★ BUSIEST</span>' : ''}</span>
+            <span style="font-family: var(--font-mono); font-weight: 700; color: ${isMax ? '#f59e0b' : 'var(--accent-primary)'};">${Math.round(stat.hourlyDemand).toLocaleString()} PCU/hr</span>
+          </div>
+          <div style="height: 14px; width: 100%; background: var(--bg-input); border-radius: 4px; overflow: hidden; border: 1px solid var(--border-color);">
+            <div style="width: ${pct}%; height: 100%; background: ${barColor}; border-radius: 3px; transition: width 0.3s ease;"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = `
+      <div style="background: rgba(15, 23, 42, 0.5); padding: 0.85rem; border-radius: 8px; border: 1px solid var(--border-color);">
+        ${barsHTML}
+      </div>
+    `;
+  }
+
+  /**
+   * Render Vehicle Composition Donut/Pie Chart SVG & Table
+   * FIX: Reads exclusively from project.processedTraffic.pcuCategoryBreakdown (centralized SSoT)
+   * instead of iterating state.approaches[k].vehicles (stale legacy format).
+   */
+  function renderVehicleCompositionPieChart(approaches, pcuFactors, totalVehicles) {
+    const container = document.getElementById('vehPieChartContainer');
+    const legend = document.getElementById('vehPieLegendList');
+    const tableBody = document.getElementById('vehCompositionTableBody');
+    if (!container || !legend || !tableBody) return;
+
+    // ── PRIMARY SOURCE: processedTraffic.pcuCategoryBreakdown (always up-to-date after recomputeProjectData) ──
+    const proj = loadProject();
+    const pcuBreakdown = (proj && proj.processedTraffic && proj.processedTraffic.pcuCategoryBreakdown)
+      ? proj.processedTraffic.pcuCategoryBreakdown
+      : null;
+
+    const COLOR_MAP = {
+      car: '#38bdf8', motorcycle: '#818cf8', autorickshaw: '#f59e0b',
+      bus: '#ef4444', truck: '#10b981', bicycle: '#a855f7',
+      tractor: '#ec4899', cart: '#64748b', lcv: '#22d3ee'
+    };
+
+    let categories = [];
+
+    if (pcuBreakdown && pcuBreakdown.length > 0) {
+      // Use the centralized computed breakdown — exact SSoT
+      categories = pcuBreakdown.map(item => ({
+        name: item.name,
+        key: item.key,
+        count: item.count,
+        color: COLOR_MAP[item.key] || '#94a3b8',
+        factor: item.factor,
+        pcuVal: item.calculatedPcu
+      })).filter(c => c.count > 0);
+    } else {
+      // Fallback: aggregate from approaches (legacy path when processedTraffic not yet computed)
+      let car = 0, motorcycle = 0, autorickshaw = 0, bus = 0, truck = 0, bicycle = 0, tractor = 0, cart = 0;
+      Object.values(approaches).forEach(app => {
+        const v = app.vehicles || {};
+        car += parseFloat(v.car || app.car || app.veh_car) || 0;
+        motorcycle += parseFloat(v.motorcycle || v.twowheeler || app.motorcycle || app.bike) || 0;
+        autorickshaw += parseFloat(v.autorickshaw || v.auto || app.autorickshaw) || 0;
+        bus += parseFloat(v.bus || app.bus) || 0;
+        truck += parseFloat(v.truck || v.lcv || app.truck || app.lcv) || 0;
+        bicycle += parseFloat(v.bicycle || app.bicycle) || 0;
+        tractor += parseFloat(v.tractor || app.tractor) || 0;
+        cart += parseFloat(v.cart || app.cart) || 0;
+      });
+      let sumVeh = car + motorcycle + autorickshaw + bus + truck + bicycle + tractor + cart;
+      if (sumVeh === 0 && totalVehicles > 0) {
+        car = Math.round(totalVehicles * 0.48);
+        motorcycle = Math.round(totalVehicles * 0.32);
+        autorickshaw = Math.round(totalVehicles * 0.12);
+        bus = Math.round(totalVehicles * 0.05);
+        truck = Math.round(totalVehicles * 0.03);
+      }
+      const currentPcuFactors = (proj && proj.engineeringParameters && proj.engineeringParameters.pcuFactors) || pcuFactors || DEFAULT_STATE.pcuFactors;
+      const rawCategories = [
+        { name: 'Car / Jeep / Van', key: 'car', count: car },
+        { name: 'Two-Wheeler', key: 'motorcycle', count: motorcycle },
+        { name: 'Auto-Rickshaw', key: 'autorickshaw', count: autorickshaw },
+        { name: 'Bus / Coach', key: 'bus', count: bus },
+        { name: 'Truck / LCV', key: 'truck', count: truck },
+        { name: 'Bicycle', key: 'bicycle', count: bicycle },
+        { name: 'Tractor / Trailer', key: 'tractor', count: tractor },
+        { name: 'Animal Cart / Rickshaw', key: 'cart', count: cart }
+      ];
+      categories = rawCategories
+        .filter(c => c.count > 0)
+        .map(c => ({
+          ...c,
+          color: COLOR_MAP[c.key] || '#94a3b8',
+          factor: currentPcuFactors[c.key] || 1.0,
+          pcuVal: Math.round(c.count * (currentPcuFactors[c.key] || 1.0))
+        }));
+    }
+
+    const totalCount = categories.reduce((acc, c) => acc + c.count, 0) || 1;
+
+    // SVG Doughnut
+    let cumulativePercent = 0;
+    const slicesSVG = categories.map(cat => {
+      const pct = cat.count / totalCount;
+      const startAngle = cumulativePercent * 2 * Math.PI;
+      cumulativePercent += pct;
+      const endAngle = cumulativePercent * 2 * Math.PI;
+
+      const rOuter = 90;
+      const rInner = 58;
+      const cx = 110;
+      const cy = 110;
+
+      const x1 = cx + rOuter * Math.sin(startAngle);
+      const y1 = cy - rOuter * Math.cos(startAngle);
+      const x2 = cx + rOuter * Math.sin(endAngle);
+      const y2 = cy - rOuter * Math.cos(endAngle);
+
+      const ix1 = cx + rInner * Math.sin(endAngle);
+      const iy1 = cy - rInner * Math.cos(endAngle);
+      const ix2 = cx + rInner * Math.sin(startAngle);
+      const iy2 = cy - rInner * Math.cos(startAngle);
+
+      const largeArcFlag = pct > 0.5 ? 1 : 0;
+      const pathData = `M ${x1} ${y1} A ${rOuter} ${rOuter} 0 ${largeArcFlag} 1 ${x2} ${y2} L ${ix1} ${iy1} A ${rInner} ${rInner} 0 ${largeArcFlag} 0 ${ix2} ${iy2} Z`;
+
+      const pcuFactor = cat.factor || (pcuFactors && pcuFactors[cat.key]) || 1.0;
+      const pcuVal = cat.pcuVal !== undefined ? cat.pcuVal : Math.round(cat.count * pcuFactor);
+
+      return `<path d="${pathData}" fill="${cat.color}" opacity="0.9" style="transition: opacity 0.2s ease; cursor: pointer;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.9'"><title>${cat.name}&#10;Count: ${cat.count.toLocaleString()} (${(pct * 100).toFixed(1)}%)&#10;PCU Factor: ×${pcuFactor}&#10;PCU Contrib: ${pcuVal.toLocaleString()} PCU</title></path>`;
+    }).join('');
+
+    container.innerHTML = `
+      <svg width="220" height="220" viewBox="0 0 220 220" style="filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));">
+        ${slicesSVG}
+        <circle cx="110" cy="110" r="54" fill="var(--bg-panel)" stroke="var(--border-color)" stroke-width="1" />
+        <text x="110" y="104" text-anchor="middle" fill="var(--text-primary)" font-size="15" font-weight="800">${totalCount.toLocaleString()}</text>
+        <text x="110" y="122" text-anchor="middle" fill="var(--text-secondary)" font-size="10" font-weight="600">Total Veh</text>
+      </svg>
+    `;
+
+    // Dynamic Legend
+    legend.innerHTML = categories.map(cat => {
+      const pct = ((cat.count / totalCount) * 100).toFixed(1);
+      return `
+        <div class="pie-legend-item" style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; background: var(--bg-panel); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: 4px;">
+          <span class="pie-color-swatch" style="width: 10px; height: 10px; border-radius: 2px; background: ${cat.color}; display: inline-block;"></span>
+          <span style="color: var(--text-primary);">${cat.name}:</span>
+          <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-primary);">${cat.count.toLocaleString()} (${pct}%)</span>
+        </div>
+      `;
+    }).join('');
+
+    // Table on Right (Vehicle Class, Observed Count, Percentage)
+    tableBody.innerHTML = categories.map(cat => {
+      const splitPct = ((cat.count / totalCount) * 100).toFixed(1);
+      const pcuFactor = cat.factor || 1.0;
+      const pcuVal = cat.pcuVal !== undefined ? cat.pcuVal : Math.round(cat.count * pcuFactor);
+
+      return `
+        <tr>
+          <td>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="width: 10px; height: 10px; border-radius: 2px; background: ${cat.color}; display: inline-block;"></span>
+              <strong>${cat.name}</strong>
+            </div>
+          </td>
+          <td style="text-align: right;">${cat.count.toLocaleString()}</td>
+          <td style="text-align: right; color: var(--accent-primary); font-weight: 700;">${splitPct}%</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  /**
+   * Render Turning Movement Stacked Bar Chart SVG
+   */
+  function renderTurningMovementStackedBarChart(activeKeys, approachStats) {
+    const container = document.getElementById('turningStackedBarContainer');
+    if (!container) return;
+
+    const barsHTML = activeKeys.map(k => {
+      const stat = approachStats[k];
+      const total = stat.left + stat.through + stat.right || stat.vehCount || 1;
+      const pLeft = parseFloat(((stat.left / total) * 100).toFixed(1));
+      const pThrough = parseFloat(((stat.through / total) * 100).toFixed(1));
+      const pRight = parseFloat(((stat.right / total) * 100).toFixed(1));
+
+      return `
+        <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem;">
+            <span style="font-weight: 700; color: var(--text-primary);">${stat.name} <span style="font-weight: 400; color: var(--text-secondary);">(${stat.vehCount.toLocaleString()} veh)</span></span>
+            <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary);">
+              <span style="color: #10b981;">L: ${stat.left} (${pLeft}%)</span> | 
+              <span style="color: #38bdf8;">T: ${stat.through} (${pThrough}%)</span> | 
+              <span style="color: #f59e0b;">R: ${stat.right} (${pRight}%)</span>
+            </span>
+          </div>
+          <div style="height: 22px; width: 100%; background: var(--bg-input); border-radius: 6px; display: flex; overflow: hidden; border: 1px solid var(--border-color); position: relative;">
+            <div style="width: ${pLeft}%; background: #10b981; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 700; color: #022c22; transition: width 0.3s ease;" title="Left Turn: ${stat.left} (${pLeft}%)">
+              ${pLeft > 7 ? `${pLeft}%` : ''}
+            </div>
+            <div style="width: ${pThrough}%; background: #38bdf8; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 700; color: #082f49; transition: width 0.3s ease;" title="Through: ${stat.through} (${pThrough}%)">
+              ${pThrough > 7 ? `${pThrough}%` : ''}
+            </div>
+            <div style="width: ${pRight}%; background: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 700; color: #451a03; transition: width 0.3s ease;" title="Right Turn: ${stat.right} (${pRight}%)">
+              ${pRight > 7 ? `${pRight}%` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = `
+      <div style="background: rgba(15, 23, 42, 0.5); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+        ${barsHTML}
+        <div style="display: flex; gap: 1.5rem; justify-content: flex-end; font-size: 0.76rem; font-weight: 600; color: var(--text-secondary); margin-top: 8px; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 6px;">
+          <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #10b981;"></span> 🟩 Left Turn (L)</span>
+          <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #38bdf8;"></span> 🟦 Through (T)</span>
+          <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #f59e0b;"></span> 🟧 Right Turn (R)</span>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Render Critical Lane Flow Ratio Progress Bars
+   */
+  function renderCriticalLaneFlowRatioBars(activeKeys, approachStats) {
+    const container = document.getElementById('criticalLaneFlowRatioBarsContainer');
+    if (!container) return;
+
+    let maxFlowRatioKey = activeKeys[0];
+    activeKeys.forEach(k => {
+      if (approachStats[k].flowRatioY > (approachStats[maxFlowRatioKey] ? approachStats[maxFlowRatioKey].flowRatioY : 0)) {
+        maxFlowRatioKey = k;
+      }
+    });
+
+    const barsHTML = activeKeys.map(k => {
+      const stat = approachStats[k];
+      const y = stat.flowRatioY;
+      const isCritical = (k === maxFlowRatioKey);
+
+      let statusColor = '#10b981'; // Green
+      let statusLabel = 'Normal';
+      if (y > 0.85) {
+        statusColor = '#ef4444'; // Red
+        statusLabel = 'Over Capacity';
+      } else if (y > 0.65) {
+        statusColor = '#f59e0b'; // Yellow
+        statusLabel = 'Near Capacity';
+      }
+
+      const barWidthPct = Math.min(100, Math.round(y * 100));
+
+      return `
+        <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem;">
+            <span style="font-weight: 700; color: var(--text-primary);">
+              ${stat.name} ${isCritical ? '<span class="critical-lane-badge badge-fail" style="font-size: 0.65rem; margin-left: 6px;">🔥 CRITICAL LANE</span>' : ''}
+            </span>
+            <span style="font-family: var(--font-mono); font-weight: 700; color: ${statusColor};">
+              y<sub>i</sub> = ${y.toFixed(4)} <span style="font-size: 0.7rem; font-weight: 600;">(${statusLabel})</span>
+            </span>
+          </div>
+          <div style="height: 16px; width: 100%; background: var(--bg-input); border-radius: 4px; overflow: hidden; border: 1px solid var(--border-color); position: relative;">
+            <div style="width: ${barWidthPct}%; height: 100%; background: ${statusColor}; border-radius: 3px; transition: width 0.3s ease;"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = `
+      <div style="background: rgba(15, 23, 42, 0.5); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+        ${barsHTML}
+        <div style="display: flex; gap: 1.25rem; justify-content: flex-end; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-top: 6px;">
+          <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: #10b981;"></span> Green (Normal: y ≤ 0.65)</span>
+          <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: #f59e0b;"></span> Yellow (Near Capacity: 0.65 < y ≤ 0.85)</span>
+          <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: #ef4444;"></span> Red (Over Capacity: y > 0.85)</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPCUFactorBreakdownList(approaches, pcuFactors) {
+    const breakdownEl = document.getElementById('pcuFactorBreakdownList');
+    if (!breakdownEl) return;
+
+    let car = 0, motorcycle = 0, autorickshaw = 0, bus = 0, truck = 0, bicycle = 0, tractor = 0, cart = 0;
+
+    Object.values(approaches).forEach(app => {
+      const v = app.vehicles || {};
+      car += parseFloat(v.car || app.car) || 0;
+      motorcycle += parseFloat(v.motorcycle || v.twowheeler || app.motorcycle || app.bike) || 0;
+      autorickshaw += parseFloat(v.autorickshaw || v.auto || app.autorickshaw) || 0;
+      bus += parseFloat(v.bus || app.bus) || 0;
+      truck += parseFloat(v.truck || v.lcv || app.truck || app.lcv) || 0;
+      bicycle += parseFloat(v.bicycle || app.bicycle) || 0;
+      tractor += parseFloat(v.tractor || app.tractor) || 0;
+      cart += parseFloat(v.cart || app.cart) || 0;
+    });
+
+    const totalVeh = car + motorcycle + autorickshaw + bus + truck + bicycle + tractor + cart;
+    if (totalVeh === 0) {
+      const state = getState();
+      let stateTotalVeh = 0;
+      Object.values(state.approaches || {}).forEach(a => stateTotalVeh += (parseFloat(a.flow) || 0));
+      if (stateTotalVeh > 0) {
+        car = Math.round(stateTotalVeh * 0.48);
+        motorcycle = Math.round(stateTotalVeh * 0.32);
+        autorickshaw = Math.round(stateTotalVeh * 0.12);
+        bus = Math.round(stateTotalVeh * 0.05);
+        truck = Math.round(stateTotalVeh * 0.03);
+      }
+    }
+
+    const items = [
+      { name: 'Cars / Vans', key: 'car', count: car },
+      { name: 'Bikes / 2W', key: 'motorcycle', count: motorcycle },
+      { name: 'Auto-Rickshaws', key: 'autorickshaw', count: autorickshaw },
+      { name: 'Buses / Coaches', key: 'bus', count: bus },
+      { name: 'Trucks / Freight', key: 'truck', count: truck },
+      { name: 'Bicycles', key: 'bicycle', count: bicycle },
+      { name: 'Tractors', key: 'tractor', count: tractor },
+      { name: 'Carts / Rickshaws', key: 'cart', count: cart }
+    ].filter(i => i.count > 0);
+
+    let totalPCUCalc = 0;
+    const linesHtml = items.map(item => {
+      const factor = pcuFactors[item.key] || 1.0;
+      const pcu = Math.round(item.count * factor);
+      totalPCUCalc += pcu;
+      return `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+          <span><strong>${item.name}</strong>:</span>
+          <span style="font-family: var(--font-mono); color: var(--accent-primary); font-weight: 700;">
+            ${item.count.toLocaleString()} × ${factor.toFixed(1)} = ${pcu.toLocaleString()} PCU
+          </span>
+        </div>
+      `;
+    }).join('');
+
+    breakdownEl.innerHTML = linesHtml + `
+      <div style="border-top: 1px solid var(--border-color); margin-top: 8px; padding-top: 6px; display: flex; justify-content: space-between; font-weight: 800; font-size: 0.85rem; color: var(--success);">
+        <span>Total Converted PCU:</span>
+        <span style="font-family: var(--font-mono);">${totalPCUCalc.toLocaleString()} PCU</span>
+      </div>
+    `;
+  }
+
+
+
+  /**
+   * Render Vehicle Composition Donut/Pie Chart SVG (Step 5 / Run Analysis context)
+   * FIX: Reads from project.processedTraffic.pcuCategoryBreakdown (centralized SSoT).
+   */
+  function renderVehicleCompositionPieChart(approaches, pcuFactors, totalVehicles) {
+    const container = document.getElementById('vehPieChartContainer');
+    const legend = document.getElementById('vehPieLegendList');
+    if (!container || !legend) return;
+
+    const COLOR_MAP = {
+      car: '#38bdf8', motorcycle: '#10b981', autorickshaw: '#f59e0b',
+      bus: '#ec4899', truck: '#8b5cf6', bicycle: '#64748b',
+      tractor: '#f97316', cart: '#94a3b8', lcv: '#22d3ee'
+    };
+
+    // ── PRIMARY SOURCE: processedTraffic.pcuCategoryBreakdown ──
+    const proj = loadProject();
+    const pcuBreakdown = (proj && proj.processedTraffic && proj.processedTraffic.pcuCategoryBreakdown)
+      ? proj.processedTraffic.pcuCategoryBreakdown
+      : null;
+
+    let categories = [];
+
+    if (pcuBreakdown && pcuBreakdown.length > 0) {
+      categories = pcuBreakdown
+        .filter(item => item.count > 0)
+        .map(item => ({
+          label: item.name,
+          key: item.key,
+          count: item.count,
+          color: COLOR_MAP[item.key] || '#94a3b8'
+        }));
+    } else {
+      // Fallback: aggregate from approaches (legacy path)
+      let car = 0, motorcycle = 0, autorickshaw = 0, bus = 0, truck = 0, bicycle = 0;
+      Object.values(approaches).forEach(app => {
+        car += parseFloat(app.car || app.veh_car) || 0;
+        motorcycle += parseFloat(app.motorcycle || app.bike || app.veh_bike) || 0;
+        autorickshaw += parseFloat(app.autorickshaw || app.auto || app.veh_auto) || 0;
+        bus += parseFloat(app.bus || app.veh_bus) || 0;
+        truck += parseFloat(app.truck || app.hcv || app.veh_hcv) || 0;
+        bicycle += parseFloat(app.bicycle || app.veh_bicycle) || 0;
+      });
+      const sumVeh = car + motorcycle + autorickshaw + bus + truck + bicycle;
+      const rawCats = sumVeh > 0
+        ? [
+          { label: 'Cars / Vans', key: 'car', count: car },
+          { label: 'Two-Wheelers', key: 'motorcycle', count: motorcycle },
+          { label: 'Auto-Rickshaws', key: 'autorickshaw', count: autorickshaw },
+          { label: 'Buses / Coaches', key: 'bus', count: bus },
+          { label: 'Trucks / Freight', key: 'truck', count: truck },
+          { label: 'Bicycles', key: 'bicycle', count: bicycle }
+        ].filter(c => c.count > 0)
+        : [
+          { label: 'Cars (Estimated)', key: 'car', count: Math.round(totalVehicles * 0.45) },
+          { label: 'Two-Wheelers', key: 'motorcycle', count: Math.round(totalVehicles * 0.35) },
+          { label: 'Autos / 3W', key: 'autorickshaw', count: Math.round(totalVehicles * 0.12) },
+          { label: 'Buses & Trucks', key: 'bus', count: Math.round(totalVehicles * 0.08) }
+        ];
+      categories = rawCats.map(c => ({ ...c, color: COLOR_MAP[c.key] || '#94a3b8' }));
+    }
+
+    const totalCount = categories.reduce((acc, c) => acc + c.count, 0) || 1;
+
+    let cumulativePercent = 0;
+    const slicesSVG = categories.map(cat => {
+      const pct = cat.count / totalCount;
+      const startAngle = cumulativePercent * 2 * Math.PI;
+      cumulativePercent += pct;
+      const endAngle = cumulativePercent * 2 * Math.PI;
+
+      const x1 = 80 + 60 * Math.sin(startAngle);
+      const y1 = 80 - 60 * Math.cos(startAngle);
+      const x2 = 80 + 60 * Math.sin(endAngle);
+      const y2 = 80 - 60 * Math.cos(endAngle);
+
+      const largeArcFlag = pct > 0.5 ? 1 : 0;
+      const pathData = `M 80 80 L ${x1} ${y1} A 60 60 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+
+      return `<path d="${pathData}" fill="${cat.color}" opacity="0.95"><title>${cat.label}: ${cat.count} (${(pct * 100).toFixed(1)}%)</title></path>`;
+    }).join('');
+
+    container.innerHTML = `
+      <svg width="160" height="160" viewBox="0 0 160 160">
+        ${slicesSVG}
+        <circle cx="80" cy="80" r="38" fill="var(--bg-panel)" />
+        <text x="80" y="76" text-anchor="middle" fill="var(--text-primary)" font-size="11" font-weight="700">${totalCount.toLocaleString()}</text>
+        <text x="80" y="92" text-anchor="middle" fill="var(--text-secondary)" font-size="9">Vehicles</text>
+      </svg>
+    `;
+
+    legend.innerHTML = categories.map(cat => {
+      const pct = ((cat.count / totalCount) * 100).toFixed(1);
+      return `
+        <div class="pie-legend-item">
+          <div>
+            <span class="pie-color-swatch" style="background: ${cat.color};"></span>
+            <span>${cat.label}</span>
+          </div>
+          <span style="font-family: var(--font-mono); font-weight: 700;">${pct}%</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  /**
+   * Render Turning Movement Stacked Bar Chart SVG
+   */
+  function renderTurningMovementStackedBarChart(activeKeys, approachStats) {
+    const container = document.getElementById('turningStackedBarContainer');
+    if (!container) return;
+
+    const barsHTML = activeKeys.map(k => {
+      const stat = approachStats[k];
+      const total = stat.left + stat.through + stat.right || stat.vehCount || 1;
+      const pLeft = ((stat.left / total) * 100).toFixed(1);
+      const pThrough = ((stat.through / total) * 100).toFixed(1);
+      const pRight = ((stat.right / total) * 100).toFixed(1);
+
+      return `
+        <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary);">
+            <span><strong>${stat.name}</strong> (${stat.vehCount.toLocaleString()} veh)</span>
+            <span style="font-family: var(--font-mono); color: var(--text-secondary);">Left: ${stat.left} | Thru: ${stat.through} | Right: ${stat.right}</span>
+          </div>
+          <div style="height: 18px; width: 100%; background: var(--bg-input); border-radius: 4px; display: flex; overflow: hidden; border: 1px solid var(--border-color);">
+            <div style="width: ${pLeft}%; background: #10b981;" title="Left Turn: ${stat.left} (${pLeft}%)"></div>
+            <div style="width: ${pThrough}%; background: #38bdf8;" title="Through: ${stat.through} (${pThrough}%)"></div>
+            <div style="width: ${pRight}%; background: #f59e0b;" title="Right Turn: ${stat.right} (${pRight}%)"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = `
+      <div style="padding: 0.5rem 0;">
+        ${barsHTML}
+        <div style="display: flex; gap: 1rem; justify-content: flex-end; font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+          <span><span class="pie-color-swatch" style="background: #10b981;"></span> Left Turn (L)</span>
+          <span><span class="pie-color-swatch" style="background: #38bdf8;"></span> Through (T)</span>
+          <span><span class="pie-color-swatch" style="background: #f59e0b;"></span> Right Turn (R)</span>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Raw Dataset Preview State (Search, Sort, Pagination)
+   */
+  let rawDatasetPreviewState = {
+    searchQuery: '',
+    sortCol: 'time',
+    sortDir: 'asc',
+    currentPage: 1,
+    pageSize: 50
+  };
+
   /**
    * Render Dataset Upload Status, Analysis Interval Selector & Raw Dataset Preview Table in Step 2
    */
@@ -3522,33 +4189,84 @@ const FlowGuard = (function() {
     const selectedInterval = datasetResult.selectedInterval || peakInterval;
     const stats = datasetResult.datasetStats || {};
 
-    // First 50 records for preview table
-    const first50 = records.slice(0, 50);
+    const peakWindowStr = stats.peakIntervalWindow || peakInterval.timeWindow || peakInterval.time || '08:45–09:00';
 
-    // Build options for Analysis Interval Selector
+    // Build options for Analysis Interval Selector (Display ONLY clean time ranges with Peak label, NO statistics)
     const intervalOptionsHTML = intervals.map(inv => {
-      const isPeak = peakInterval && inv.time === peakInterval.time;
-      const isSel = selectedInterval && inv.time === selectedInterval.time;
-      const label = `${inv.timeWindow} ${isPeak ? '★ [PEAK WINDOW]' : ''} — ${inv.totalVehicles.toLocaleString()} veh (${inv.hourlyEquivalentPCU.toLocaleString()} PCU/h)`;
-      return `<option value="${inv.time}" ${isSel ? 'selected' : ''}>${label}</option>`;
+      const timeLabel = inv.timeWindow || inv.time || '08:00–08:15';
+      const isPeak = peakInterval && (inv.time === peakInterval.time || inv.timeWindow === peakInterval.timeWindow);
+      const isSel = selectedInterval && (inv.time === selectedInterval.time || inv.timeWindow === selectedInterval.timeWindow);
+      const displayLabel = `${timeLabel} ${isPeak ? '(Peak)' : ''}`;
+      return `<option value="${inv.time}" ${isSel ? 'selected' : ''}>${displayLabel.trim()}</option>`;
     }).join('');
+
+    // Normalize records into 13 required columns
+    const normalizedRecords = records.map(r => ({
+      date: r.date || r.Date || '2026-08-06',
+      time: r.time || r.Time || '08:45–09:00',
+      road: r.road || r.Road || 'North',
+      movement: r.movement || r.Movement || (r.leftTurn !== undefined ? 'Left / Thru / Right' : 'Through'),
+      vehicleType: r.vehicleType || r.VehicleType || (r.cars !== undefined ? 'Mixed Fleet' : 'Car'),
+      count: r.count !== undefined ? r.count : (r.totalVehicles !== undefined ? r.totalVehicles : (r.cars ? (r.cars + (r.bikes||0) + (r.autorickshaw||0) + (r.bus||0) + (r.truck||0) + (r.bicycle||0)) : 0)),
+      pedestrians: r.pedestrianCount !== undefined ? r.pedestrianCount : (r.PedestrianCount !== undefined ? r.PedestrianCount : (r.pedestrians || 0)),
+      incident: r.incident || r.Incident || 'None',
+      roadWidth: r.roadWidth || r.RoadWidth || r.width || r.CrosswalkWidth || 14.0,
+      leftLanes: r.leftLanes !== undefined ? r.leftLanes : (r.LeftLanes !== undefined ? r.LeftLanes : 1),
+      throughLanes: r.throughLanes !== undefined ? r.throughLanes : (r.ThroughLanes !== undefined ? r.ThroughLanes : (r.incomingLanes ? Math.max(1, r.incomingLanes - 1) : 1)),
+      rightLanes: r.rightLanes !== undefined ? r.rightLanes : (r.RightLanes !== undefined ? r.RightLanes : 1),
+      laneWidth: r.laneWidth || r.LaneWidth || (r.roadWidth ? (r.roadWidth / (r.incomingLanes || 2)).toFixed(1) : 3.5)
+    }));
+
+    // Filter records by search query
+    const q = rawDatasetPreviewState.searchQuery.toLowerCase().trim();
+    let filtered = normalizedRecords.filter(r => {
+      if (!q) return true;
+      return String(r.date).toLowerCase().includes(q) ||
+             String(r.time).toLowerCase().includes(q) ||
+             String(r.road).toLowerCase().includes(q) ||
+             String(r.movement).toLowerCase().includes(q) ||
+             String(r.vehicleType).toLowerCase().includes(q) ||
+             String(r.incident).toLowerCase().includes(q);
+    });
+
+    // Sort records
+    const col = rawDatasetPreviewState.sortCol;
+    const dir = rawDatasetPreviewState.sortDir === 'asc' ? 1 : -1;
+    filtered.sort((a, b) => {
+      let valA = a[col] !== undefined ? a[col] : '';
+      let valB = b[col] !== undefined ? b[col] : '';
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        return (valA - valB) * dir;
+      }
+      return String(valA).localeCompare(String(valB)) * dir;
+    });
+
+    // Pagination
+    const pageSize = rawDatasetPreviewState.pageSize;
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    if (rawDatasetPreviewState.currentPage > totalPages) rawDatasetPreviewState.currentPage = totalPages;
+    const curPage = rawDatasetPreviewState.currentPage;
+    const startIdx = (curPage - 1) * pageSize;
+    const pagedRecords = filtered.slice(startIdx, startIdx + pageSize);
+
+    const sortIcon = (columnKey) => {
+      if (rawDatasetPreviewState.sortCol !== columnKey) return '↕';
+      return rawDatasetPreviewState.sortDir === 'asc' ? '↑' : '↓';
+    };
 
     container.innerHTML = `
       <div style="display: flex; flex-direction: column; gap: 1.25rem; margin-top: 1.5rem;">
 
-        <!-- STEP 2: INTERACTIVE ANALYSIS INTERVAL SELECTOR -->
+        <!-- ANALYSIS INTERVAL SELECTION (CLEAN DISPLAY ONLY, NO VEHICLE / PCU STATS) -->
         <div class="card" style="padding: 1.25rem; border: 1px solid rgba(245, 158, 11, 0.4); background: rgba(30, 41, 59, 0.5);">
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
             <div>
-              <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #f59e0b; font-weight: 700;">🎯 Analysis Interval Selection</div>
-              <h4 style="margin: 0.2rem 0 0 0; color: var(--text-primary); font-size: 1rem;">
-                Peak Window Detected: <span style="color: #f59e0b; font-weight: 700;">${stats.peakIntervalWindow}</span> (${(peakInterval.totalVehicles || 0).toLocaleString()} Vehicles)
+              <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #f59e0b; font-weight: 700; margin-bottom: 0.3rem;">🎯 Analysis Interval Selection</div>
+              <h4 style="margin: 0; color: var(--text-primary); font-size: 0.95rem; font-weight: 600;">
+                Peak Window Detected: <span style="color: #f59e0b; font-weight: 700;">${peakWindowStr}</span> <span style="font-size: 0.78rem; font-weight: 400; color: var(--text-secondary);">(Automatically detected from uploaded dataset)</span>
               </h4>
-              <p style="font-size: 0.78rem; color: var(--text-secondary); margin: 0.2rem 0 0 0;">
-                Select the time interval to use for downstream signal optimization and summary analysis.
-              </p>
             </div>
-            <div style="min-width: 280px;">
+            <div style="min-width: 260px;">
               <label for="analysisIntervalSelect" style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.35rem;">Analysis Interval Window:</label>
               <select id="analysisIntervalSelect" class="form-control" style="background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--accent-primary); font-weight: 600; padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer; width: 100%;">
                 ${intervalOptionsHTML}
@@ -3557,68 +4275,138 @@ const FlowGuard = (function() {
           </div>
         </div>
 
-        <!-- STEP 2: RAW DATASET RECORDS PREVIEW TABLE -->
+        <!-- RAW DATASET RECORDS PREVIEW (13 COLUMNS, SEARCH, SORT, PAGINATION) -->
         <div class="card" style="padding: 1.25rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
-            <h4 style="margin: 0; color: var(--text-primary); font-size: 0.95rem;">📋 Raw Dataset Records Preview</h4>
-            <span style="font-size: 0.75rem; color: var(--text-secondary);">Showing first ${first50.length} of ${records.length} parsed rows</span>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+            <div>
+              <h4 style="margin: 0; color: var(--text-primary); font-size: 0.95rem; font-weight: 700;">📋 Raw Dataset Records Preview</h4>
+              <span style="font-size: 0.75rem; color: var(--text-secondary);" id="rawRecordsCounterText">
+                Showing ${filtered.length > 0 ? (startIdx + 1) : 0}–${Math.min(startIdx + pageSize, filtered.length)} of ${filtered.length} parsed rows ${records.length !== filtered.length ? `(filtered from ${records.length})` : ''}
+              </span>
+            </div>
+
+            <!-- Toolbar: Search & Page Size -->
+            <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+              <input type="text" id="rawRecordsSearchInput" value="${rawDatasetPreviewState.searchQuery}" placeholder="🔍 Search records..." 
+                style="background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.8rem; width: 200px;">
+              <select id="rawRecordsPageSize" style="background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.5rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer;">
+                <option value="10" ${pageSize === 10 ? 'selected' : ''}>10 / page</option>
+                <option value="25" ${pageSize === 25 ? 'selected' : ''}>25 / page</option>
+                <option value="50" ${pageSize === 50 ? 'selected' : ''}>50 / page</option>
+                <option value="100" ${pageSize === 100 ? 'selected' : ''}>100 / page</option>
+              </select>
+            </div>
           </div>
 
-          <div class="table-responsive" style="max-height: 320px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
-            <table class="data-table" style="font-size: 0.78rem;">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Date</th>
-                  <th>Time</th>
-                  <th>Road / Approach</th>
-                  <th>Cars</th>
-                  <th>Bikes</th>
-                  <th>Autos</th>
-                  <th>Buses</th>
-                  <th>Trucks</th>
-                  <th>Bicycles</th>
-                  <th>Total Veh</th>
-                  <th>Left</th>
-                  <th>Through</th>
-                  <th>Right</th>
-                  <th>Lanes</th>
+          <!-- Scrollable Table -->
+          <div class="table-responsive" style="max-height: 420px; overflow-y: auto; overflow-x: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+            <table class="data-table" style="font-size: 0.78rem; width: 100%; text-align: left; border-collapse: collapse;">
+              <thead style="position: sticky; top: 0; background: var(--bg-panel); z-index: 2;">
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                  <th style="cursor: pointer; padding: 8px 10px;" onclick="window.sortDatasetPreview('date')">Survey Date ${sortIcon('date')}</th>
+                  <th style="cursor: pointer; padding: 8px 10px;" onclick="window.sortDatasetPreview('time')">Time Interval ${sortIcon('time')}</th>
+                  <th style="cursor: pointer; padding: 8px 10px;" onclick="window.sortDatasetPreview('road')">Road Direction ${sortIcon('road')}</th>
+                  <th style="cursor: pointer; padding: 8px 10px;" onclick="window.sortDatasetPreview('movement')">Movement ${sortIcon('movement')}</th>
+                  <th style="cursor: pointer; padding: 8px 10px;" onclick="window.sortDatasetPreview('vehicleType')">Vehicle Type ${sortIcon('vehicleType')}</th>
+                  <th style="cursor: pointer; padding: 8px 10px; text-align: right;" onclick="window.sortDatasetPreview('count')">Count ${sortIcon('count')}</th>
+                  <th style="cursor: pointer; padding: 8px 10px; text-align: right;" onclick="window.sortDatasetPreview('pedestrians')">Pedestrian Count ${sortIcon('pedestrians')}</th>
+                  <th style="cursor: pointer; padding: 8px 10px;" onclick="window.sortDatasetPreview('incident')">Incident ${sortIcon('incident')}</th>
+                  <th style="cursor: pointer; padding: 8px 10px; text-align: right;" onclick="window.sortDatasetPreview('roadWidth')">Road Width (m) ${sortIcon('roadWidth')}</th>
+                  <th style="cursor: pointer; padding: 8px 10px; text-align: right;" onclick="window.sortDatasetPreview('leftLanes')">Left Lanes ${sortIcon('leftLanes')}</th>
+                  <th style="cursor: pointer; padding: 8px 10px; text-align: right;" onclick="window.sortDatasetPreview('throughLanes')">Through Lanes ${sortIcon('throughLanes')}</th>
+                  <th style="cursor: pointer; padding: 8px 10px; text-align: right;" onclick="window.sortDatasetPreview('rightLanes')">Right Lanes ${sortIcon('rightLanes')}</th>
+                  <th style="cursor: pointer; padding: 8px 10px; text-align: right;" onclick="window.sortDatasetPreview('laneWidth')">Lane Width (m) ${sortIcon('laneWidth')}</th>
                 </tr>
               </thead>
               <tbody>
-                ${first50.map((r, idx) => `
-                  <tr>
-                    <td>${idx + 1}</td>
-                    <td>${r.date}</td>
-                    <td><strong>${r.time}</strong></td>
-                    <td><span class="road-chip" style="font-size:0.7rem;">${r.road}</span></td>
-                    <td>${r.cars}</td>
-                    <td>${r.bikes}</td>
-                    <td>${r.autorickshaw}</td>
-                    <td>${r.bus}</td>
-                    <td>${r.truck}</td>
-                    <td>${r.bicycle}</td>
-                    <td><strong>${r.totalVehicles}</strong></td>
-                    <td>${r.leftTurn}</td>
-                    <td>${r.through}</td>
-                    <td>${r.rightTurn}</td>
-                    <td>${r.incomingLanes}</td>
+                ${pagedRecords.length > 0 ? pagedRecords.map(r => `
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding: 8px 10px;">${r.date}</td>
+                    <td style="padding: 8px 10px;"><strong>${r.time}</strong></td>
+                    <td style="padding: 8px 10px;"><span class="road-chip" style="font-size:0.7rem;">${r.road}</span></td>
+                    <td style="padding: 8px 10px;">${r.movement}</td>
+                    <td style="padding: 8px 10px;">${r.vehicleType}</td>
+                    <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: var(--accent-primary);">${r.count.toLocaleString()}</td>
+                    <td style="padding: 8px 10px; text-align: right;">${r.pedestrians}</td>
+                    <td style="padding: 8px 10px;">${r.incident !== 'None' ? `<span style="color:#ef4444; font-weight:700;">⚠️ ${r.incident}</span>` : 'None'}</td>
+                    <td style="padding: 8px 10px; text-align: right;">${r.roadWidth}</td>
+                    <td style="padding: 8px 10px; text-align: right;">${r.leftLanes}</td>
+                    <td style="padding: 8px 10px; text-align: right;">${r.throughLanes}</td>
+                    <td style="padding: 8px 10px; text-align: right;">${r.rightLanes}</td>
+                    <td style="padding: 8px 10px; text-align: right;">${r.laneWidth}</td>
                   </tr>
-                `).join('')}
+                `).join('') : `
+                  <tr>
+                    <td colspan="13" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No records match the current filter.</td>
+                  </tr>
+                `}
               </tbody>
             </table>
-          <!-- Next Step Button Ending Traffic Data Input Stage -->
-          <div style="display: flex; justify-content: flex-end; margin-top: 1.25rem;">
-            <button class="btn-primary-cyan" style="font-size: 0.95rem; padding: 12px 24px; font-weight: 700;" onclick="FlowGuard.setWizardStep(3)">
-              Next Step → Engineering Parameters
-            </button>
+          </div>
+
+          <!-- Pagination Bar -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; flex-wrap: wrap; gap: 0.5rem; font-size: 0.8rem;">
+            <span style="color: var(--text-secondary);">Page ${curPage} of ${totalPages}</span>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn-ghost-reset" id="btnPrevDatasetPage" ${curPage <= 1 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>← Previous</button>
+              <button class="btn-ghost-reset" id="btnNextDatasetPage" ${curPage >= totalPages ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>Next →</button>
+            </div>
           </div>
         </div>
 
       </div>
     `;
 
-    // Attach Event Listener to Analysis Interval Dropdown Selector
+    // Global helper for column header click sorting
+    window.sortDatasetPreview = function(colKey) {
+      if (rawDatasetPreviewState.sortCol === colKey) {
+        rawDatasetPreviewState.sortDir = rawDatasetPreviewState.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        rawDatasetPreviewState.sortCol = colKey;
+        rawDatasetPreviewState.sortDir = 'asc';
+      }
+      renderDatasetPreviewTable(datasetResult, containerElId);
+    };
+
+    // Search Input listener
+    const searchEl = document.getElementById('rawRecordsSearchInput');
+    if (searchEl) {
+      searchEl.addEventListener('input', (e) => {
+        rawDatasetPreviewState.searchQuery = e.target.value;
+        rawDatasetPreviewState.currentPage = 1;
+        renderDatasetPreviewTable(datasetResult, containerElId);
+      });
+    }
+
+    // Page Size Selector listener
+    const pageSizeEl = document.getElementById('rawRecordsPageSize');
+    if (pageSizeEl) {
+      pageSizeEl.addEventListener('change', (e) => {
+        rawDatasetPreviewState.pageSize = parseInt(e.target.value, 10) || 50;
+        rawDatasetPreviewState.currentPage = 1;
+        renderDatasetPreviewTable(datasetResult, containerElId);
+      });
+    }
+
+    // Prev Page listener
+    const prevBtn = document.getElementById('btnPrevDatasetPage');
+    if (prevBtn && curPage > 1) {
+      prevBtn.addEventListener('click', () => {
+        rawDatasetPreviewState.currentPage--;
+        renderDatasetPreviewTable(datasetResult, containerElId);
+      });
+    }
+
+    // Next Page listener
+    const nextBtn = document.getElementById('btnNextDatasetPage');
+    if (nextBtn && curPage < totalPages) {
+      nextBtn.addEventListener('click', () => {
+        rawDatasetPreviewState.currentPage++;
+        renderDatasetPreviewTable(datasetResult, containerElId);
+      });
+    }
+
+    // Analysis Interval Dropdown Listener
     const intervalSelect = document.getElementById('analysisIntervalSelect');
     if (intervalSelect) {
       intervalSelect.addEventListener('change', (e) => {
@@ -3628,7 +4416,6 @@ const FlowGuard = (function() {
           datasetResult.selectedInterval = newInterval;
           datasetResult.aggregated = newInterval.roads;
 
-          // Update active state in FlowGuard
           const currentState = getState();
           const updatedApproaches = { ...currentState.approaches };
 
@@ -3640,7 +4427,7 @@ const FlowGuard = (function() {
                 id: k,
                 road: agg.road,
                 name: agg.name,
-                flow: agg.flow, // Hourly Equivalent Demand PCU/h
+                flow: agg.flow,
                 pcuTotal: agg.flow,
                 cars: agg.cars,
                 bikes: agg.bikes,
@@ -3676,7 +4463,6 @@ const FlowGuard = (function() {
             dataUploaded: true
           });
 
-          // Re-render preview
           renderDatasetPreviewTable(datasetResult, containerElId);
         }
       });
@@ -3797,7 +4583,7 @@ const FlowGuard = (function() {
         }
       });
 
-      setProgress('Calculating IRC:106 PCUs & Webster Green Splits...', 85);
+      setProgress('Detecting Peak Analysis Interval & Validating Records...', 85);
 
       const peakWindowStr = result.peakInterval ? (result.peakInterval.timeWindow || result.peakInterval.intervalLabel || '08:30 AM - 08:45 AM') : '08:30 AM - 08:45 AM';
       const selectedIntervalNameStr = selectedInterval ? (selectedInterval.timeWindow || selectedInterval.intervalLabel || 'Peak Interval') : 'Peak Interval';
@@ -3882,9 +4668,9 @@ const FlowGuard = (function() {
         ingestionProj.trafficInput.roadSummary = result.roadSummary;
         console.log('[FlowGuard AI] Road Summary PCU stored:', {
           north: result.roadSummary.north.totalPCU,
-          east:  result.roadSummary.east.totalPCU,
+          east: result.roadSummary.east.totalPCU,
           south: result.roadSummary.south.totalPCU,
-          west:  result.roadSummary.west.totalPCU
+          west: result.roadSummary.west.totalPCU
         });
       }
 
@@ -3917,9 +4703,9 @@ const FlowGuard = (function() {
     const dateStr = '2026-08-06';
     const roads = [
       { name: 'Road A - North', lanes: 2, speed: 50, ped: 25, width: 14.0 },
-      { name: 'Road B - East',  lanes: 2, speed: 50, ped: 20, width: 14.0 },
+      { name: 'Road B - East', lanes: 2, speed: 50, ped: 20, width: 14.0 },
       { name: 'Road C - South', lanes: 2, speed: 50, ped: 15, width: 14.0 },
-      { name: 'Road D - West',  lanes: 2, speed: 50, ped: 18, width: 14.0 }
+      { name: 'Road D - West', lanes: 2, speed: 50, ped: 18, width: 14.0 }
     ];
 
     for (let h = 0; h < 24; h++) {
@@ -3999,7 +4785,7 @@ const FlowGuard = (function() {
     let html = '';
     ANALYSIS_PIPELINE_STAGES.forEach(stage => {
       const state = stageStates[stage.id] || { status: 'pending', timeMs: null, detail: null };
-      
+
       let cardClass = 'stage-card pending';
       let statusIconHtml = '<span style="width: 10px; height: 10px; border-radius: 50%; background: #475569; display: inline-block;"></span>';
       let statusText = 'Waiting';
@@ -4437,8 +5223,8 @@ const FlowGuard = (function() {
     updateProjectInspector
   };
 })();
-if (typeof window !== 'undefined') { 
-  window.FlowGuard = FlowGuard; 
+if (typeof window !== 'undefined') {
+  window.FlowGuard = FlowGuard;
   window.getProject = FlowGuard.getProject;
   window.saveProject = FlowGuard.saveProject;
   window.exportProjectJSON = FlowGuard.exportProjectJSON;
@@ -4446,7 +5232,6 @@ if (typeof window !== 'undefined') {
   window.renderEngineeringDashboard = FlowGuard.renderEngineeringDashboard;
   window.calculateTrafficPressureIndex = FlowGuard.calculateTrafficPressureIndex;
   window.setWizardStep = FlowGuard.setWizardStep;
-  window.createNewProject = FlowGuard.createNewProject;
   window.setTrafficInputSubmode = FlowGuard.setTrafficInputSubmode;
   window.executeDatasetIngestionPipeline = FlowGuard.executeDatasetIngestionPipeline;
   window.renderDatasetPreviewTable = FlowGuard.renderDatasetPreviewTable;
