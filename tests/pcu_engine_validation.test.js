@@ -36,16 +36,6 @@ describe('FlowGuard AI - Centralized PCU Calculation Engine & Validation', () =>
     expect(north.hourlyDemand).toEqual(454 * 4); // surveyDuration = 15 => 1816
   });
 
-  test('Automatic validation checklist passes for verified project data', () => {
-    const proj = FlowGuard.getProject();
-    FlowGuard.saveProject(proj);
-
-    const processed = FlowGuard.getProject().processedTraffic;
-    expect(processed.validation).toBeDefined();
-    expect(processed.validation.valid).toBe(true);
-    expect(processed.validation.errors).toHaveLength(0);
-  });
-
   test('Tasks 1-6: Master PCU identity, movement-wise PCU, hourly demand, and y=q/S flow ratio', () => {
     const proj = FlowGuard.getProject();
     proj.trafficInput.vehicleCounts.north = { car: 100, motorcycle: 100, autorickshaw: 50, bus: 10, truck: 10, bicycle: 0 };

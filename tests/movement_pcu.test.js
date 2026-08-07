@@ -4,15 +4,6 @@
  */
 
 const FlowGuard = require('../js/app');
-p.trafficInput.turningCounts = {
-  north: { left: 5, through: 10, right: 5, flow: 20 },
-  east: { left: 5, through: 10, right: 5, flow: 20 },
-  south: { left: 5, through: 10, right: 5, flow: 20 },
-  west: { left: 5, through: 10, right: 5, flow: 20 }
-};
-FlowGuard.saveProject(p);
-};
-
 describe('FlowGuard AI - Movement-Based PCU Engine', () => {
 
   beforeEach(() => {

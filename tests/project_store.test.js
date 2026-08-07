@@ -101,5 +101,3 @@ describe('FlowGuard AI - Unified Project Store Architecture', () => {
   });
 
 });
-
-});
