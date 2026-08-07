@@ -649,265 +649,115 @@
                 <span class="badge badge-low">Survey Metadata</span>
               </div>
 
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                <div class="summary-metric-box"
-                  style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Input Mode</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;"
-                    id="sumDashMethod">Historical Dataset Upload</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashMethod">--</div>
                 </div>
-                <div class="summary-metric-box"
-                  style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Survey
-                    Duration</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;"
-                    id="sumDashDuration">15 Minutes</div>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Survey Duration</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashDuration">--</div>
                 </div>
-                <div class="summary-metric-box"
-                  style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Selected
-                    Interval</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;"
-                    id="sumDashSelectedInterval">--</div>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Survey Date</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashSurveyDate">--</div>
                 </div>
-                <div class="summary-metric-box"
-                  style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Peak
-                    Interval</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;"
-                    id="sumDashPeakHour">--</div>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Parsed Records</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashParsedRecords">0</div>
                 </div>
-                <div class="summary-metric-box"
-                  style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total
-                    Vehicles</div>
-                  <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;"
-                    id="sumDashObservedVehicles">0</div>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Roads</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashRoads">0</div>
+                </div>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Time Intervals</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTimeIntervals">0</div>
+                </div>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total Vehicles</div>
+                  <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashObservedVehicles">0</div>
+                </div>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total PCU</div>
+                  <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTotalPCU">0</div>
+                </div>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Peak Interval</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashPeakHour">--</div>
+                </div>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Peak Interval PCU</div>
+                  <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashPeakPCU">0</div>
+                </div>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Status</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="sumDashStatus">Awaiting Dataset Upload</div>
                 </div>
               </div>
             </div>
 
-            <!-- SECTION 2: ROAD-WISE ENGINEERING CARDS -->
+            <!-- SECTION 2: ROAD-WISE ENGINEERING CARDS (ROADS A-D) -->
             <div class="summary-dash-card full-width">
               <div class="summary-dash-header">
                 <div class="summary-dash-title-group">
                   <div class="summary-dash-icon">🚦</div>
                   <div>
-                    <div class="summary-dash-title">2. Road-wise Engineering Cards</div>
-                    <div class="summary-dash-subtitle">Independent approach demand, turning movements, geometry &amp;
-                      saturation flow</div>
+                    <div class="summary-dash-title">2–5. Road-wise Engineering Cards</div>
+                    <div class="summary-dash-subtitle">Independent approach geometry, traffic volume, vehicle composition, PCU, peak hour, and Webster inputs for Roads A–D</div>
                   </div>
                 </div>
                 <span class="badge badge-low">Approach Analysis</span>
               </div>
 
-              <!-- 4 Independent Engineering Cards Grid -->
+              <!-- 4 Independent Engineering Cards Grid (Road A-North, Road B-East, Road C-South, Road D-West) -->
               <div id="sumDashApproachCardsGrid"
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
-                <!-- Dynamically populated from processedTraffic.approaches -->
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem;">
+                <!-- Dynamically populated from project.processedTraffic -->
               </div>
             </div>
 
-            <!-- SECTION 3: VEHICLE COMPOSITION -->
+            <!-- SECTION 6: INTERSECTION SUMMARY -->
             <div class="summary-dash-card full-width">
               <div class="summary-dash-header">
                 <div class="summary-dash-title-group">
-                  <div class="summary-dash-icon">🍕</div>
+                  <div class="summary-dash-icon">🌐</div>
                   <div>
-                    <div class="summary-dash-title">3. Vehicle Composition</div>
-                    <div class="summary-dash-subtitle">Modal breakdown, counts, percentages from uploaded dataset</div>
+                    <div class="summary-dash-title">6. Intersection Summary</div>
+                    <div class="summary-dash-subtitle">Network-wide traffic demand aggregation &amp; critical approach highlights</div>
                   </div>
                 </div>
-                <span class="badge badge-low">Modal Distribution</span>
+                <span class="badge badge-low">Network Aggregation</span>
               </div>
 
-              <div
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; align-items: center;">
-                <!-- LEFT: Professional Doughnut Chart -->
-                <div
-                  style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
-                  <div id="vehPieChartContainer" style="width: 220px; height: 220px; position: relative;">
-                    <!-- Interactive SVG Donut Pie Chart -->
-                  </div>
-                  <div class="pie-legend-list" id="vehPieLegendList"
-                    style="margin-top: 1rem; width: 100%; display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center;">
-                    <!-- Dynamic legend -->
-                  </div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Most Congested Road</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashMostCongestedRoad">--</div>
                 </div>
-
-                <!-- RIGHT: Vehicle Composition Table -->
-                <div style="overflow-x: auto;">
-                  <table class="mini-data-table" style="width: 100%;">
-                    <thead>
-                      <tr>
-                        <th>Vehicle Category</th>
-                        <th style="text-align: right;">Observed Count</th>
-                        <th style="text-align: right;">Percentage (%)</th>
-                      </tr>
-                    </thead>
-                    <tbody id="vehCompositionTableBody">
-                      <!-- Dynamically populated from processedTraffic -->
-                    </tbody>
-                  </table>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Highest Approach PCU</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashHighestApproachPCU">0</div>
+                </div>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Peak Interval Overall</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashPeakIntervalOverall">--</div>
+                </div>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total Network Vehicles</div>
+                  <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTotalNetworkVehicles">0</div>
+                </div>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total Network PCU</div>
+                  <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTotalNetworkPCU">0</div>
+                </div>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Status</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="sumDashNetworkStatus">Awaiting Dataset Upload</div>
                 </div>
               </div>
             </div>
-
-            <!-- SECTION 4: PCU SUMMARY -->
-            <div class="summary-dash-card full-width">
-              <div class="summary-dash-header">
-                <div class="summary-dash-title-group">
-                  <div class="summary-dash-icon">🚗</div>
-                  <div>
-                    <div class="summary-dash-title">4. PCU Summary</div>
-                    <div class="summary-dash-subtitle">Mode-wise observed counts, configured IRC:106 PCU factors, and
-                      calculated PCU</div>
-                  </div>
-                </div>
-                <span class="badge badge-low">IRC:106 Conversion</span>
-              </div>
-
-              <div style="overflow-x: auto;">
-                <table class="mini-data-table" style="width: 100%;">
-                  <thead>
-                    <tr>
-                      <th>Vehicle Class</th>
-                      <th style="text-align: right;">Observed Count</th>
-                      <th style="text-align: right;">Configured IRC:106 PCU Factor</th>
-                      <th style="text-align: right;">Converted PCU</th>
-                    </tr>
-                  </thead>
-                  <tbody id="pcuSummaryCategoryTableBody">
-                    <!-- Dynamically populated from processedTraffic -->
-                  </tbody>
-                  <tfoot>
-                    <tr style="font-weight: 800; background: rgba(56,189,248,0.1);">
-                      <td style="color: var(--text-primary);">Total Summary</td>
-                      <td style="text-align: right;" id="pcuSumTotalObserved">-</td>
-                      <td style="text-align: right;">-</td>
-                      <td style="text-align: right; color: var(--accent-primary);" id="pcuSumTotalCalculated">-</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-
-            <!-- SECTION 5: ROAD DEMAND COMPARISON -->
-            <div class="summary-dash-card full-width">
-              <div class="summary-dash-header">
-                <div class="summary-dash-title-group">
-                  <div class="summary-dash-icon">📊</div>
-                  <div>
-                    <div class="summary-dash-title">5. Road Demand Comparison</div>
-                    <div class="summary-dash-subtitle">Approach-wise demand comparison (Hourly Demand PCU/hr sorted
-                      highest to lowest)</div>
-                  </div>
-                </div>
-                <span class="badge badge-low">Demand Comparison</span>
-              </div>
-
-              <div id="roadDemandBarChartContainer" style="width: 100%; min-height: 180px; padding: 0.5rem 0;">
-                <!-- Horizontal Bar Chart -->
-              </div>
-            </div>
-
-            <!-- SECTION 6: ENGINEERING PARAMETERS SNAPSHOT -->
-            <div class="summary-dash-card full-width">
-              <div class="summary-dash-header">
-                <div class="summary-dash-title-group">
-                  <div class="summary-dash-icon">⏱️</div>
-                  <div>
-                    <div class="summary-dash-title">6. Engineering Parameters Snapshot</div>
-                    <div class="summary-dash-subtitle">Read-only signal bounds, saturation flow &amp; crosswalk safety
-                      parameters</div>
-                  </div>
-                </div>
-                <span class="badge badge-low">Engineering Snapshot</span>
-              </div>
-
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                <div class="summary-metric-box"
-                  style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Controller
-                    Type</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;"
-                    id="sumDashController">Fixed Time</div>
-                </div>
-                <div class="summary-metric-box"
-                  style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Base
-                    Saturation Flow</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;"
-                    id="sumDashBaseSat">1800 PCU/h/lane</div>
-                </div>
-                <div class="summary-metric-box"
-                  style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Amber Time
-                  </div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;"
-                    id="sumDashAmber">3 s</div>
-                </div>
-                <div class="summary-metric-box"
-                  style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">All Red Time
-                  </div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;"
-                    id="sumDashAllRed">2 s</div>
-                </div>
-                <div class="summary-metric-box"
-                  style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Pedestrian
-                    Walking Speed</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;"
-                    id="sumDashPedWalkSpeed">1.2 m/s</div>
-                </div>
-                <div class="summary-metric-box"
-                  style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Crossing
-                    Distance</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: #38bdf8; margin-top: 0.2rem;"
-                    id="sumDashPedDistance">7.0 m</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- SECTION 7: ENGINEERING READINESS -->
-            <div class="summary-dash-card full-width">
-              <div class="summary-dash-header">
-                <div class="summary-dash-title-group">
-                  <div class="summary-dash-icon">✓</div>
-                  <div>
-                    <div class="summary-dash-title">7. Engineering Readiness</div>
-                    <div class="summary-dash-subtitle">Pre-optimization survey &amp; input readiness assessment</div>
-                  </div>
-                </div>
-                <span class="badge badge-success">Pre-Analysis Ready</span>
-              </div>
-
-              <div style="display: flex; gap: 0.85rem; flex-wrap: wrap; padding: 0.5rem 0;">
-                <span
-                  style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #10b981; font-size: 0.8rem; font-weight: 700; padding: 6px 14px; border-radius: 20px;">✓
-                  Geometry Complete</span>
-                <span
-                  style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #10b981; font-size: 0.8rem; font-weight: 700; padding: 6px 14px; border-radius: 20px;">✓
-                  Dataset Imported</span>
-                <span
-                  style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #10b981; font-size: 0.8rem; font-weight: 700; padding: 6px 14px; border-radius: 20px;">✓
-                  Vehicle Counts Processed</span>
-                <span
-                  style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #10b981; font-size: 0.8rem; font-weight: 700; padding: 6px 14px; border-radius: 20px;">✓
-                  PCU Conversion Complete</span>
-                <span
-                  style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #10b981; font-size: 0.8rem; font-weight: 700; padding: 6px 14px; border-radius: 20px;">✓
-                  Turning Movements Available</span>
-                <span
-                  style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #10b981; font-size: 0.8rem; font-weight: 700; padding: 6px 14px; border-radius: 20px;">✓
-                  Engineering Parameters Loaded</span>
-                <span
-                  style="background: rgba(56,189,248,0.2); border: 1px solid var(--accent-primary); color: var(--accent-primary); font-size: 0.8rem; font-weight: 800; padding: 6px 14px; border-radius: 20px;">✓
-                  Ready for Webster Analysis</span>
-              </div>
-            </div>
+          </div>
 
           </div>
         </section>
