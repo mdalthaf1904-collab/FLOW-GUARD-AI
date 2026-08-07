@@ -370,13 +370,16 @@ const FlowGuard = (function () {
       },
       engineeringParameters: {
         pcuFactors: {
-          car: 1.0,
           motorcycle: 0.5,
-          autorickshaw: 0.8,
-          bus: 3.0,
-          truck: 3.0,
+          car: 1.0,
+          autorickshaw: 1.2,
+          lcv: 1.4,
+          bus: 2.2,
+          truck: 2.2,
+          tractor: 4.0,
           bicycle: 0.4,
-          tractor: 4.5,
+          cyclerickshaw: 1.5,
+          tonga: 1.5,
           cart: 2.0
         },
         intersection: {
@@ -390,23 +393,8 @@ const FlowGuard = (function () {
           totalLostTime: 16.0,
           effectiveGreen: 8.0,
           baseSaturationFlow: 1800,
-          laneWidth: 3.5,
-          heavyVehiclePct: 5,
-          gradientPct: 0,
-          parkingFactor: 1.00,
-          sideFrictionFactor: 1.00,
-          saturationFlow: 1638,
-          effectiveSaturationFlow: 1638,
-          crosswalkWidth: 14.0,
-          walkingSpeed: 1.2,
-          startupTime: 7.0,
-          pedestrianDemand: 150,
-          requiredPedGreen: 18.7,
-          controllerType: 'Fixed Time',
-          areaType: 'Urban CBD',
-          schoolZone: 'No',
-          disabledCrossing: 'Yes',
-          pushButton: 'No'
+          numPhases: 4,
+          controllerType: 'Fixed Time'
         }
       },
       processedTraffic: {
@@ -3190,8 +3178,17 @@ const FlowGuard = (function () {
       resetPcuBtn.addEventListener('click', (e) => {
         e.preventDefault();
         const defaultFactors = {
-          car: 1.0, motorcycle: 0.5, autorickshaw: 0.8,
-          bus: 3.0, truck: 3.0, bicycle: 0.4, tractor: 4.5, cart: 2.0
+          motorcycle: 0.5,
+          car: 1.0,
+          autorickshaw: 1.2,
+          lcv: 1.4,
+          bus: 2.2,
+          truck: 2.2,
+          tractor: 4.0,
+          bicycle: 0.4,
+          cyclerickshaw: 1.5,
+          tonga: 1.5,
+          cart: 2.0
         };
         const currentInputs = document.querySelectorAll('.pcu-edit-input');
         currentInputs.forEach(input => {
@@ -3210,7 +3207,7 @@ const FlowGuard = (function () {
 
   /**
    * Validate user input parameters against engineering bounds and update design assumptions summary.
-   * Auto-links Step 1 Geometry (Lanes, Width, Median) to Pedestrian Crossing Distance.
+   * Focuses on parameters affecting Webster Signal Optimization.
    */
   function updateEngineeringCalculations() {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
@@ -3222,29 +3219,11 @@ const FlowGuard = (function () {
     const allRedTime = Math.max(0, parseFloat((document.getElementById('engAllRedTime') || {}).value) || 2.0);
     const startupLost = Math.max(0, parseFloat((document.getElementById('engStartupLost') || {}).value) || 2.0);
     const clearanceLost = Math.max(0, parseFloat((document.getElementById('engClearanceLost') || {}).value) || 2.0);
+    const numPhases = parseInt((document.getElementById('engNumPhases') || {}).value, 10) || 4;
     const controllerType = (document.getElementById('engControllerType') || {}).value || 'Fixed Time';
 
-    // 2. Saturation Flow Settings & Adjustment Factors
+    // 2. Base Saturation Flow Settings
     const baseSat = Math.max(500, parseFloat((document.getElementById('engBaseSatFlow') || {}).value) || 1800);
-    const laneWidth = parseFloat((document.getElementById('engLaneWidth') || {}).value) || 3.5;
-    const hvPercent = parseFloat((document.getElementById('engHVPercent') || {}).value) || 5;
-    const gradient = parseFloat((document.getElementById('engGradient') || {}).value) || 0;
-    const parkingFactor = parseFloat((document.getElementById('engParkingFactor') || {}).value) || 1.0;
-    const sideFriction = parseFloat((document.getElementById('engSideFriction') || {}).value) || 1.0;
-    const medianType = (document.getElementById('engMedianType') || {}).value || 'Raised Kerb';
-
-    const fw = 1.0 + ((laneWidth - 3.5) / 10.5);
-    const fhv = 100.0 / (100.0 + (hvPercent * 2.0));
-    const fg = 1.0 - (0.005 * gradient);
-
-    const widthValEl = document.getElementById('engWidthVal');
-    if (widthValEl) widthValEl.textContent = `${laneWidth.toFixed(1)}m → fw = ${fw.toFixed(2)}`;
-
-    const hvValEl = document.getElementById('engHVVal');
-    if (hvValEl) hvValEl.textContent = `${hvPercent}% HV → fHV = ${fhv.toFixed(2)}`;
-
-    const gradValEl = document.getElementById('engGradVal');
-    if (gradValEl) gradValEl.textContent = `${gradient}% Grade → fg = ${fg.toFixed(2)}`;
 
     // 3. PCU Factors
     const currentState = getState();
@@ -3258,98 +3237,27 @@ const FlowGuard = (function () {
       }
     });
 
-    // 4. Pedestrian Parameters — Auto Link Geometry from Step 1
-    const schoolZone = (document.getElementById('engSchoolZone') || {}).value || 'No';
-    const elderlyArea = (document.getElementById('engElderlyArea') || {}).value || 'No';
-
-    let defaultSpeed = 1.2;
-    if (schoolZone === 'Yes') defaultSpeed = 1.0;
-    if (elderlyArea === 'Yes') defaultSpeed = 0.9;
-
-    const walkSpeedInput = document.getElementById('engWalkSpeed');
-    let walkSpeed = Math.max(0.4, parseFloat((walkSpeedInput || {}).value) || defaultSpeed);
-
-    // Auto-calculate Crossing Distance from Step 1 Geometry:
-    // Crossing Distance = (Number of Incoming Lanes * Lane Width) + Median Width (if present)
-    const approaches = currentState.approaches || DEFAULT_STATE.approaches;
-    const activeKeys = getActiveApproachKeys(currentState.configType || '4CROSS');
-    let maxIncomingLanes = 2;
-    activeKeys.forEach(k => {
-      const app = approaches[k];
-      if (app && app.lanes) {
-        maxIncomingLanes = Math.max(maxIncomingLanes, parseInt(app.lanes, 10) || 2);
-      }
-    });
-
-    const medianWidth = (medianType === 'Raised Kerb' || medianType === 'raised') ? 2.0 : 0.0;
-    const crossingDistance = parseFloat(((maxIncomingLanes * laneWidth) + medianWidth).toFixed(1));
-
-    // Pedestrian Time Calculations
-    const pedStartup = 5.0; // standard startup time
-    const clearanceTime = parseFloat((crossingDistance / walkSpeed).toFixed(1));
-    const reqPedGreen = clearanceTime;
-    const totalCrossingTime = parseFloat((pedStartup + clearanceTime).toFixed(1));
-
-    // Update Read-Only Preview Cards
-    const distEl = document.getElementById('pedAutoDistance');
-    if (distEl) distEl.textContent = `${crossingDistance.toFixed(1)} m`;
-
-    const walkSpeedEl = document.getElementById('pedAutoWalkSpeed');
-    if (walkSpeedEl) walkSpeedEl.textContent = `${walkSpeed.toFixed(1)} m/s`;
-
-    const reqGreenEl = document.getElementById('pedAutoReqGreen');
-    if (reqGreenEl) reqGreenEl.textContent = `${clearanceTime.toFixed(1)} s`;
-
-    const clearanceEl = document.getElementById('pedAutoClearance');
-    if (clearanceEl) clearanceEl.textContent = `${clearanceTime.toFixed(1)} s`;
-
-    const totalTimeEl = document.getElementById('pedAutoTotalTime');
-    if (totalTimeEl) totalTimeEl.textContent = `${totalCrossingTime.toFixed(1)} s`;
-
-    // Non-blocking Validation Warning
-    const warningBanner = document.getElementById('pedValidationWarningBanner');
-    if (warningBanner) {
-      if (totalCrossingTime > minGreen) {
-        warningBanner.style.display = 'block';
-        warningBanner.textContent = `⚠ Required pedestrian crossing time (${totalCrossingTime.toFixed(1)}s) exceeds current minimum green (${minGreen}s). The issue will be addressed during optimization.`;
-      } else {
-        warningBanner.style.display = 'none';
-      }
-    }
-
     // Input Validation Badges
     updateInputCheckmark('valCheckMinGreen', minGreen >= 5 && minGreen <= 15, '✓ Valid (5–15s)');
     updateInputCheckmark('valCheckMaxGreen', maxGreen >= 30 && maxGreen <= 180, '✓ Valid (30–180s)');
     updateInputCheckmark('valCheckAmber', amberTime >= 3.0 && amberTime <= 5.0, '✓ Valid (3–5s)');
     updateInputCheckmark('valCheckAllRed', allRedTime >= 1.0 && allRedTime <= 3.0, '✓ Valid (1–3s)');
     updateInputCheckmark('valCheckSatFlow', baseSat >= 1400 && baseSat <= 2200, '✓ Valid (1400–2200 PCU/h/ln)');
-    updateInputCheckmark('valCheckHV', hvPercent >= 0 && hvPercent <= 40, '✓ Valid (0–40%)');
-    updateInputCheckmark('valCheckWalkSpeed', walkSpeed >= 0.8 && walkSpeed <= 1.5, '✓ Valid (0.8–1.5m/s)');
 
-    // 5. Update Engineering Assumptions Summary Labels
+    // 4. Update Engineering Assumptions Summary Labels
     const assumpCtrlEl = document.getElementById('summaryAssumpController');
     if (assumpCtrlEl) assumpCtrlEl.textContent = controllerType;
 
-    const assumpMinGreenEl = document.getElementById('summaryAssumpMinGreen');
-    if (assumpMinGreenEl) assumpMinGreenEl.textContent = `${minGreen} s`;
-
-    const assumpMaxGreenEl = document.getElementById('summaryAssumpMaxGreen');
-    if (assumpMaxGreenEl) assumpMaxGreenEl.textContent = `${maxGreen} s`;
-
-    const assumpAmberEl = document.getElementById('summaryAssumpAmber');
-    if (assumpAmberEl) assumpAmberEl.textContent = `${amberTime} s`;
-
-    const assumpAllRedEl = document.getElementById('summaryAssumpAllRed');
-    if (assumpAllRedEl) assumpAllRedEl.textContent = `${allRedTime} s`;
+    const assumpCtrlTypeEl = document.getElementById('summaryAssumpControllerType');
+    if (assumpCtrlTypeEl) assumpCtrlTypeEl.textContent = controllerType;
 
     const assumpBaseSatEl = document.getElementById('summaryAssumpBaseSat');
     if (assumpBaseSatEl) assumpBaseSatEl.textContent = `${baseSat} PCU/hr/lane`;
 
-    const assumpWalkSpeedEl = document.getElementById('summaryAssumpWalkSpeed');
-    if (assumpWalkSpeedEl) assumpWalkSpeedEl.textContent = `${walkSpeed} m/s`;
+    const assumpPhasesEl = document.getElementById('summaryAssumpPhases');
+    if (assumpPhasesEl) assumpPhasesEl.textContent = `${numPhases} Phases`;
 
     // Save State
-    const effectiveSatFlowEst = Math.round(baseSat * fw * fhv * fg * parkingFactor * sideFriction);
     const phaseLostTime = startupLost + clearanceLost;
 
     currentState.intersection = {
@@ -3360,21 +3268,12 @@ const FlowGuard = (function () {
       allRedTime: allRedTime,
       startupLostTime: startupLost,
       clearanceLostTime: clearanceLost,
-      totalLostTime: 4 * phaseLostTime,
+      totalLostTime: numPhases * phaseLostTime,
+      numPhases: numPhases,
       baseSaturationFlow: baseSat,
-      laneWidth: laneWidth,
-      heavyVehiclePct: hvPercent,
-      gradientPct: gradient,
-      parkingFactor: parkingFactor,
-      sideFrictionFactor: sideFriction,
-      saturationFlow: effectiveSatFlowEst,
-      effectiveSaturationFlow: effectiveSatFlowEst,
-      crosswalkWidth: crossingDistance,
-      walkingSpeed: walkSpeed,
-      startupTime: pedStartup,
-      requiredPedGreen: reqPedGreen,
-      pedestrianClearanceTime: clearanceTime,
-      pedestrianTotalCrossingTime: totalCrossingTime
+      saturationFlow: baseSat,
+      effectiveSaturationFlow: baseSat,
+      controllerType: controllerType
     };
     currentState.pcuFactors = pcuFactors;
     saveState(currentState);
