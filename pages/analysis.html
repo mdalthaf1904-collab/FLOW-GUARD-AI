@@ -60,7 +60,15 @@
         <div class="wizard-sidebar-header">ANALYSIS WIZARD</div>
         
         <ul class="wizard-stepper-list">
-          <li class="wizard-step-item active" data-step-id="1" onclick="FlowGuard.setWizardStep(1)">
+          <li class="wizard-step-item active" data-step-id="0" onclick="FlowGuard.setWizardStep(0)">
+            <span class="wizard-step-num">0</span>
+            <div class="wizard-step-content">
+              <span class="wizard-step-title">New Analysis</span>
+              <span class="wizard-step-subtitle">Start a new project</span>
+            </div>
+          </li>
+
+          <li class="wizard-step-item" data-step-id="1" onclick="FlowGuard.setWizardStep(1)">
             <span class="wizard-step-num">1</span>
             <div class="wizard-step-content">
               <span class="wizard-step-title">Intersection Geometry</span>
@@ -132,7 +140,23 @@
         <p style="font-size: 0.82rem; color: var(--text-secondary);">Configure intersection details, input traffic data, and run engineering analysis.</p>
 
        <!-- STEP 1 SECTION: INTERSECTION GEOMETRY -->
-      <section id="wizard-section-1" class="wizard-section-panel" style="display: block; margin-bottom: 2rem;">
+      <!-- STEP 0 SECTION: NEW ANALYSIS -->
+      <section id="wizard-section-0" class="wizard-section-panel" style="display: block; margin-bottom: 2rem; text-align: center; padding: 4rem 2rem;">
+        <div style="margin-bottom: 2rem;">
+          <svg viewBox="0 0 24 24" style="width: 64px; height: 64px; fill: var(--accent-primary); opacity: 0.8; margin-bottom: 1rem;">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+          </svg>
+          <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">Start a New Traffic Analysis</h2>
+          <p style="font-size: 0.95rem; color: var(--text-secondary); max-width: 500px; margin: 0 auto;">
+            Create a clean workspace to begin a new intersection study. This will reset all current inputs, datasets, and analysis results while preserving your engineering parameters.
+          </p>
+        </div>
+        <button id="btnStartNewAnalysis" class="btn-primary-cyan" onclick="FlowGuard.createNewProject()" style="font-size: 1.1rem; padding: 16px 32px; font-weight: 700; border-radius: 8px;">
+          Start New Analysis
+        </button>
+      </section>
+
+      <section id="wizard-section-1" class="wizard-section-panel" style="display: none; margin-bottom: 2rem;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem;">
           <h2 class="section-header-title" style="font-size: 1.05rem; margin-bottom: 0;">1. INTERSECTION GEOMETRY</h2>
           <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -1378,6 +1402,7 @@
     </div>
   </footer>
 
+  <script charset="utf-8" src="../js/traffic_summary.js"></script>
   <script charset="utf-8" src="../js/app.js"></script>
   <script charset="utf-8" src="../js/congestion.js"></script>
   <script charset="utf-8" src="../js/simulation.js"></script>

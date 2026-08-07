@@ -96,8 +96,37 @@ describe('FlowGuard AI - Unified Project Store Architecture', () => {
     // Verify processedTraffic contains pre-computed approachStats
     expect(proj.processedTraffic.approachStats).toBeDefined();
     expect(proj.processedTraffic.approachStats.north).toBeDefined();
+    proj.trafficInput.vehicleCounts.north = { car: 100 };
+    FlowGuard.saveProject(proj);
     expect(proj.processedTraffic.totalVehicles).toBeGreaterThan(0);
     expect(proj.processedTraffic.totalPCUDemand).toBeGreaterThan(0);
+  });
+
+  test('resetToDefaults preserves Engineering Parameters while clearing traffic inputs and downstream analysis results', () => {
+    const proj = FlowGuard.getProject();
+
+    // Mutate engineering parameters
+    proj.engineeringParameters.pcuFactors.bus = 4.5;
+    proj.engineeringParameters.intersection.saturationFlow = 1950;
+    proj.trafficInput.excelUploaded = true;
+    proj.analysisResults.optResult = { cOpt: 90 };
+    FlowGuard.saveProject(proj);
+
+    // Run resetToDefaults (default: preserveEngineeringParams = true)
+    FlowGuard.resetToDefaults(true);
+
+    const resetProj = FlowGuard.getProject();
+
+    // Engineering Parameters must remain preserved
+    expect(resetProj.engineeringParameters.pcuFactors.bus).toEqual(4.5);
+    expect(resetProj.engineeringParameters.intersection.saturationFlow).toEqual(1950);
+
+    // Traffic Input, Processed Traffic, Analysis Results, and Reports must be cleared
+    expect(resetProj.trafficInput.excelUploaded).toEqual(false);
+    expect(resetProj.trafficInput.rawDatasetRecords).toEqual([]);
+    expect(resetProj.trafficInput.roadSummary).toBeUndefined();
+    expect(resetProj.analysisResults.optResult).toBeNull();
+    expect(resetProj.report.generatedAt).toBeNull();
   });
 
 });

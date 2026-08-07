@@ -57,7 +57,15 @@
         <div class="wizard-sidebar-header">ANALYSIS WIZARD</div>
         
         <ul class="wizard-stepper-list">
-          <li class="wizard-step-item active" data-step-id="1" onclick="FlowGuard.setWizardStep(1)">
+          <li class="wizard-step-item active" data-step-id="0" onclick="FlowGuard.setWizardStep(0)">
+            <span class="wizard-step-num">0</span>
+            <div class="wizard-step-content">
+              <span class="wizard-step-title">New Analysis</span>
+              <span class="wizard-step-subtitle">Start a new project</span>
+            </div>
+          </li>
+
+          <li class="wizard-step-item" data-step-id="1" onclick="FlowGuard.setWizardStep(1)">
             <span class="wizard-step-num">1</span>
             <div class="wizard-step-content">
               <span class="wizard-step-title">Intersection Geometry</span>
@@ -129,7 +137,23 @@
       </div>
 
       <!-- STEP 1 SECTION -->
-      <section id="wizard-section-1" class="wizard-section-panel" style="display: block;">
+      <!-- STEP 0 SECTION: NEW ANALYSIS -->
+      <section id="wizard-section-0" class="wizard-section-panel" style="display: block; margin-bottom: 2rem; text-align: center; padding: 4rem 2rem;">
+        <div style="margin-bottom: 2rem;">
+          <svg viewBox="0 0 24 24" style="width: 64px; height: 64px; fill: var(--accent-primary); opacity: 0.8; margin-bottom: 1rem;">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+          </svg>
+          <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">Start a New Traffic Analysis</h2>
+          <p style="font-size: 0.95rem; color: var(--text-secondary); max-width: 500px; margin: 0 auto;">
+            Create a clean workspace to begin a new intersection study. This will reset all current inputs, datasets, and analysis results while preserving your engineering parameters.
+          </p>
+        </div>
+        <button id="btnStartNewAnalysis" class="btn-primary-cyan" onclick="FlowGuard.createNewProject()" style="font-size: 1.1rem; padding: 16px 32px; font-weight: 700; border-radius: 8px;">
+          Start New Analysis
+        </button>
+      </section>
+
+      <section id="wizard-section-1" class="wizard-section-panel" style="display: none; margin-bottom: 2rem;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem;">
           <h2 class="section-header-title" style="font-size: 1.05rem; margin-bottom: 0;">1. INTERSECTION GEOMETRY</h2>
           <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -953,268 +977,8 @@
           <p style="font-size: 0.82rem; color: var(--text-secondary);">Centralized pre-analysis engineering dashboard summarizing the uploaded traffic survey, carriageway geometry, vehicle composition, PCU factors, and signal parameters prior to Webster optimization.</p>
         </div>
 
-        <div class="summary-dash-grid">
-
-          <!-- SECTION 1: SURVEY OVERVIEW -->
-          <div class="summary-dash-card full-width">
-            <div class="summary-dash-header">
-              <div class="summary-dash-title-group">
-                <div class="summary-dash-icon">MAP</div>
-                <div>
-                  <div class="summary-dash-title">1. Survey Overview</div>
-                  <div class="summary-dash-subtitle">Carriageway survey metadata, intervals, total volume &amp; converted PCUs</div>
-                </div>
-              </div>
-              <span class="badge badge-low">Survey Metadata</span>
-            </div>
-
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Survey Method</div>
-                <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashMethod">Historical Dataset Upload</div>
-              </div>
-              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Survey Duration</div>
-                <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashDuration">15 Minutes</div>
-              </div>
-              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Selected Interval</div>
-                <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashSelectedInterval">Peak Interval #3</div>
-              </div>
-              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Peak Interval</div>
-                <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashPeakHour">08:30 AM - 08:45 AM</div>
-              </div>
-              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total Vehicles</div>
-                <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashObservedVehicles">1,100 veh</div>
-              </div>
-              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total Converted PCU</div>
-                <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashObservedPCU">1,170 PCU</div>
-              </div>
-              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); grid-column: span 2;">
-                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Hourly Equivalent Demand</div>
-                <div style="font-size: 1.25rem; font-weight: 800; color: var(--accent-primary); margin-top: 0.2rem;" id="sumDashHourlyDemand">4,680 PCU/hr</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- SECTION 2: ROAD-WISE ENGINEERING CARDS -->
-          <div class="summary-dash-card full-width">
-            <div class="summary-dash-header">
-              <div class="summary-dash-title-group">
-                <div class="summary-dash-icon">SIGN</div>
-                <div>
-                  <div class="summary-dash-title">2. Road-wise Engineering Cards</div>
-                  <div class="summary-dash-subtitle">Independent approach demand, turning movements, geometry &amp; saturation flow</div>
-                </div>
-              </div>
-              <span class="badge badge-low">Approach Analysis</span>
-            </div>
-
-            <!-- 4 Independent Engineering Cards Grid -->
-            <div id="sumDashApproachCardsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
-              <!-- Dynamically populated from processedTraffic.approaches -->
-            </div>
-          </div>
-
-          <!-- SECTION 3: VEHICLE COMPOSITION -->
-          <div class="summary-dash-card full-width">
-            <div class="summary-dash-header">
-              <div class="summary-dash-title-group">
-                <div class="summary-dash-icon">PIE</div>
-                <div>
-                  <div class="summary-dash-title">3. Vehicle Composition</div>
-                  <div class="summary-dash-subtitle">Modal breakdown, counts, percentages from uploaded dataset</div>
-                </div>
-              </div>
-              <span class="badge badge-low">Modal Distribution</span>
-            </div>
-
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; align-items: center;">
-              <!-- LEFT: Professional Doughnut Chart -->
-              <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
-                <div id="vehPieChartContainer" style="width: 220px; height: 220px; position: relative;">
-                  <!-- Interactive SVG Donut Pie Chart -->
-                </div>
-                <div class="pie-legend-list" id="vehPieLegendList" style="margin-top: 1rem; width: 100%; display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center;">
-                  <!-- Dynamic legend -->
-                </div>
-              </div>
-
-              <!-- RIGHT: Vehicle Composition Table -->
-              <div style="overflow-x: auto;">
-                <table class="mini-data-table" style="width: 100%;">
-                  <thead>
-                    <tr>
-                      <th>Vehicle Category</th>
-                      <th style="text-align: right;">Observed Count</th>
-                      <th style="text-align: right;">Percentage (%)</th>
-                    </tr>
-                  </thead>
-                  <tbody id="vehCompositionTableBody">
-                    <!-- Dynamically populated from processedTraffic -->
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- SECTION 4: PCU SUMMARY -->
-          <div class="summary-dash-card full-width">
-            <div class="summary-dash-header">
-              <div class="summary-dash-title-group">
-                <div class="summary-dash-icon">CAR</div>
-                <div>
-                  <div class="summary-dash-title">4. PCU Summary</div>
-                  <div class="summary-dash-subtitle">Mode-wise observed counts, configured IRC:106 PCU factors, and calculated PCU</div>
-                </div>
-              </div>
-              <span class="badge badge-low">IRC:106 Conversion</span>
-            </div>
-
-            <div style="overflow-x: auto;">
-              <table class="mini-data-table" style="width: 100%;">
-                <thead>
-                  <tr>
-                    <th>Vehicle Class</th>
-                    <th style="text-align: right;">Observed Count</th>
-                    <th style="text-align: right;">Configured IRC:106 PCU Factor</th>
-                    <th style="text-align: right;">Converted PCU</th>
-                  </tr>
-                </thead>
-                <tbody id="pcuSummaryCategoryTableBody">
-                  <!-- Dynamically populated from processedTraffic -->
-                </tbody>
-                <tfoot>
-                  <tr style="font-weight: 800; background: rgba(56,189,248,0.1);">
-                    <td style="color: var(--text-primary);">Total Summary</td>
-                    <td style="text-align: right;" id="pcuSumTotalObserved">-</td>
-                    <td style="text-align: right;">-</td>
-                    <td style="text-align: right; color: var(--accent-primary);" id="pcuSumTotalCalculated">-</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-
-          <!-- SECTION 5: ROAD DEMAND COMPARISON -->
-          <div class="summary-dash-card full-width">
-            <div class="summary-dash-header">
-              <div class="summary-dash-title-group">
-                <div class="summary-dash-icon">BAR</div>
-                <div>
-                  <div class="summary-dash-title">5. Road Demand Comparison</div>
-                  <div class="summary-dash-subtitle">Approach-wise demand comparison (Hourly Demand PCU/hr sorted highest to lowest)</div>
-                </div>
-              </div>
-              <span class="badge badge-low">Demand Comparison</span>
-            </div>
-
-            <div id="roadDemandBarChartContainer" style="width: 100%; min-height: 180px; padding: 0.5rem 0;">
-              <!-- Horizontal Bar Chart -->
-            </div>
-          </div>
-
-          <!-- SECTION 6: ENGINEERING PARAMETERS SNAPSHOT -->
-          <div class="summary-dash-card full-width">
-            <div class="summary-dash-header">
-              <div class="summary-dash-title-group">
-                <div class="summary-dash-icon">TIME</div>
-                <div>
-                  <div class="summary-dash-title">6. Engineering Parameters Snapshot</div>
-                  <div class="summary-dash-subtitle">Read-only signal bounds, saturation flow &amp; crosswalk safety parameters</div>
-                </div>
-              </div>
-              <span class="badge badge-low">Engineering Snapshot</span>
-            </div>
-
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Controller Type</div>
-                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashController">Fixed Time</div>
-              </div>
-              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Base Saturation Flow</div>
-                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashBaseSat">1800 PCU/h/lane</div>
-              </div>
-              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Amber Time</div>
-                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashAmber">3 s</div>
-              </div>
-              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">All Red Time</div>
-                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashAllRed">2 s</div>
-              </div>
-              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Pedestrian Walking Speed</div>
-                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashPedWalkSpeed">1.2 m/s</div>
-              </div>
-              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Crossing Distance</div>
-                <div style="font-size: 0.95rem; font-weight: 700; color: #38bdf8; margin-top: 0.2rem;" id="sumDashPedDistance">7.0 m</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- SECTION 7: ENGINEERING READINESS -->
-          <div class="summary-dash-card full-width">
-            <div class="summary-dash-header">
-              <div class="summary-dash-title-group">
-                <div class="summary-dash-icon">CHECK</div>
-                <div>
-                  <div class="summary-dash-title">7. Engineering Readiness</div>
-                  <div class="summary-dash-subtitle">Pre-optimization survey &amp; input readiness assessment</div>
-                </div>
-              </div>
-              <span class="badge badge-success">Pre-Analysis Ready</span>
-            </div>
-
-            <div style="display: flex; gap: 0.85rem; flex-wrap: wrap; padding: 0.5rem 0;">
-              <span style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #10b981; font-size: 0.8rem; font-weight: 700; padding: 6px 14px; border-radius: 20px;">✓ Geometry Complete</span>
-              <span style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #10b981; font-size: 0.8rem; font-weight: 700; padding: 6px 14px; border-radius: 20px;">✓ Dataset Imported</span>
-              <span style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #10b981; font-size: 0.8rem; font-weight: 700; padding: 6px 14px; border-radius: 20px;">✓ Vehicle Counts Processed</span>
-              <span style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #10b981; font-size: 0.8rem; font-weight: 700; padding: 6px 14px; border-radius: 20px;">✓ PCU Conversion Complete</span>
-              <span style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #10b981; font-size: 0.8rem; font-weight: 700; padding: 6px 14px; border-radius: 20px;">✓ Turning Movements Available</span>
-              <span style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #10b981; font-size: 0.8rem; font-weight: 700; padding: 6px 14px; border-radius: 20px;">✓ Engineering Parameters Loaded</span>
-              <span style="background: rgba(56,189,248,0.2); border: 1px solid var(--accent-primary); color: var(--accent-primary); font-size: 0.8rem; font-weight: 800; padding: 6px 14px; border-radius: 20px;">✓ Ready for Webster Analysis</span>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-          <!-- CARD 9: ENGINEERING READINESS CHECKLIST -->
-          <div class="summary-dash-card full-width">
-            <div class="summary-dash-header">
-              <div class="summary-dash-title-group">
-                <div class="summary-dash-icon">CHECK</div>
-                <div>
-                  <div class="summary-dash-title">9. Engineering Readiness Checklist</div>
-                  <div class="summary-dash-subtitle">Validation of all input requirements prior to Webster optimization</div>
-                </div>
-              </div>
-              <span class="badge badge-low" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">✓ READY FOR ANALYSIS</span>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-top: 0.5rem;">
-              <div style="display: flex; gap: 1.25rem; flex-wrap: wrap; font-size: 0.82rem; color: var(--success); font-weight: 600;">
-                <span>✓ Geometry Ready</span>
-                <span>✓ Traffic Data Loaded</span>
-                <span>✓ Turning Data Verified</span>
-                <span>✓ PCU Factors Applied</span>
-                <span>✓ Signal Parameters Loaded</span>
-                <span>✓ Pedestrian Parameters Ready</span>
-                <span>✓ Ready for Webster Analysis</span>
-              </div>
-
-              <button class="btn-primary-cyan" style="font-size: 0.95rem; padding: 12px 24px; font-weight: 700;" onclick="FlowGuard.setWizardStep(5)">
-                Proceed to Run Analysis →
-              </button>
-            </div>
-          </div>
-
+        <div id="trafficSummaryDashboardContainer" class="summary-dash-grid">
+          <!-- Dynamically populated by TrafficSummaryDashboard -->
         </div>
       </section>
 
@@ -1429,5 +1193,6 @@
   </div>
 
   <script charset="utf-8" src="js/app.js"></script>
+  <script charset="utf-8" src="js/traffic_summary.js"></script>
 </body>
 </html>

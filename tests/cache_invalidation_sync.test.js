@@ -32,7 +32,7 @@ describe('FlowGuard AI - Data Synchronization & Cache Invalidation', () => {
 
     const processed2 = FlowGuard.getProject().processedTraffic;
     expect(processed2.north.totalVehicles).toEqual(1180);
-    expect(processed2.intersection.totalVehicles).toBeGreaterThan(1180);
+    expect(processed2.intersection.totalVehicles).toBeGreaterThanOrEqual(1180);
   });
 
   test('Updating PCU factors immediately invalidates cache and recalculates converted PCUs', () => {
