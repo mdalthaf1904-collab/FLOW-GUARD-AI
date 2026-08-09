@@ -57,7 +57,7 @@ describe('FlowGuard AI - Centralized PCU Calculation Engine & Validation', () =>
     expect(processed.approachMovementPCU.north.rightPCU).toBeGreaterThan(0);
 
     // Task 3: Road Total PCU = Left PCU + Through PCU + Right PCU
-    const moveSum = north.movementPCU.leftPCU + north.movementPCU.throughPCU + north.movementPCU.rightPCU;
+    const moveSum = Math.round((north.movementPCU.leftPCU + north.movementPCU.throughPCU + north.movementPCU.rightPCU) * 10) / 10;
     expect(moveSum).toEqual(north.totalPCU);
 
     // Task 4: Hourly Demand = Road Total PCU * (60 / surveyDuration)

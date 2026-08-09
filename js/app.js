@@ -565,65 +565,24 @@ const FlowGuard = (function () {
     if (!project.trafficInput) project.trafficInput = createInitialProject().trafficInput;
     if (!project.engineeringParameters) project.engineeringParameters = createInitialProject().engineeringParameters;
 
-    // ── DATASET GUARD: If no dataset has been uploaded or seeded, zero out dataset & processedTraffic and return early. ──
+    // ── DATASET GUARD: Strictly check in-memory dataset condition ──
+    const hasRawRecords = !!(
+      (project.dataset && Array.isArray(project.dataset.records) && project.dataset.records.length > 0) ||
+      (project.trafficInput && Array.isArray(project.trafficInput.rawDatasetRecords) && project.trafficInput.rawDatasetRecords.length > 0)
+    );
     const hasVehicleCounts = project.trafficInput && project.trafficInput.vehicleCounts &&
       Object.values(project.trafficInput.vehicleCounts).some(v => Object.values(v || {}).some(c => c > 0));
-    const hasRawRecords = !!(
-      (project.dataset && project.dataset.records && project.dataset.records.length > 0) ||
-      (project.trafficInput && project.trafficInput.rawDatasetRecords && project.trafficInput.rawDatasetRecords.length > 0)
-    );
+
     const datasetUploaded = !!(
-      (project.dataset && project.dataset.uploaded) ||
+      (project.dataset && project.dataset.uploaded === true) ||
       (project.trafficInput && (project.trafficInput.datasetUploaded || project.trafficInput.excelUploaded)) ||
       hasRawRecords ||
       hasVehicleCounts
     );
 
     if (!datasetUploaded) {
-      project.dataset = {
-        uploaded: false,
-        records: [],
-        intervals: [],
-        parsedRecords: 0,
-        numRoads: 0,
-        numIntervals: 0,
-        totalVehicles: 0,
-        totalPCU: 0,
-        peakInterval: '--',
-        peakIntervalPCU: 0,
-        surveyDate: '--',
-        surveyDuration: '--',
-        inputMode: '--',
-        status: 'Awaiting Dataset Upload'
-      };
-
-      project.processedTraffic = {
-        approachStats: {},
-        totalVehicles: 0,
-        totalPCUDemand: 0,
-        totalPCU: 0,
-        hourlyTotalDemand: 0,
-        criticalLaneKey: null,
-        pcuCategoryBreakdown: [],
-        sumModalVeh: {},
-        sumModalPcu: {},
-        movementPCU: {},
-        approachPCU: {},
-        hourlyDemand: {},
-        metadata: {
-          inputMode: '--',
-          surveyDuration: '--',
-          surveyDate: '--',
-          parsedRecords: 0,
-          numRoads: 0,
-          numIntervals: 0,
-          totalVehicles: 0,
-          totalPCU: 0,
-          peakInterval: '--',
-          peakIntervalPCU: 0,
-          status: 'Awaiting Dataset Upload'
-        }
-      };
+      project.dataset = createInitialProject().dataset;
+      project.processedTraffic = createInitialProject().processedTraffic;
       return;
     }
 
@@ -690,7 +649,7 @@ const FlowGuard = (function () {
           }
 
           const cnt = r.count !== undefined ? r.count : (r.totalVehicles || 0);
-          const pcuVal = cnt * resolved.factor;
+          const pcuVal = r.rawPCU !== undefined ? r.rawPCU : (cnt * resolved.factor);
           roadTotalPCUFromRecords += pcuVal;
 
           const movKey = normalizeMovementKey(r.movement);
@@ -781,18 +740,30 @@ const FlowGuard = (function () {
         }
       });
 
-      if (appRecords.length > 0 && roadTotalPCUFromRecords > 0) {
-        roadTotalPCU = Math.round(roadTotalPCUFromRecords * 10) / 10;
+      let effLeft = left, effThrough = through, effRight = right;
+      if (effLeft === 0 && effThrough === 0 && effRight === 0) {
+        effThrough = finalVehTotal > 0 ? finalVehTotal : 1;
       }
+      const effTotalMove = effLeft + effThrough + effRight;
 
-      const leftPCU = appRecords.length > 0 ? Math.round(leftPCUFromRecords) : Math.round((left / (left + through + right || 1)) * roadTotalPCU);
-      const throughPCU = appRecords.length > 0 ? Math.round(throughPCUFromRecords) : Math.round((through / (left + through + right || 1)) * roadTotalPCU);
-      const rightPCU = appRecords.length > 0 ? Math.round(rightPCUFromRecords) : Math.max(0, Math.round(roadTotalPCU - leftPCU - throughPCU));
+      const leftPCU = appRecords.length > 0
+        ? Math.round(leftPCUFromRecords * 10) / 10
+        : Math.round(((effLeft / effTotalMove) * roadTotalPCU) * 10) / 10;
 
-      const leftHourlyPCU = Math.round(leftPCU * mult);
-      const throughHourlyPCU = Math.round(throughPCU * mult);
-      const rightHourlyPCU = Math.round(rightPCU * mult);
-      const roadHourlyDemand = Math.round(roadTotalPCU * mult);
+      const throughPCU = appRecords.length > 0
+        ? Math.round(throughPCUFromRecords * 10) / 10
+        : Math.round(((effThrough / effTotalMove) * roadTotalPCU) * 10) / 10;
+
+      const rightPCU = appRecords.length > 0
+        ? Math.round(rightPCUFromRecords * 10) / 10
+        : Math.round(((effRight / effTotalMove) * roadTotalPCU) * 10) / 10;
+
+      roadTotalPCU = Math.round((leftPCU + throughPCU + rightPCU) * 10) / 10;
+
+      const leftHourlyPCU = Math.round(leftPCU * mult * 10) / 10;
+      const throughHourlyPCU = Math.round(throughPCU * mult * 10) / 10;
+      const rightHourlyPCU = Math.round(rightPCU * mult * 10) / 10;
+      const roadHourlyDemand = Math.round((leftHourlyPCU + throughHourlyPCU + rightHourlyPCU) * 10) / 10;
 
       totalVehiclesSum += finalVehTotal;
       totalPCUSum += roadTotalPCU;
@@ -842,43 +813,86 @@ const FlowGuard = (function () {
         assignProp(movementComposition.right, right);
       }
 
-      // Compute 4 15-minute interval PCUs for Peak Hour Analysis
-      const standardIntervals = ['08:00–08:15', '08:15–08:30', '08:30–08:45', '08:45–09:00'];
-      const intervalMap = {};
-      standardIntervals.forEach(invLabel => intervalMap[invLabel] = 0);
+      // ── INDEPENDENT PER-ROAD PEAK HOUR ANALYSIS ──
+      // Group records for approach k by actual 15-minute interval
+      const roadIntervalMap = {};
+      const datasetIntervals = (project.dataset && project.dataset.intervals) ? project.dataset.intervals : [];
 
       if (appRecords.length > 0) {
         appRecords.forEach(r => {
-          const invStr = r.timeWindow || r.time || '08:00–08:15';
-          const pcuVal = r.rawPCU !== undefined ? r.rawPCU : ((r.count || 0) * (pcuFactors[r.catKey] || 1.0));
+          const invLabel = normalizeTimeIntervalKey(r.timeWindow || r.time, 15);
+          if (!invLabel) return;
 
-          // Match or assign to standard interval label
-          let matchedKey = standardIntervals.find(s => invStr.includes(s.slice(0, 5))) || standardIntervals[0];
-          intervalMap[matchedKey] = (intervalMap[matchedKey] || 0) + pcuVal;
+          if (!roadIntervalMap[invLabel]) {
+            roadIntervalMap[invLabel] = { vehVolume: 0, pcuDemand: 0 };
+          }
+          const cnt = r.count !== undefined ? r.count : (r.totalVehicles || 0);
+          const rawVehType = r.vehicleType || r.vehicletype || r.catKey || 'Cars';
+          const resolved = resolveVehicleCategoryAndPCU(rawVehType, pcuFactors);
+          const pcuVal = r.rawPCU !== undefined ? r.rawPCU : (cnt * (resolved.factor || 1.0));
+
+          roadIntervalMap[invLabel].vehVolume += cnt;
+          roadIntervalMap[invLabel].pcuDemand += pcuVal;
         });
-      } else {
-        // Fallback split across 4 intervals
-        const quarterPCU = roadTotalPCU / 4;
-        intervalMap['08:00–08:15'] = quarterPCU * 0.9;
-        intervalMap['08:15–08:30'] = quarterPCU * 1.05;
-        intervalMap['08:30–08:45'] = quarterPCU * 1.15;
-        intervalMap['08:45–09:00'] = quarterPCU * 0.9;
+      } else if (datasetIntervals.length > 0) {
+        datasetIntervals.forEach(inv => {
+          const invLabel = normalizeTimeIntervalKey(inv.timeWindow || inv.time, 15);
+          if (!invLabel) return;
+          const appData = inv.roads ? inv.roads[k] : null;
+          roadIntervalMap[invLabel] = {
+            vehVolume: appData ? (appData.totalVehicles || 0) : 0,
+            pcuDemand: appData ? (appData.convertedPCU || appData.flow || 0) : 0
+          };
+        });
       }
 
-      const intervalPCUs = standardIntervals.map(invLabel => ({
-        interval: invLabel,
-        pcu: Math.round((intervalMap[invLabel] || 0) * 10) / 10
+      const intervalLabels = Object.keys(roadIntervalMap).sort();
+      const intervalList = intervalLabels.map(lbl => ({
+        label: lbl,
+        vehVolume: roadIntervalMap[lbl].vehVolume,
+        pcuDemand: roadIntervalMap[lbl].pcuDemand
       }));
 
-      let maxInv = intervalPCUs[0];
-      intervalPCUs.forEach(item => {
-        if (item.pcu > maxInv.pcu) maxInv = item;
+      const intervalPCUs = intervalList.map(item => ({
+        interval: item.label,
+        pcu: Math.round(item.pcuDemand * 10) / 10,
+        volume: item.vehVolume
+      }));
+
+      // Peak PCU Interval (PCU-based demand for existing Peak PCU output)
+      let maxPcuInv = intervalList[0] || { label: '—', vehVolume: 0, pcuDemand: 0 };
+      intervalList.forEach(item => {
+        if (item.pcuDemand > maxPcuInv.pcuDemand) {
+          maxPcuInv = item;
+        }
       });
 
-      const peakIntervalStr = maxInv ? maxInv.interval : '08:30–08:45';
-      const peakIntervalPCU = maxInv ? maxInv.pcu : 0;
-      const peakHourVol = Math.round(intervalPCUs.reduce((sum, item) => sum + item.pcu, 0) * 10) / 10;
-      const phf = peakIntervalPCU > 0 ? parseFloat((peakHourVol / (4 * peakIntervalPCU)).toFixed(2)) : 0.92;
+      // Peak Hour Volume & PHF (RAW VEHICLE COUNT-based across 4 consecutive 15-minute intervals)
+      let bestWindowVehVol = 0;
+      let max15MinVehVolInBestWindow = 0;
+
+      if (intervalList.length >= 4) {
+        for (let i = 0; i <= intervalList.length - 4; i++) {
+          const windowFour = intervalList.slice(i, i + 4);
+          const winVehVol = windowFour.reduce((sum, item) => sum + item.vehVolume, 0);
+          if (winVehVol >= bestWindowVehVol) {
+            bestWindowVehVol = winVehVol;
+            max15MinVehVolInBestWindow = Math.max(...windowFour.map(item => item.vehVolume));
+          }
+        }
+      } else if (intervalList.length > 0) {
+        bestWindowVehVol = intervalList.reduce((sum, item) => sum + item.vehVolume, 0);
+        max15MinVehVolInBestWindow = Math.max(...intervalList.map(item => item.vehVolume));
+      }
+
+      const phfVal = (max15MinVehVolInBestWindow > 0 && bestWindowVehVol > 0 && intervalList.length > 1)
+        ? parseFloat((bestWindowVehVol / (4 * max15MinVehVolInBestWindow)).toFixed(2))
+        : null;
+
+      const peakIntervalStr = maxPcuInv ? maxPcuInv.label : '—';
+      const peakIntervalPCU = Math.round((maxPcuInv ? maxPcuInv.pcuDemand : 0) * 10) / 10;
+      const peakHourVol = bestWindowVehVol;
+      const phf = phfVal !== null ? Math.min(1.0, phfVal) : null;
 
       let dominant = 'Through';
       let maxMoveVal = through;
@@ -1082,32 +1096,27 @@ const FlowGuard = (function () {
     }
   }
 
+  function reloadFromStorage() {
+    _projectStore = null;
+    return loadProject();
+  }
+
   function loadProject() {
     if (_projectStore) return _projectStore;
 
     try {
-      if (typeof sessionStorage !== 'undefined') {
-        const sess = sessionStorage.getItem(PROJECT_STORAGE_KEY);
-        if (sess) {
-          _projectStore = JSON.parse(sess);
-          // Ensure datasetUploaded is present (backwards compat for projects saved before this flag existed)
-          if (!_projectStore.trafficInput) _projectStore.trafficInput = createInitialProject().trafficInput;
-          if (_projectStore.trafficInput.datasetUploaded === undefined) {
-            // Infer from whether excelUploaded or datasetStats exist
-            _projectStore.trafficInput.datasetUploaded = !!(_projectStore.trafficInput.excelUploaded || _projectStore.trafficInput.datasetStats);
-          }
-          recomputeProjectData(_projectStore);
-          return _projectStore;
-        }
-      }
       if (typeof localStorage !== 'undefined') {
         const local = localStorage.getItem(PROJECT_STORAGE_KEY);
         if (local) {
-          _projectStore = JSON.parse(local);
-          if (!_projectStore.trafficInput) _projectStore.trafficInput = createInitialProject().trafficInput;
-          if (_projectStore.trafficInput.datasetUploaded === undefined) {
-            _projectStore.trafficInput.datasetUploaded = !!(_projectStore.trafficInput.excelUploaded || _projectStore.trafficInput.datasetStats);
-          }
+          const parsed = JSON.parse(local);
+          // Instantiate initial project template with clean empty dataset & processedTraffic
+          const cleanProj = createInitialProject();
+
+          if (parsed.projectInfo) cleanProj.projectInfo = { ...cleanProj.projectInfo, ...parsed.projectInfo };
+          if (parsed.geometry) cleanProj.geometry = { ...cleanProj.geometry, ...parsed.geometry };
+          if (parsed.engineeringParameters) cleanProj.engineeringParameters = { ...cleanProj.engineeringParameters, ...parsed.engineeringParameters };
+
+          _projectStore = cleanProj;
           recomputeProjectData(_projectStore);
           return _projectStore;
         }
@@ -1117,7 +1126,6 @@ const FlowGuard = (function () {
     }
 
     _projectStore = createInitialProject();
-    // No recomputeProjectData() on fresh project — dataset guard will short-circuit anyway
     return _projectStore;
   }
 
@@ -1127,15 +1135,23 @@ const FlowGuard = (function () {
     _projectStore = project;
 
     try {
-      const serialized = JSON.stringify(project);
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem(PROJECT_STORAGE_KEY, serialized);
-      }
+      // Build persistent payload containing ONLY long-lived configuration
+      const persistentPayload = {
+        projectInfo: project.projectInfo,
+        geometry: project.geometry,
+        engineeringParameters: project.engineeringParameters
+      };
+
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(PROJECT_STORAGE_KEY, serialized);
+        localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(persistentPayload));
+      }
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem(PROJECT_STORAGE_KEY);
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        sessionStorage.removeItem(CSV_RECORDS_KEY);
       }
     } catch (err) {
-      console.warn('[FlowGuard AI] Error writing project to storage:', err);
+      console.warn('[FlowGuard AI] Error writing persistent project configuration to storage:', err);
     }
 
     // Notify Project Inspector (developer mode only)
@@ -1284,39 +1300,33 @@ const FlowGuard = (function () {
     saveProject(proj);
   }
 
+  let _csvRecordsCache = null;
+
   function saveCSVRecords(records) {
-    try {
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem(CSV_RECORDS_KEY, JSON.stringify(records));
-      }
-    } catch (e) {
-      console.warn('SessionStorage write CSV records failed:', e);
-    }
+    _csvRecordsCache = records;
   }
 
   function getCSVRecords() {
-    try {
-      if (typeof sessionStorage !== 'undefined') {
-        const recs = sessionStorage.getItem(CSV_RECORDS_KEY);
-        if (recs) return JSON.parse(recs);
-      }
-    } catch (e) {
-      console.warn('SessionStorage get CSV records failed:', e);
-    }
-    return null;
+    return _csvRecordsCache;
   }
 
   function resetToDefaults() {
     _projectStore = createInitialProject();
-    // Save directly without triggering recomputeProjectData (no dataset present)
+    _csvRecordsCache = null;
     try {
-      const serialized = JSON.stringify(_projectStore);
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem(PROJECT_STORAGE_KEY, serialized);
-        sessionStorage.removeItem(CSV_RECORDS_KEY);
-      }
+      // Build persistent payload containing ONLY long-lived configuration
+      const persistentPayload = {
+        projectInfo: _projectStore.projectInfo,
+        geometry: _projectStore.geometry,
+        engineeringParameters: _projectStore.engineeringParameters
+      };
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(PROJECT_STORAGE_KEY, serialized);
+        localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(persistentPayload));
+      }
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem(PROJECT_STORAGE_KEY);
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        sessionStorage.removeItem(CSV_RECORDS_KEY);
       }
     } catch (err) {
       console.warn('[FlowGuard AI] Error writing reset project to storage:', err);
@@ -1360,9 +1370,12 @@ const FlowGuard = (function () {
     proj.analysisResults = initial.analysisResults;
     proj.report = initial.report;
 
+    _csvRecordsCache = null;
     saveProject(proj);
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.removeItem(CSV_RECORDS_KEY);
+      sessionStorage.removeItem(PROJECT_STORAGE_KEY);
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
     }
     console.log('[FlowGuard AI] Dataset cleared. Traffic Summary reset to empty state.');
     return proj;
@@ -1749,18 +1762,47 @@ const FlowGuard = (function () {
   }
 
   /**
+   * Universal helper to normalize and format time interval keys safely without hardcoded fallbacks
+   */
+  function normalizeTimeIntervalKey(timeStr, intervalMinutes = 15) {
+    if (!timeStr) return '';
+    const str = String(timeStr).trim();
+
+    // Already an interval window string like "08:00–08:15" or "08:00 - 08:15"
+    if (str.includes('–') || str.includes('-')) {
+      const sep = str.includes('–') ? '–' : '-';
+      const parts = str.split(sep).map(s => s.trim());
+      if (parts.length === 2) {
+        const formatPart = (p) => {
+          const t = p.split(':').map(Number);
+          if (t.length >= 2 && !isNaN(t[0]) && !isNaN(t[1])) {
+            return `${String(t[0]).padStart(2, '0')}:${String(t[1]).padStart(2, '0')}`;
+          }
+          return p;
+        };
+        return `${formatPart(parts[0])}–${formatPart(parts[1])}`;
+      }
+    }
+
+    // Single timestamp string like "08:00" or "8:00"
+    const parts = str.split(':').map(Number);
+    if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      const startMins = parts[0] * 60 + parts[1];
+      const endMins = (startMins + (intervalMinutes || 15)) % 1440;
+      const pad = (n) => String(n).padStart(2, '0');
+      const startFormatted = `${pad(Math.floor(startMins / 60))}:${pad(startMins % 60)}`;
+      const endFormatted = `${pad(Math.floor(endMins / 60))}:${pad(endMins % 60)}`;
+      return `${startFormatted}–${endFormatted}`;
+    }
+
+    return str;
+  }
+
+  /**
    * Helper to format time interval window (e.g. "08:30" + 15m -> "08:30–08:45")
    */
-  function formatIntervalWindow(timeStr, intervalMinutes) {
-    if (!timeStr) return '08:30–08:45';
-    const parts = String(timeStr).trim().split(':').map(Number);
-    const startMins = (parts[0] || 0) * 60 + (parts[1] || 0);
-    const endMins = (startMins + intervalMinutes) % 1440;
-
-    const pad = (n) => String(n).padStart(2, '0');
-    const startFormatted = `${pad(Math.floor(startMins / 60))}:${pad(startMins % 60)}`;
-    const endFormatted = `${pad(Math.floor(endMins / 60))}:${pad(endMins % 60)}`;
-    return `${startFormatted}–${endFormatted}`;
+  function formatIntervalWindow(timeStr, intervalMinutes = 15) {
+    return normalizeTimeIntervalKey(timeStr, intervalMinutes);
   }
 
   /**
@@ -2051,13 +2093,40 @@ const FlowGuard = (function () {
       return inv;
     });
 
-    // STEP 4: Identify Peak Interval
+    // STEP 4: Identify Peak Interval by Max PCU_interval across all approaches
     let peakInterval = intervals[0];
     intervals.forEach(inv => {
-      if (inv.totalVehicles > (peakInterval ? peakInterval.totalVehicles : 0)) {
+      if (inv.totalPCU > (peakInterval ? peakInterval.totalPCU : 0)) {
         peakInterval = inv;
       }
     });
+
+    // Determine min(t_start) and max(t_end) for T_duration = max(t_end) - min(t_start)
+    const totalSurveyDurationMinutes = (timeStrings.length || 1) * surveyIntervalMinutes;
+    const surveyDurationFormatted = (totalSurveyDurationMinutes === 60)
+      ? '60 Minutes (1 Hour)'
+      : (totalSurveyDurationMinutes > 60
+          ? `${totalSurveyDurationMinutes} Minutes (${(totalSurveyDurationMinutes / 60).toFixed(1)} Hours)`
+          : `${totalSurveyDurationMinutes} Minutes`);
+
+    // Extract Survey Date from record corresponding to min(t_start)
+    const earliestTime = timeStrings[0];
+    const earliestRecord = records.find(r => r.time === earliestTime) || records[0];
+    const rawDateVal = earliestRecord ? (earliestRecord.date || earliestRecord.Date) : null;
+    const surveyDateFormatted = (() => {
+      if (!rawDateVal) return '—';
+      const parts = String(rawDateVal).trim().split(/[-/]/);
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          // YYYY-MM-DD -> DD-MM-YYYY
+          return `${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[0]}`;
+        } else if (parts[2].length === 4) {
+          // MM-DD-YYYY or DD-MM-YYYY
+          return `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[2]}`;
+        }
+      }
+      return String(rawDateVal);
+    })();
 
     // Dataset Statistics
     let grandTotalVehicles = 0;
@@ -2086,6 +2155,8 @@ const FlowGuard = (function () {
       rowsRead: records.length,
       surveyIntervalLabel: surveyIntervalLabel,
       surveyIntervalMinutes: surveyIntervalMinutes,
+      surveyDurationFormatted: surveyDurationFormatted,
+      surveyDateFormatted: surveyDateFormatted,
       numberOfRoads: uniqueRoads.length || 4,
       startTime: timeStrings[0] || '00:00',
       endTime: timeStrings[timeStrings.length - 1] || '23:45',
@@ -2098,7 +2169,6 @@ const FlowGuard = (function () {
     };
 
     // Road Summary Calculation
-    const totalSurveyDurationMinutes = (timeStrings.length || 1) * surveyIntervalMinutes;
     const datasetHourlyMultiplier = 60 / totalSurveyDurationMinutes;
 
     const roadSummary = {
@@ -2135,6 +2205,8 @@ const FlowGuard = (function () {
       intervals: intervals,
       surveyIntervalMinutes: surveyIntervalMinutes,
       surveyIntervalLabel: surveyIntervalLabel,
+      surveyDurationFormatted: surveyDurationFormatted,
+      surveyDateFormatted: surveyDateFormatted,
       peakInterval: peakInterval,
       selectedInterval: selectedInterval,
       datasetStats: datasetStats,
@@ -4271,16 +4343,13 @@ const FlowGuard = (function () {
     // ── 1. SURVEY OVERVIEW ──
     if (!isUploaded) {
       setText('sumDashMethod', 'Awaiting Dataset Upload');
-      setText('sumDashDuration', '--');
-      setText('sumDashSurveyDate', '--');
-      setText('sumDashParsedRecords', '0');
+      setText('sumDashDuration', '—');
+      setText('sumDashSurveyDate', '—');
+      setText('sumDashParsedRecords', '—');
       setText('sumDashRoads', '4 (From Geometry Setup)');
-      setText('sumDashTimeIntervals', '--');
-      setText('sumDashObservedVehicles', '0');
-      setText('sumDashTotalPCU', '0.0');
-      setText('sumDashPeakHour', '--');
-      setText('sumDashPeakPCU', '0.0');
-      setText('sumDashPHF', '--');
+      setText('sumDashTimeIntervals', '—');
+      setText('sumDashObservedVehicles', '—');
+      setText('sumDashTotalPCU', '—');
       setText('sumDashStatus', '⚠ Please upload a traffic survey file in Step 2');
       setBadge('sumDashOverviewBadge', 'Awaiting Upload', false);
     } else {
@@ -4290,30 +4359,24 @@ const FlowGuard = (function () {
       }
       setText('sumDashMethod', rawInputMode);
 
-      const rawDuration = ds.surveyDuration || geom.surveyDuration || '--';
-      let formattedDuration = '--';
-      if (rawDuration && rawDuration !== '--') {
+      const rawDuration = ds.surveyDuration || '—';
+      let formattedDuration = '—';
+      if (rawDuration && rawDuration !== '—') {
         const durStr = String(rawDuration).trim();
         if (durStr === '15' || durStr === '15 Minutes') formattedDuration = '15 Minutes';
         else if (durStr === '30' || durStr === '30 Minutes') formattedDuration = '30 Minutes';
-        else if (durStr === '60' || durStr === '60 Minutes' || durStr === '60 Minutes (1 Hour)') formattedDuration = '60 Minutes (1 Hour)';
+        else if (durStr === '60' || durStr === '60 Minutes' || durStr === '60 Minutes (1 Hour)' || durStr === '1 Hour') formattedDuration = '60 Minutes (1 Hour)';
         else if (/^\d+$/.test(durStr)) formattedDuration = `${durStr} Minutes`;
         else formattedDuration = durStr;
       }
       setText('sumDashDuration', formattedDuration);
 
-      setText('sumDashSurveyDate', ds.surveyDate || '--');
+      setText('sumDashSurveyDate', ds.surveyDate || '—');
       setText('sumDashParsedRecords', String(ds.parsedRecords || (ds.records ? ds.records.length : 0)));
       setText('sumDashRoads', '4 (From Geometry Setup)');
-      setText('sumDashTimeIntervals', String(ds.numIntervals || '--'));
+      setText('sumDashTimeIntervals', String(ds.numIntervals || (ds.intervals ? ds.intervals.length : '—')));
       setText('sumDashObservedVehicles', formatNum(pt.totalVehicles || ds.totalVehicles || 0));
       setText('sumDashTotalPCU', formatNum(pt.totalPCUDemand || pt.totalPCU || ds.totalPCU || 0, 1));
-      setText('sumDashPeakHour', ds.peakInterval || '--');
-      setText('sumDashPeakPCU', formatNum(ds.peakIntervalPCU || 0, 1));
-
-      // Overall PHF
-      const overallPHF = pt.intersectionSummary?.phf ?? pt.peakHourFactor ?? null;
-      setText('sumDashPHF', overallPHF !== null && overallPHF !== undefined ? String(overallPHF) : 'Not Available');
 
       setText('sumDashStatus', '✓ Dataset Validated & Processed');
       setBadge('sumDashOverviewBadge', 'Dataset Validated', true);
@@ -4335,55 +4398,62 @@ const FlowGuard = (function () {
         const mvPcu = roadData.movementPCU || {};
         const pk = roadData.peakHourAnalysis || {};
 
-        // STEP 1 GEOMETRY (NEVER OVERRIDDEN BY EXCEL)
-        const laneCounts = geom.laneCounts || {};
-        const laneConfigs = geom.laneConfigs || {};
-        const lanesVal = parseInt(laneCounts[app.key] || (geom.lanesPerApproach ? geom.lanesPerApproach[app.key] : 2), 10) || 2;
-        const laneWidthVal = parseFloat(geom.laneWidth) || 3.5;
-        const roadWidthVal = parseFloat((lanesVal * laneWidthVal).toFixed(1));
-        const speedLimitVal = geom.speedLimit || 50;
-        const laneConfigVal = laneConfigs[app.key] || `L1 | T${Math.max(1, lanesVal - 1)}`;
+        // STEP 1 GEOMETRY — Authoritative Source: project.geometry.approaches[key]
+        const approachesGeom = (geom && geom.approaches) ? geom.approaches : {};
+        const appGeom = approachesGeom[app.key] || {};
+
+        const designationVal = appGeom.designation || app.desig;
+        const directionVal = appGeom.direction || app.bound;
+        const roadWidthVal = appGeom.approachWidth !== undefined ? parseFloat(appGeom.approachWidth) : ((geom.approachWidths && geom.approachWidths[app.key]) !== undefined ? parseFloat(geom.approachWidths[app.key]) : 14.0);
+        const laneWidthVal = appGeom.laneWidth !== undefined ? parseFloat(appGeom.laneWidth) : ((geom.laneWidths && geom.laneWidths[app.key]) !== undefined ? parseFloat(geom.laneWidths[app.key]) : 3.5);
+        const speedLimitVal = appGeom.speedLimit !== undefined ? parseInt(appGeom.speedLimit, 10) : ((geom.speedLimits && geom.speedLimits[app.key]) !== undefined ? parseInt(geom.speedLimits[app.key], 10) : 40);
+        const lanesVal = appGeom.incomingLanes !== undefined ? parseInt(appGeom.incomingLanes, 10) : ((geom.laneCounts && geom.laneCounts[app.key]) !== undefined ? parseInt(geom.laneCounts[app.key], 10) : 4);
+        const laneConfigVal = appGeom.laneConfig || (geom.laneConfigs ? geom.laneConfigs[app.key] : null) || 'L1 | T2 | R1';
+
+        const cardTitle = `${designationVal.toUpperCase()} — ${directionVal.toUpperCase()}`;
 
         // RAW VOLUMES (Step 2)
-        const totalVeh = isUploaded ? formatNum(roadData.totalVehicles || 0) : '0';
-        const leftVeh = isUploaded ? formatNum(tc.left || 0) : '0';
-        const throughVeh = isUploaded ? formatNum(tc.through || 0) : '0';
-        const rightVeh = isUploaded ? formatNum(tc.right || 0) : '0';
+        const totalVeh = isUploaded ? formatNum(roadData.totalVehicles || 0) : '—';
+        const leftVeh = isUploaded ? formatNum(tc.left || 0) : '—';
+        const throughVeh = isUploaded ? formatNum(tc.through || 0) : '—';
+        const rightVeh = isUploaded ? formatNum(tc.right || 0) : '—';
 
         // PCU DEMAND (Step 3 factors * Step 2 raw count)
-        const leftPCUStr = isUploaded ? formatNum(mvPcu.leftPCU || 0, 1) : 'None';
-        const throughPCUStr = isUploaded ? formatNum(mvPcu.throughPCU || 0, 1) : 'None';
-        const rightPCUStr = isUploaded ? formatNum(mvPcu.rightPCU || 0, 1) : 'None';
-        const totalPCUStr = isUploaded ? formatNum(mvPcu.totalPCU || roadData.totalPCU || 0, 1) + ' PCU/h' : '0 PCU/h';
+        const leftPCUNum = mvPcu.leftPCU !== undefined ? parseFloat(mvPcu.leftPCU) : 0;
+        const throughPCUNum = mvPcu.throughPCU !== undefined ? parseFloat(mvPcu.throughPCU) : 0;
+        const rightPCUNum = mvPcu.rightPCU !== undefined ? parseFloat(mvPcu.rightPCU) : 0;
+        const totalPCUNum = Math.round((leftPCUNum + throughPCUNum + rightPCUNum) * 10) / 10;
+
+        const leftPCUStr = isUploaded ? formatNum(leftPCUNum, 1) + ' PCU/h' : '—';
+        const throughPCUStr = isUploaded ? formatNum(throughPCUNum, 1) + ' PCU/h' : '—';
+        const rightPCUStr = isUploaded ? formatNum(rightPCUNum, 1) + ' PCU/h' : '—';
+        const totalPCUStr = isUploaded ? formatNum(totalPCUNum, 1) + ' PCU/h' : '—';
 
         // PEAK ANALYSIS
-        const peakIntervalStr = isUploaded ? (pk.peakInterval || '--') : '--';
-        const phfValStr = isUploaded ? (pk.peakHourFactor !== undefined && pk.peakHourFactor !== null ? String(pk.peakHourFactor) : 'Not Available') : '--';
+        const peakIntervalStr = isUploaded ? (pk.peakInterval || '—') : '—';
+        const phfValStr = (isUploaded && pk.peakHourFactor !== undefined && pk.peakHourFactor !== null && pk.peakHourFactor !== '—') ? String(pk.peakHourFactor) : '—';
 
         // WEBSTER INPUTS
         // Saturation Flow s = S0 * n
         const satFlowVal = baseSat * lanesVal;
-        const satFlowStr = isUploaded ? `${formatNum(satFlowVal)} PCU/h` : 'Awaiting Data';
+        const satFlowStr = isUploaded ? `${formatNum(satFlowVal)} PCU/h` : `${formatNum(satFlowVal)} PCU/h`;
 
         // Critical Flow q = MAX(Left PCU, Through PCU, Right PCU)
-        const leftPCUNum = parseFloat(mvPcu.leftPCU || 0);
-        const thruPCUNum = parseFloat(mvPcu.throughPCU || 0);
-        const rightPCUNum = parseFloat(mvPcu.rightPCU || 0);
-        const critFlowVal = isUploaded ? Math.max(leftPCUNum, thruPCUNum, rightPCUNum) : 0;
-        const critFlowStr = isUploaded ? `${formatNum(critFlowVal, 1)} PCU/h` : 'None';
+        const critFlowVal = isUploaded ? Math.max(leftPCUNum, throughPCUNum, rightPCUNum) : 0;
+        const critFlowStr = isUploaded ? `${formatNum(critFlowVal, 1)} PCU/h` : '—';
 
-        let critMoveStr = '--';
+        let critMoveStr = '—';
         if (isUploaded) {
-          if (leftPCUNum >= thruPCUNum && leftPCUNum >= rightPCUNum) critMoveStr = 'Left Turn';
-          else if (rightPCUNum >= thruPCUNum && rightPCUNum >= leftPCUNum) critMoveStr = 'Right Turn';
+          if (leftPCUNum >= throughPCUNum && leftPCUNum >= rightPCUNum) critMoveStr = 'Left Turn';
+          else if (rightPCUNum >= throughPCUNum && rightPCUNum >= leftPCUNum) critMoveStr = 'Right Turn';
           else critMoveStr = 'Through';
         }
 
-        const critLaneStr = isUploaded ? `Lane 1 (${critMoveStr.slice(0, 1)})` : '--';
+        const critLaneStr = isUploaded ? `Lane 1 (${critMoveStr.slice(0, 1)})` : '—';
 
         // Flow Ratio y = q / s
         const flowRatioYVal = (isUploaded && satFlowVal > 0) ? parseFloat((critFlowVal / satFlowVal).toFixed(4)) : null;
-        const flowRatioYStr = flowRatioYVal !== null ? String(flowRatioYVal) : '--';
+        const flowRatioYStr = flowRatioYVal !== null ? String(flowRatioYVal) : '—';
 
         const badgeColor = isUploaded ? 'var(--success)' : 'var(--text-secondary)';
         const badgeBg = isUploaded ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.06)';
@@ -4393,18 +4463,18 @@ const FlowGuard = (function () {
         <div class="road-summary-card" style="background: rgba(15, 23, 42, 0.65); border: 1px solid var(--border-color); padding: 1.25rem; border-radius: 10px; display: flex; flex-direction: column; gap: 1rem;">
           <!-- Card Header & Badge -->
           <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.65rem;">
-            <div style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">${app.title}</div>
+            <div style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">${cardTitle}</div>
             <span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; font-size: 0.72rem; letter-spacing: 0.5px; border: 1px solid rgba(255,255,255,0.1);">${badgeText}</span>
           </div>
 
-          <!-- Approach Geometry (Step 1) -->
+          <!-- Approach Geometry (Step 1 Authoritative State) -->
           <div style="background: rgba(30, 41, 59, 0.4); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
             <div style="font-size: 0.72rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase; margin-bottom: 0.4rem; letter-spacing: 0.5px;">Approach Geometry</div>
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.45rem; font-size: 0.8rem; color: var(--text-secondary);">
               <div>Road Width: <strong style="color: var(--text-primary);">${roadWidthVal} m</strong></div>
               <div>Lane Width: <strong style="color: var(--text-primary);">${laneWidthVal} m</strong></div>
               <div>Speed Limit: <strong style="color: var(--text-primary);">${speedLimitVal} km/h</strong></div>
-              <div>Incoming Lanes: <strong style="color: var(--text-primary);">${lanesVal} IN</strong></div>
+              <div>Incoming Lanes: <strong style="color: var(--text-primary);">${lanesVal}</strong></div>
               <div style="grid-column: span 2;">Lane Config: <strong style="color: var(--text-primary);">${laneConfigVal}</strong></div>
             </div>
           </div>
@@ -4461,14 +4531,16 @@ const FlowGuard = (function () {
       if (!isUploaded) return 0;
       const roadData = pt[key] || {};
       const mvPcu = roadData.movementPCU || {};
-      const lanesVal = parseInt(geom.laneCounts ? geom.laneCounts[key] : 2, 10) || 2;
+      const approachesGeom = (geom && geom.approaches) ? geom.approaches : {};
+      const appGeom = approachesGeom[key] || {};
+      const lanesVal = appGeom.incomingLanes !== undefined ? parseInt(appGeom.incomingLanes, 10) : (parseInt(geom.laneCounts ? geom.laneCounts[key] : 2, 10) || 2);
       const satFlow = baseSat * lanesVal;
       const critFlow = Math.max(parseFloat(mvPcu.leftPCU || 0), parseFloat(mvPcu.throughPCU || 0), parseFloat(mvPcu.rightPCU || 0));
       return satFlow > 0 ? (critFlow / satFlow) : 0;
     };
 
     const getApproachCritMove = (key) => {
-      if (!isUploaded) return '--';
+      if (!isUploaded) return '—';
       const roadData = pt[key] || {};
       const mvPcu = roadData.movementPCU || {};
       const l = parseFloat(mvPcu.leftPCU || 0);
@@ -4484,35 +4556,39 @@ const FlowGuard = (function () {
     const yC = getApproachFlowRatio('south'); // Road C
     const yD = getApproachFlowRatio('west');  // Road D
 
+    const approachesGeom = (geom && geom.approaches) ? geom.approaches : {};
+
     // Phase 1 = Road A + Road C (North/South)
     const yPhase1 = Math.max(yA, yC);
     const phase1CritRoad = yA >= yC ? 'Road A (North)' : 'Road C (South)';
     const phase1CritMove = yA >= yC ? getApproachCritMove('north') : getApproachCritMove('south');
-    const phase1Lanes = parseInt(geom.laneCounts ? (yA >= yC ? geom.laneCounts.north : geom.laneCounts.south) : 2, 10) || 2;
+    const phase1Key = yA >= yC ? 'north' : 'south';
+    const phase1Lanes = (approachesGeom[phase1Key] && approachesGeom[phase1Key].incomingLanes !== undefined) ? parseInt(approachesGeom[phase1Key].incomingLanes, 10) : (parseInt(geom.laneCounts ? geom.laneCounts[phase1Key] : 2, 10) || 2);
     const phase1SatFlowVal = baseSat * phase1Lanes;
-    const phase1CritFlowVal = isUploaded ? Math.max(yA * (baseSat * (parseInt(geom.laneCounts?.north || 2, 10))), yC * (baseSat * (parseInt(geom.laneCounts?.south || 2, 10)))) : 0;
+    const phase1CritFlowVal = isUploaded ? Math.max(yA * (baseSat * (parseInt(approachesGeom.north?.incomingLanes || geom.laneCounts?.north || 4, 10))), yC * (baseSat * (parseInt(approachesGeom.south?.incomingLanes || geom.laneCounts?.south || 4, 10)))) : 0;
 
     // Phase 2 = Road B + Road D (East/West)
     const yPhase2 = Math.max(yB, yD);
     const phase2CritRoad = yB >= yD ? 'Road B (East)' : 'Road D (West)';
     const phase2CritMove = yB >= yD ? getApproachCritMove('east') : getApproachCritMove('west');
-    const phase2Lanes = parseInt(geom.laneCounts ? (yB >= yD ? geom.laneCounts.east : geom.laneCounts.west) : 2, 10) || 2;
+    const phase2Key = yB >= yD ? 'east' : 'west';
+    const phase2Lanes = (approachesGeom[phase2Key] && approachesGeom[phase2Key].incomingLanes !== undefined) ? parseInt(approachesGeom[phase2Key].incomingLanes, 10) : (parseInt(geom.laneCounts ? geom.laneCounts[phase2Key] : 2, 10) || 2);
     const phase2SatFlowVal = baseSat * phase2Lanes;
-    const phase2CritFlowVal = isUploaded ? Math.max(yB * (baseSat * (parseInt(geom.laneCounts?.east || 2, 10))), yD * (baseSat * (parseInt(geom.laneCounts?.west || 2, 10)))) : 0;
+    const phase2CritFlowVal = isUploaded ? Math.max(yB * (baseSat * (parseInt(approachesGeom.east?.incomingLanes || geom.laneCounts?.east || 4, 10))), yD * (baseSat * (parseInt(approachesGeom.west?.incomingLanes || geom.laneCounts?.west || 4, 10)))) : 0;
 
     const totalY = yPhase1 + yPhase2;
 
-    setText('phase1CritMove', isUploaded ? `${phase1CritRoad} - ${phase1CritMove}` : '--');
-    setText('phase1CritFlow', isUploaded ? `${formatNum(phase1CritFlowVal, 1)} PCU/h` : 'None');
-    setText('phase1SatFlow', isUploaded ? `${formatNum(phase1SatFlowVal)} PCU/h` : 'Awaiting Data');
-    setText('phase1FlowRatioY', isUploaded ? String(parseFloat(yPhase1.toFixed(4))) : '--');
+    setText('phase1CritMove', isUploaded ? `${phase1CritRoad} - ${phase1CritMove}` : '—');
+    setText('phase1CritFlow', isUploaded ? `${formatNum(phase1CritFlowVal, 1)} PCU/h` : '—');
+    setText('phase1SatFlow', `${formatNum(phase1SatFlowVal)} PCU/h`);
+    setText('phase1FlowRatioY', isUploaded ? String(parseFloat(yPhase1.toFixed(4))) : '—');
 
-    setText('phase2CritMove', isUploaded ? `${phase2CritRoad} - ${phase2CritMove}` : '--');
-    setText('phase2CritFlow', isUploaded ? `${formatNum(phase2CritFlowVal, 1)} PCU/h` : 'None');
-    setText('phase2SatFlow', isUploaded ? `${formatNum(phase2SatFlowVal)} PCU/h` : 'Awaiting Data');
-    setText('phase2FlowRatioY', isUploaded ? String(parseFloat(yPhase2.toFixed(4))) : '--');
+    setText('phase2CritMove', isUploaded ? `${phase2CritRoad} - ${phase2CritMove}` : '—');
+    setText('phase2CritFlow', isUploaded ? `${formatNum(phase2CritFlowVal, 1)} PCU/h` : '—');
+    setText('phase2SatFlow', `${formatNum(phase2SatFlowVal)} PCU/h`);
+    setText('phase2FlowRatioY', isUploaded ? String(parseFloat(yPhase2.toFixed(4))) : '—');
 
-    setText('sumDashTotalFlowRatioY', isUploaded ? String(parseFloat(totalY.toFixed(4))) : '--');
+    setText('sumDashTotalFlowRatioY', isUploaded ? String(parseFloat(totalY.toFixed(4))) : '—');
     setText('sumDashPreAnalysisStatus', isUploaded ? 'Ready for Webster Optimization Analysis' : 'Awaiting Validated Dataset');
   }
 
@@ -4974,7 +5050,7 @@ const FlowGuard = (function () {
       ingestionProj.trafficInput.rowsRead = result.datasetStats ? result.datasetStats.rowsRead : 0;
       ingestionProj.trafficInput.timeRange = result.datasetStats ? `${result.datasetStats.startTime || ''} – ${result.datasetStats.endTime || ''}` : '';
 
-      // Authoritative SSoT dataset object storing ALL parsed records (336 rows)
+      // Authoritative SSoT dataset object storing ALL parsed records
       ingestionProj.dataset = {
         uploaded: true,
         records: result.records || [], // Stores ALL parsed records in memory
@@ -4984,10 +5060,10 @@ const FlowGuard = (function () {
         numIntervals: result.intervals ? result.intervals.length : 0,
         totalVehicles: result.datasetStats ? result.datasetStats.totalVehicles : 0,
         totalPCU: result.datasetStats ? result.datasetStats.totalPCU : 0,
-        peakInterval: result.peakInterval ? (result.peakInterval.timeWindow || result.peakInterval.time) : '--',
+        peakInterval: result.peakInterval ? (result.peakInterval.timeWindow || result.peakInterval.time) : '—',
         peakIntervalPCU: result.peakInterval ? result.peakInterval.totalPCU : 0,
-        surveyDate: (result.records && result.records[0]) ? (result.records[0].date || result.records[0].Date) : '--',
-        surveyDuration: result.surveyIntervalLabel || '15 Minutes',
+        surveyDate: result.surveyDateFormatted || ((result.records && result.records[0]) ? (result.records[0].date || result.records[0].Date) : '—'),
+        surveyDuration: result.surveyDurationFormatted || result.surveyIntervalLabel || '1 Hour',
         inputMode: 'Historical Dataset Upload',
         status: 'Dataset Loaded & Processed'
       };
@@ -5542,6 +5618,7 @@ const FlowGuard = (function () {
     getCSVRecords,
     resetToDefaults,
     clearDataset,
+    reloadFromStorage,
     formatNum,
     validateInput,
     getActiveApproachKeys,

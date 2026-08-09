@@ -44,13 +44,13 @@ describe('FlowGuard AI - Independent Road PCU Calculation Model', () => {
 
     // Verify movement PCUs sum to road total PCU
     const northM = processed.north.movementPCU;
-    expect(northM.leftPCU + northM.throughPCU + northM.rightPCU).toEqual(processed.north.totalPCU);
+    expect(Math.round((northM.leftPCU + northM.throughPCU + northM.rightPCU) * 10) / 10).toEqual(processed.north.totalPCU);
 
     // Verify East road properties independently
     expect(processed.east.totalVehicles).toEqual(610);
     expect(processed.east.totalPCU).toBeGreaterThan(0);
     const eastM = processed.east.movementPCU;
-    expect(eastM.leftPCU + eastM.throughPCU + eastM.rightPCU).toEqual(processed.east.totalPCU);
+    expect(Math.round((eastM.leftPCU + eastM.throughPCU + eastM.rightPCU) * 10) / 10).toEqual(processed.east.totalPCU);
   });
 
   test('Intersection totals equal the sum of independent road calculations', () => {

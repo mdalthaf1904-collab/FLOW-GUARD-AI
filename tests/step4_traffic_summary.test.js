@@ -161,4 +161,180 @@ describe('Step 4 Traffic Summary & Engineering Dashboard Unit & Integration Test
     expect(pt.levelOfService).toBeUndefined();
   });
 
+  test('8. Step 4 geometry mapping reads directly from project.geometry.approaches and persists across load/recompute', () => {
+    const proj = FlowGuard.getProject();
+    proj.geometry.approaches = {
+      north: { designation: 'Road A', direction: 'NORTHBOUND', approachWidth: 10.5, laneWidth: 3.5, speedLimit: 40, incomingLanes: 3, laneConfig: 'L1 | T1 | R1' },
+      east:  { designation: 'Road B', direction: 'EASTBOUND',  approachWidth: 14.0, laneWidth: 3.5, speedLimit: 40, incomingLanes: 4, laneConfig: 'L1 | T2 | R1' },
+      south: { designation: 'Road C', direction: 'SOUTHBOUND', approachWidth: 14.0, laneWidth: 3.5, speedLimit: 40, incomingLanes: 4, laneConfig: 'L1 | T2 | R1' },
+      west:  { designation: 'Road D', direction: 'WESTBOUND',  approachWidth: 14.0, laneWidth: 3.5, speedLimit: 40, incomingLanes: 4, laneConfig: 'L1 | T2 | R1' }
+    };
+    FlowGuard.saveProject(proj);
+
+    FlowGuard.recomputeProjectData(proj);
+
+    const reloaded = FlowGuard.getProject();
+    const northApp = reloaded.geometry.approaches.north;
+
+    expect(northApp.approachWidth).toBe(10.5);
+    expect(northApp.laneWidth).toBe(3.5);
+    expect(northApp.incomingLanes).toBe(3);
+    expect(northApp.speedLimit).toBe(40);
+    expect(northApp.laneConfig).toBe('L1 | T1 | R1');
+  });
+
+  test('9. Browser Refresh Architecture Test: localStorage persists ONLY persistent config (geometry & engineering parameters), while dataset resets to empty', () => {
+    const proj = FlowGuard.getProject();
+    // 1. Set custom geometry and engineering parameters
+    proj.geometry.approaches.north.approachWidth = 10.5;
+    proj.geometry.approaches.north.incomingLanes = 3;
+    proj.engineeringParameters.saturation.baseSaturationFlow = 1900;
+
+    // 2. Add an uploaded dataset to in-memory state
+    proj.dataset = {
+      uploaded: true,
+      records: [
+        { time: '08:00', road: 'Road A', key: 'north', movement: 'Through', vehicleType: 'Cars', count: 500 }
+      ]
+    };
+    FlowGuard.saveProject(proj);
+
+    // Verify localStorage contains persistent payload ONLY (no dataset records)
+    const storedStr = localStorage.getItem('FLOWGUARD_PROJECT_V8');
+    expect(storedStr).toBeDefined();
+    const storedObj = JSON.parse(storedStr);
+    expect(storedObj.geometry).toBeDefined();
+    expect(storedObj.geometry.approaches.north.approachWidth).toBe(10.5);
+    expect(storedObj.engineeringParameters.saturation.baseSaturationFlow).toBe(1900);
+    expect(storedObj.dataset).toBeUndefined(); // Omitted from persistent localStorage payload
+
+    // 3. Simulate browser page reload (F5) by clearing in-memory store and re-reading from localStorage
+    const reloadedProj = FlowGuard.reloadFromStorage ? FlowGuard.reloadFromStorage() : FlowGuard.getProject();
+
+    // Verify Step 1 Geometry and Step 3 Engineering Parameters were restored intact
+    expect(reloadedProj.geometry.approaches.north.approachWidth).toBe(10.5);
+    expect(reloadedProj.geometry.approaches.north.incomingLanes).toBe(3);
+    expect(reloadedProj.engineeringParameters.saturation.baseSaturationFlow).toBe(1900);
+
+    // Verify dataset reset to neutral empty state
+    expect(reloadedProj.dataset.uploaded).toBe(false);
+    expect(reloadedProj.dataset.records).toEqual([]);
+    expect(reloadedProj.processedTraffic.totalVehicles).toBe(0);
+    expect(reloadedProj.processedTraffic.totalPCUDemand).toBe(0);
+  });
+
+  test('10. Independent Road A–D Approach Widths are read directly from project.geometry.approaches[key].approachWidth', () => {
+    const proj = FlowGuard.getProject();
+    proj.geometry.approaches.north.approachWidth = 10.5;
+    proj.geometry.approaches.east.approachWidth = 14.0;
+    proj.geometry.approaches.south.approachWidth = 17.5;
+    proj.geometry.approaches.west.approachWidth = 21.0;
+    FlowGuard.saveProject(proj);
+
+    const loadedProj = FlowGuard.getProject();
+    expect(loadedProj.geometry.approaches.north.approachWidth).toBe(10.5);
+    expect(loadedProj.geometry.approaches.east.approachWidth).toBe(14.0);
+    expect(loadedProj.geometry.approaches.south.approachWidth).toBe(17.5);
+    expect(loadedProj.geometry.approaches.west.approachWidth).toBe(21.0);
+
+    // Modify Road A only
+    proj.geometry.approaches.north.approachWidth = 12.0;
+    FlowGuard.saveProject(proj);
+
+    const updatedProj = FlowGuard.getProject();
+    expect(updatedProj.geometry.approaches.north.approachWidth).toBe(12.0);
+    expect(updatedProj.geometry.approaches.east.approachWidth).toBe(14.0);
+    expect(updatedProj.geometry.approaches.south.approachWidth).toBe(17.5);
+    expect(updatedProj.geometry.approaches.west.approachWidth).toBe(21.0);
+  });
+
+  test('11. Independent Road A–D Peak Hour Analysis evaluates distinct peak intervals and PHFs per road', () => {
+    const proj = FlowGuard.getProject();
+
+    // Construct synthetic records where Roads A, B, C, D peak at different intervals
+    proj.dataset = {
+      uploaded: true,
+      records: [
+        // Road A (north) peaks at 08:15–08:30 (V_peak = 500, V_total = 1770) -> PHF = 1770 / (4 * 500) = 0.89
+        { timeWindow: '08:00–08:15', key: 'north', road: 'Road A', movement: 'Through', vehicleType: 'Cars', count: 400, rawPCU: 400 },
+        { timeWindow: '08:15–08:30', key: 'north', road: 'Road A', movement: 'Through', vehicleType: 'Cars', count: 500, rawPCU: 500 },
+        { timeWindow: '08:30–08:45', key: 'north', road: 'Road A', movement: 'Through', vehicleType: 'Cars', count: 450, rawPCU: 450 },
+        { timeWindow: '08:45–09:00', key: 'north', road: 'Road A', movement: 'Through', vehicleType: 'Cars', count: 420, rawPCU: 420 },
+
+        // Road B (east) peaks at 08:30–08:45 (V_peak = 520, V_total = 1620) -> PHF = 1620 / (4 * 520) = 0.78
+        { timeWindow: '08:00–08:15', key: 'east', road: 'Road B', movement: 'Through', vehicleType: 'Cars', count: 300, rawPCU: 300 },
+        { timeWindow: '08:15–08:30', key: 'east', road: 'Road B', movement: 'Through', vehicleType: 'Cars', count: 400, rawPCU: 400 },
+        { timeWindow: '08:30–08:45', key: 'east', road: 'Road B', movement: 'Through', vehicleType: 'Cars', count: 520, rawPCU: 520 },
+        { timeWindow: '08:45–09:00', key: 'east', road: 'Road B', movement: 'Through', vehicleType: 'Cars', count: 400, rawPCU: 400 },
+
+        // Road C (south) peaks at 08:45–09:00 (V_peak = 560, V_total = 1850) -> PHF = 1850 / (4 * 560) = 0.83
+        { timeWindow: '08:00–08:15', key: 'south', road: 'Road C', movement: 'Through', vehicleType: 'Cars', count: 450, rawPCU: 450 },
+        { timeWindow: '08:15–08:30', key: 'south', road: 'Road C', movement: 'Through', vehicleType: 'Cars', count: 430, rawPCU: 430 },
+        { timeWindow: '08:30–08:45', key: 'south', road: 'Road C', movement: 'Through', vehicleType: 'Cars', count: 410, rawPCU: 410 },
+        { timeWindow: '08:45–09:00', key: 'south', road: 'Road C', movement: 'Through', vehicleType: 'Cars', count: 560, rawPCU: 560 },
+
+        // Road D (west) peaks at 08:00–08:15 (V_peak = 600, V_total = 1960) -> PHF = 1960 / (4 * 600) = 0.82
+        { timeWindow: '08:00–08:15', key: 'west', road: 'Road D', movement: 'Through', vehicleType: 'Cars', count: 600, rawPCU: 600 },
+        { timeWindow: '08:15–08:30', key: 'west', road: 'Road D', movement: 'Through', vehicleType: 'Cars', count: 480, rawPCU: 480 },
+        { timeWindow: '08:30–08:45', key: 'west', road: 'Road D', movement: 'Through', vehicleType: 'Cars', count: 450, rawPCU: 450 },
+        { timeWindow: '08:45–09:00', key: 'west', road: 'Road D', movement: 'Through', vehicleType: 'Cars', count: 430, rawPCU: 430 }
+      ]
+    };
+    FlowGuard.saveProject(proj);
+    FlowGuard.recomputeProjectData(proj);
+
+    const pt = proj.processedTraffic;
+
+    // Verify Road A Peak Analysis
+    expect(pt.north.peakHourAnalysis.peakInterval).toBe('08:15–08:30');
+    expect(pt.north.peakHourAnalysis.peakHourVolume).toBe(1770);
+    expect(pt.north.peakHourAnalysis.peakHourFactor).toBe(0.89);
+
+    // Verify Road B Peak Analysis
+    expect(pt.east.peakHourAnalysis.peakInterval).toBe('08:30–08:45');
+    expect(pt.east.peakHourAnalysis.peakHourVolume).toBe(1620);
+    expect(pt.east.peakHourAnalysis.peakHourFactor).toBe(0.78);
+
+    // Verify Road C Peak Analysis
+    expect(pt.south.peakHourAnalysis.peakInterval).toBe('08:45–09:00');
+    expect(pt.south.peakHourAnalysis.peakHourVolume).toBe(1850);
+    expect(pt.south.peakHourAnalysis.peakHourFactor).toBe(0.83);
+
+    // Verify Road D Peak Analysis
+    expect(pt.west.peakHourAnalysis.peakInterval).toBe('08:00–08:15');
+    expect(pt.west.peakHourAnalysis.peakHourVolume).toBe(1960);
+    expect(pt.west.peakHourAnalysis.peakHourFactor).toBe(0.82);
+  });
+
+  test('12. Step 4 Road Cards satisfy Total Demand = Left PCU + Through PCU + Right PCU with consistent 1-decimal rounding', () => {
+    const proj = FlowGuard.getProject();
+    proj.dataset = {
+      uploaded: true,
+      records: [
+        // Road A (1450 vehicles, all Through, PCU factor -> 1118.9 PCU)
+        { timeWindow: '09:30–09:45', key: 'north', road: 'Road A', movement: 'Through', vehicleType: 'Cars', count: 1450, rawPCU: 1118.9 }
+      ]
+    };
+    FlowGuard.saveProject(proj);
+    FlowGuard.recomputeProjectData(proj);
+
+    const pt = proj.processedTraffic;
+    ['north', 'east', 'south', 'west'].forEach(key => {
+      const road = pt[key];
+      const left = road.movementPCU.leftPCU;
+      const through = road.movementPCU.throughPCU;
+      const right = road.movementPCU.rightPCU;
+      const total = road.movementPCU.totalPCU;
+
+      const expectedTotal = Math.round((left + through + right) * 10) / 10;
+      expect(total).toBe(expectedTotal);
+    });
+
+    // Check Road A specific values
+    expect(pt.north.movementPCU.leftPCU).toBe(0);
+    expect(pt.north.movementPCU.throughPCU).toBe(1118.9);
+    expect(pt.north.movementPCU.rightPCU).toBe(0);
+    expect(pt.north.movementPCU.totalPCU).toBe(1118.9);
+  });
+
 });
