@@ -428,23 +428,21 @@
                   <span class="input-val-check" id="valCheckClearanceLost" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (≥ 0s)</span>
                 </div>
 
-                <div class="control-field-group">
-                  <label class="control-field-label">Number of Signal Phases</label>
-                  <select id="engNumPhases" class="control-field-select">
-                    <option value="2">2 Phases</option>
-                    <option value="3">3 Phases</option>
-                    <option value="4" selected>4 Phases</option>
-                  </select>
-                </div>
-
-                <div class="control-field-group">
-                  <label class="control-field-label">Controller Type</label>
-                  <select id="engControllerType" class="control-field-select">
-                    <option value="Fixed Time" selected>Fixed Time</option>
-                    <option value="Semi-Actuated">Semi-Actuated</option>
-                    <option value="Fully-Actuated">Fully-Actuated</option>
-                    <option value="Adaptive Dynamic">Adaptive Dynamic</option>
-                  </select>
+                <div class="control-field-group" style="grid-column: span 2; background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span style="font-size: 0.78rem; font-weight: 700; color: var(--accent-primary); text-transform: uppercase;">Signal Phase Structure</span>
+                    <span class="badge badge-low" style="background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); font-size: 0.7rem;">Fixed analytical phase structure</span>
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; font-size: 0.82rem;">
+                    <div style="background: rgba(30,41,59,0.5); padding: 0.5rem 0.75rem; border-radius: 4px; border-left: 3px solid var(--accent-primary);">
+                      <strong style="color: var(--accent-primary);">Phase 1 — North / South</strong>
+                      <div style="color: var(--text-secondary); font-size: 0.78rem;">Road A + Road C</div>
+                    </div>
+                    <div style="background: rgba(30,41,59,0.5); padding: 0.5rem 0.75rem; border-radius: 4px; border-left: 3px solid #fcd34d;">
+                      <strong style="color: #fcd34d;">Phase 2 — East / West</strong>
+                      <div style="color: var(--text-secondary); font-size: 0.78rem;">Road B + Road D</div>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="control-field-group" style="grid-column: span 2;">
@@ -455,9 +453,6 @@
                     </label>
                     <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; cursor: pointer; color: var(--text-primary);">
                       <input type="radio" name="cycleConstraint" value="manual"> Manual Fixed Cycle
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; cursor: pointer; color: var(--text-primary);">
-                      <input type="radio" name="cycleConstraint" value="adaptive"> Adaptive Dynamic
                     </label>
                   </div>
                 </div>
@@ -684,30 +679,8 @@
                     <input type="radio" name="baselineMode" value="not_available" checked> Not Available
                   </label>
                   <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer; color: var(--text-primary);">
-                    <input type="radio" name="baselineMode" value="network"> Network-wide
-                  </label>
-                  <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer; color: var(--text-primary);">
                     <input type="radio" name="baselineMode" value="road_wise"> Road-wise
                   </label>
-                </div>
-              </div>
-
-              <!-- NETWORK-WIDE CONTAINER -->
-              <div id="baselineNetworkContainer" style="display: none; background: rgba(15,23,42,0.6); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-weight: 700; color: var(--accent-primary); font-size: 0.82rem; margin-bottom: 0.75rem;">NETWORK-WIDE OBSERVED METRICS</div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                  <div class="control-field-group">
-                    <label class="control-field-label">Existing Average Delay (s/veh)</label>
-                    <input type="number" id="baseline_delay_network" class="control-field-select" placeholder="Not Available" min="0" step="0.1">
-                  </div>
-                  <div class="control-field-group">
-                    <label class="control-field-label">Existing Queue Length (m)</label>
-                    <input type="number" id="baseline_queue_network" class="control-field-select" placeholder="Not Available" min="0" step="1">
-                  </div>
-                  <div class="control-field-group">
-                    <label class="control-field-label">Existing Degree of Saturation (v/c)</label>
-                    <input type="number" id="baseline_dos_network" class="control-field-select" placeholder="Not Available" min="0" max="2.0" step="0.01">
-                  </div>
                 </div>
               </div>
 
@@ -806,16 +779,20 @@
 
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
                 <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Approaches</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryApproachesVal">4</div>
+                </div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Signal Phases</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryPhasesVal">4</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryPhasesVal">2</div>
                 </div>
                 <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Phase 1</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="summaryPhase1Val">North / South</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="summaryPhase1Val">Road A + Road C (N/S)</div>
                 </div>
                 <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Phase 2</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: #fcd34d; margin-top: 0.2rem;" id="summaryPhase2Val">East / West</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: #fcd34d; margin-top: 0.2rem;" id="summaryPhase2Val">Road B + Road D (E/W)</div>
                 </div>
                 <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Base Saturation Flow</div>
@@ -1278,22 +1255,24 @@
           </div>
         </div>
 
-        <!-- SECTION 6 — BEFORE vs AFTER SIMULATED ESTIMATE -->
+        <!-- SECTION 6 — BEFORE vs AFTER PERFORMANCE ESTIMATE -->
         <div class="summary-dash-card full-width" style="margin-bottom: 1.5rem;">
           <div class="summary-dash-header">
             <div class="summary-dash-title-group">
               <div class="summary-dash-icon">📊</div>
               <div>
-                <div class="summary-dash-title">SECTION 6 — BEFORE vs AFTER SIMULATED ESTIMATE</div>
-                <div class="summary-dash-subtitle">Comparative evaluation of baseline fixed-time configuration against proposed Webster plan</div>
+                <div class="summary-dash-title">SECTION 6 — BEFORE vs AFTER PERFORMANCE ESTIMATE</div>
+                <div class="summary-dash-subtitle">Comparison of observed baseline performance against the proposed Webster plan</div>
               </div>
             </div>
-            <span class="badge badge-low" style="background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3);">SIMULATED ESTIMATE</span>
+            <span class="badge badge-low" id="step5BeforeAfterScopeBadge" style="background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3);">COMPARISON SCOPE: PROPOSED PLAN ONLY</span>
           </div>
 
-          <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #fcd34d; padding: 0.65rem 1rem; border-radius: 6px; font-size: 0.78rem; font-weight: 700; margin-bottom: 1rem;">
-            ⚠ SIMULATED ESTIMATE — Analytical model estimates for decision support. Not guaranteed real-world improvement.
+          <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #fcd34d; padding: 0.65rem 1rem; border-radius: 6px; font-size: 0.78rem; font-weight: 700; margin-bottom: 0.75rem;">
+            ⚠ SIMULATED ESTIMATE — Results are analytical model estimates based on configured traffic and engineering inputs. They are not field measurements and do not guarantee real-world improvement.
           </div>
+
+          <div id="step5BeforeAfterScopeDetail" style="font-size: 0.85rem; font-weight: 700; color: var(--accent-primary); margin-bottom: 1rem; display: none;"></div>
 
           <div style="overflow-x: auto;">
             <table class="eng-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">

@@ -477,7 +477,6 @@ const FlowGuard = (function () {
         },
         baseline: {
           mode: "not_available",
-          network: { delay: null, queue: null, degreeOfSaturation: null },
           roads: {
             "Road A": { delay: null, queue: null, degreeOfSaturation: null },
             "Road B": { delay: null, queue: null, degreeOfSaturation: null },
@@ -3911,10 +3910,8 @@ const FlowGuard = (function () {
     // List of input IDs to attach live input/change listeners
     const engInputIds = [
       'engMinGreen', 'engMaxGreen', 'engAmberTime', 'engAllRedTime',
-      'engStartupLost', 'engClearanceLost', 'engNumPhases', 'engControllerType',
       'engExistingCycle', 'engBaseSatFlow', 'engWalkSpeed', 'engMinWalkTime',
       'engPedClearanceCalc', 'engIncidentEvent',
-      'baseline_delay_network', 'baseline_queue_network', 'baseline_dos_network',
       'baseline_delay_road_a', 'baseline_queue_road_a', 'baseline_dos_road_a',
       'baseline_delay_road_b', 'baseline_queue_road_b', 'baseline_dos_road_b',
       'baseline_delay_road_c', 'baseline_queue_road_c', 'baseline_dos_road_c',
@@ -4042,11 +4039,7 @@ const FlowGuard = (function () {
     if (eng.baseline && eng.baseline.mode) {
       const baseRad = document.querySelector(`input[name="baselineMode"][value="${eng.baseline.mode}"]`);
       if (baseRad) baseRad.checked = true;
-      if (eng.baseline.mode === 'network' && eng.baseline.network) {
-        if (document.getElementById('baseline_delay_network')) document.getElementById('baseline_delay_network').value = eng.baseline.network.delay ?? '';
-        if (document.getElementById('baseline_queue_network')) document.getElementById('baseline_queue_network').value = eng.baseline.network.queue ?? '';
-        if (document.getElementById('baseline_dos_network')) document.getElementById('baseline_dos_network').value = eng.baseline.network.degreeOfSaturation ?? '';
-      } else if (eng.baseline.mode === 'road_wise' && eng.baseline.roads) {
+      if (eng.baseline.mode === 'road_wise' && eng.baseline.roads) {
         ['a', 'b', 'c', 'd'].forEach(letter => {
           const roadKey = `Road ${letter.toUpperCase()}`;
           const roadData = eng.baseline.roads[roadKey] || {};
@@ -4084,8 +4077,8 @@ const FlowGuard = (function () {
     const allRedTime = parseFloat((document.getElementById('engAllRedTime') || {}).value) || 2.0;
     const startupLost = parseFloat((document.getElementById('engStartupLost') || {}).value) || 2.0;
     const clearanceLost = parseFloat((document.getElementById('engClearanceLost') || {}).value) || 2.0;
-    const numPhases = parseInt((document.getElementById('engNumPhases') || {}).value, 10) || 4;
-    const controllerType = (document.getElementById('engControllerType') || {}).value || 'Fixed Time';
+    const numPhases = 2; // Fixed analytical 2-phase model (Phase 1 N/S, Phase 2 E/W)
+    const controllerType = 'Fixed Time';
     const existingCycle = parseFloat((document.getElementById('engExistingCycle') || {}).value) || 120;
     const cycleModeRadio = document.querySelector('input[name="cycleConstraint"]:checked');
     const cycleMode = cycleModeRadio ? cycleModeRadio.value : 'auto';
@@ -4143,10 +4136,7 @@ const FlowGuard = (function () {
     const baselineModeRadio = document.querySelector('input[name="baselineMode"]:checked');
     const baselineMode = baselineModeRadio ? baselineModeRadio.value : 'not_available';
 
-    const baselineNetContainer = document.getElementById('baselineNetworkContainer');
     const baselineRoadContainer = document.getElementById('baselineRoadwiseContainer');
-
-    if (baselineNetContainer) baselineNetContainer.style.display = (baselineMode === 'network') ? 'block' : 'none';
     if (baselineRoadContainer) baselineRoadContainer.style.display = (baselineMode === 'road_wise') ? 'grid' : 'none';
 
     const parseBaselineVal = (id) => {
@@ -4158,11 +4148,6 @@ const FlowGuard = (function () {
 
     const baselineData = {
       mode: baselineMode,
-      network: {
-        delay: parseBaselineVal('baseline_delay_network'),
-        queue: parseBaselineVal('baseline_queue_network'),
-        degreeOfSaturation: parseBaselineVal('baseline_dos_network')
-      },
       roads: {
         'Road A': { delay: parseBaselineVal('baseline_delay_road_a'), queue: parseBaselineVal('baseline_queue_road_a'), degreeOfSaturation: parseBaselineVal('baseline_dos_road_a') },
         'Road B': { delay: parseBaselineVal('baseline_delay_road_b'), queue: parseBaselineVal('baseline_queue_road_b'), degreeOfSaturation: parseBaselineVal('baseline_dos_road_b') },
@@ -4222,7 +4207,8 @@ const FlowGuard = (function () {
       if (el) el.textContent = text;
     };
 
-    setSummaryTxt('summaryPhasesVal', numPhases);
+    setSummaryTxt('summaryApproachesVal', 4);
+    setSummaryTxt('summaryPhasesVal', 2);
     setSummaryTxt('summaryPhase1Val', 'Road A + Road C (N/S)');
     setSummaryTxt('summaryPhase2Val', 'Road B + Road D (E/W)');
     setSummaryTxt('summaryBaseSatVal', `${baseSat} PCU/h/lane`);
@@ -4231,7 +4217,7 @@ const FlowGuard = (function () {
     setSummaryTxt('summaryAllRedVal', `${allRedTime} s`);
     setSummaryTxt('summaryMinGreenVal', `${minGreen} s`);
     setSummaryTxt('summaryPcuFactorsVal', manualOverride ? 'Custom Override' : 'Standard');
-    setSummaryTxt('summaryBaselineVal', baselineMode === 'not_available' ? 'Not Available' : (baselineMode === 'network' ? 'Network-wide' : 'Road-wise'));
+    setSummaryTxt('summaryBaselineVal', baselineMode === 'not_available' ? 'Not Available' : 'Road-wise');
 
     // Save State into project.engineeringParameters
     const currentState = getState();
@@ -4942,64 +4928,97 @@ const FlowGuard = (function () {
       }
     }
 
-    // Section 6: Before vs After Simulation Table
+    // Section 6: Before vs After Simulation Table & Dynamic Critical Approach Mapping
+    const scopeBadge = document.getElementById('step5BeforeAfterScopeBadge');
+    const scopeDetail = document.getElementById('step5BeforeAfterScopeDetail');
     const simTableBody = document.getElementById('step5BeforeAfterTableBody');
+
+    const baselineMode = (eng.baseline && eng.baseline.mode) ? eng.baseline.mode : 'not_available';
+
+    // Map Step 4 winningKey dynamically to Road Designation, Direction & Critical Movement
+    const roadDesignationMap = { north: 'Road A', east: 'Road B', south: 'Road C', west: 'Road D' };
+    const roadDirectionMap = { north: 'Northbound', east: 'Eastbound', south: 'Southbound', west: 'Westbound' };
+
+    const critRoadDesignation = roadDesignationMap[winningKey] || 'Road C';
+    const critRoadDirection = roadDirectionMap[winningKey] || 'Southbound';
+    const critRoadMoveStr = winnerMetric.critMoveStr || 'Through';
+
+    if (scopeBadge) {
+      if (isUploaded && baselineMode === 'road_wise') {
+        scopeBadge.textContent = 'COMPARISON SCOPE: CRITICAL APPROACH';
+        scopeBadge.style.background = 'rgba(56, 189, 248, 0.15)';
+        scopeBadge.style.color = '#38bdf8';
+        scopeBadge.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+      } else {
+        scopeBadge.textContent = 'COMPARISON SCOPE: PROPOSED PLAN ONLY';
+        scopeBadge.style.background = 'rgba(245, 158, 11, 0.15)';
+        scopeBadge.style.color = '#fcd34d';
+        scopeBadge.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+      }
+    }
+
+    if (scopeDetail) {
+      if (isUploaded && baselineMode === 'road_wise') {
+        scopeDetail.style.display = 'block';
+        scopeDetail.textContent = `Critical Approach: ${critRoadDesignation} — ${critRoadDirection} — ${critRoadMoveStr}`;
+      } else {
+        scopeDetail.style.display = 'none';
+        scopeDetail.textContent = '';
+      }
+    }
+
     if (simTableBody) {
       if (!isUploaded || !isWebsterValid || !websterCycleC0 || g1 === null || g2 === null) {
         simTableBody.innerHTML = `
           <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 0.75rem 1rem; font-weight: 700;">Cycle Length (C)</td>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Cycle Length (s)</td>
             <td style="padding: 0.75rem 1rem;">Not Available</td>
             <td style="padding: 0.75rem 1rem;">Not Available</td>
             <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 0.75rem 1rem; font-weight: 700;">Green Split (g₁ / g₂)</td>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Effective Green Split (Phase 1 / Phase 2)</td>
             <td style="padding: 0.75rem 1rem;">Not Available</td>
             <td style="padding: 0.75rem 1rem;">Not Available</td>
             <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 0.75rem 1rem; font-weight: 700;">Est. Avg Delay (d)</td>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Critical Approach Avg. Delay (s/veh)</td>
             <td style="padding: 0.75rem 1rem;">Not Available</td>
             <td style="padding: 0.75rem 1rem;">Not Available</td>
             <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 0.75rem 1rem; font-weight: 700;">Est. Max Queue (Q)</td>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Critical Approach Queue (m)</td>
             <td style="padding: 0.75rem 1rem;">Not Available</td>
             <td style="padding: 0.75rem 1rem;">Not Available</td>
             <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 0.75rem 1rem; font-weight: 700;">Degree of Saturation (v/c)</td>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Critical Approach Degree of Saturation (v/c)</td>
             <td style="padding: 0.75rem 1rem;">Not Available</td>
             <td style="padding: 0.75rem 1rem;">Not Available</td>
             <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
           </tr>
           <tr>
-            <td style="padding: 0.75rem 1rem; font-weight: 700;">Level of Service (LOS)</td>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Critical Approach Level of Service (LOS)</td>
             <td style="padding: 0.75rem 1rem;">Not Available</td>
             <td style="padding: 0.75rem 1rem;">Not Available</td>
             <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
           </tr>
         `;
       } else {
-        // Authoritative Degree of Saturation X_i = q_i / [s_i * (g_i / C0)]
-        const s1 = roadMetrics[phase1CritKey].satFlow;
-        const q1 = phase1CritFlowVal;
-        const cap1 = s1 * (g1 / websterCycleC0);
-        const x1 = cap1 > 0 ? (q1 / cap1) : 0;
+        // Compute proposed metrics for the identified winningKey critical approach using existing Webster formulas
+        const isPhase1Crit = (winningKey === 'north' || winningKey === 'south');
+        const gCrit = isPhase1Crit ? g1 : g2;
+        const qCrit = winnerMetric.critFlowVal;
+        const sCrit = winnerMetric.satFlow;
 
-        const s2 = roadMetrics[phase2CritKey].satFlow;
-        const q2 = phase2CritFlowVal;
-        const cap2 = s2 * (g2 / websterCycleC0);
-        const x2 = cap2 > 0 ? (q2 / cap2) : 0;
+        const capCrit = sCrit * (gCrit / websterCycleC0);
+        const xCrit = capCrit > 0 ? (qCrit / capCrit) : 0;
+        const isCritOversaturated = xCrit >= 1.0;
 
-        const maxDOS = Math.max(x1, x2);
-        const isOversaturated = maxDOS >= 1.0;
-
-        // Authoritative Webster 2-Term Delay Model: d = d1 + d2
+        // Authoritative Webster 2-Term Delay Model calculation for critical approach
         const calcPhaseDelay = (C, g, q, s, x) => {
           if (!g || !C || !s || s <= 0 || (g / C) <= 0) return 60.0;
           if (x >= 1.0) return 80.0;
@@ -5013,80 +5032,129 @@ const FlowGuard = (function () {
           return isNaN(d) ? 35.0 : Math.max(2.0, Math.min(180.0, d));
         };
 
-        const d1 = calcPhaseDelay(websterCycleC0, g1, q1, s1, x1);
-        const d2 = calcPhaseDelay(websterCycleC0, g2, q2, s2, x2);
-        const avgDelayProposed = parseFloat(((d1 + d2) / 2).toFixed(1));
+        const dCritProposed = parseFloat(calcPhaseDelay(websterCycleC0, gCrit, qCrit, sCrit, xCrit).toFixed(1));
 
-        // Authoritative Queue Calculation: Q_veh = (q / 3600) * (C - g), Q_meters = Q_veh * 6
-        const qVeh1 = (q1 / 3600) * (websterCycleC0 - g1);
-        const qVeh2 = (q2 / 3600) * (websterCycleC0 - g2);
-        const maxQVeh = Math.max(qVeh1, qVeh2);
-        const maxQVehRounded = Math.round(maxQVeh);
-        const maxQMetersRounded = Math.round(maxQVeh * 6);
+        // Authoritative Queue Calculation for critical approach: Q_veh = (q / 3600) * (C - g), Q_meters = Q_veh * 6
+        const qVehCrit = (qCrit / 3600) * (websterCycleC0 - gCrit);
+        const qVehCritRounded = Math.round(qVehCrit);
+        const qMetersCritRounded = Math.round(qVehCrit * 6);
 
-        // Level of Service LOS
-        const getLOS = (delay) => {
-          if (delay <= 10) return 'LOS A';
-          if (delay <= 20) return 'LOS B';
-          if (delay <= 35) return 'LOS C';
-          if (delay <= 55) return 'LOS D';
-          if (delay <= 80) return 'LOS E';
-          return 'LOS F';
+        // Authoritative LOS calculation from critical-approach delay
+        const getLOSCategory = (delayVal) => {
+          if (delayVal === null || delayVal === undefined || isNaN(delayVal)) return null;
+          if (delayVal <= 10) return 'A';
+          if (delayVal <= 20) return 'B';
+          if (delayVal <= 35) return 'C';
+          if (delayVal <= 55) return 'D';
+          if (delayVal <= 80) return 'E';
+          return 'F';
         };
 
-        const losProposed = isOversaturated ? 'LOS F' : getLOS(avgDelayProposed);
+        // Read baseline metrics for the critical road if Baseline Data Mode = road_wise
+        const roadBaseline = (baselineMode === 'road_wise' && eng.baseline && eng.baseline.roads)
+          ? (eng.baseline.roads[critRoadDesignation] || {})
+          : {};
 
-        // Read baseline metrics if present in Step 3
-        const base = (eng.baseline && eng.baseline.network) || {};
+        const baseG1 = Math.round(Math.max(0, existingCycle - totalLostTimeL) / 2);
+        const baseG2 = Math.max(0, Math.max(0, existingCycle - totalLostTimeL) - baseG1);
+        const baseGreenStr = (existingCycle && !isNaN(existingCycle)) ? `${baseG1} s / ${baseG2} s` : 'Not Available';
         const baseCycleStr = `${existingCycle} s`;
-        const baseGreenStr = `${Math.round((existingCycle - totalLostTimeL) / 2)}s / ${Math.round((existingCycle - totalLostTimeL) / 2)}s`;
-        const baseDelayStr = base.delay !== null && base.delay !== undefined ? `${base.delay} s/veh` : 'Not Available';
-        const baseQueueStr = base.queue !== null && base.queue !== undefined ? `${base.queue} veh` : 'Not Available';
-        const baseDOSStr = base.degreeOfSaturation !== null && base.degreeOfSaturation !== undefined ? String(base.degreeOfSaturation) : 'Not Available';
-        const baseLOSStr = base.delay !== null && base.delay !== undefined ? getLOS(base.delay) : 'Not Available';
+        const baseDelayStr = roadBaseline.delay !== null && roadBaseline.delay !== undefined ? `${roadBaseline.delay.toFixed(1)} s/veh` : 'Not Available';
+        const baseQueueStr = roadBaseline.queue !== null && roadBaseline.queue !== undefined ? `${roadBaseline.queue} m` : 'Not Available';
+        const baseDOSStr = roadBaseline.degreeOfSaturation !== null && roadBaseline.degreeOfSaturation !== undefined ? String(roadBaseline.degreeOfSaturation) : 'Not Available';
 
+        const baseLOSCat = (baselineMode === 'road_wise' && roadBaseline.delay !== null && roadBaseline.delay !== undefined)
+          ? getLOSCategory(roadBaseline.delay)
+          : null;
+        const baseLOSStr = baseLOSCat ? `LOS ${baseLOSCat}` : 'Not Available';
+
+        const propLOSCat = isCritOversaturated ? 'F' : getLOSCategory(dCritProposed);
+        const propLOSStr = propLOSCat ? `LOS ${propLOSCat}` : 'Not Available';
+
+        const losRank = { A: 1, B: 2, C: 3, D: 4, E: 5, F: 6 };
+        let losDiffStr = '—';
+        if (baselineMode === 'road_wise' && baseLOSCat && propLOSCat) {
+          const baseRank = losRank[baseLOSCat];
+          const propRank = losRank[propLOSCat];
+          if (propRank < baseRank) {
+            losDiffStr = `${baseLOSCat} → ${propLOSCat} (Improved)`;
+          } else if (propRank > baseRank) {
+            losDiffStr = `${baseLOSCat} → ${propLOSCat} (Worsened)`;
+          } else {
+            losDiffStr = 'No LOS change';
+          }
+        }
+
+        // Calculate Estimated Changes strictly when baseline is available
         let delayDiffStr = '—';
-        if (base.delay !== null && base.delay !== undefined) {
-          const diff = avgDelayProposed - base.delay;
-          delayDiffStr = diff < 0 ? `${diff.toFixed(1)} s (${Math.abs(Math.round((diff / base.delay) * 100))}% reduction)` : `+${diff.toFixed(1)} s`;
+        if (baselineMode === 'road_wise' && roadBaseline.delay !== null && roadBaseline.delay !== undefined && !isCritOversaturated) {
+          const diff = dCritProposed - roadBaseline.delay;
+          if (roadBaseline.delay > 0) {
+            const pct = Math.abs(Math.round((diff / roadBaseline.delay) * 100));
+            delayDiffStr = diff < 0 ? `${diff.toFixed(1)} s/veh (${pct}% reduction)` : (diff > 0 ? `+${diff.toFixed(1)} s/veh (${pct}% increase)` : `0.0 s/veh (0% change)`);
+          } else {
+            delayDiffStr = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)} s/veh`;
+          }
+        }
+
+        let queueDiffStr = '—';
+        if (baselineMode === 'road_wise' && roadBaseline.queue !== null && roadBaseline.queue !== undefined) {
+          const diff = qMetersCritRounded - roadBaseline.queue;
+          if (roadBaseline.queue > 0) {
+            const pct = Math.abs(Math.round((diff / roadBaseline.queue) * 100));
+            queueDiffStr = diff < 0 ? `${diff} m (${pct}% reduction)` : (diff > 0 ? `+${diff} m (${pct}% increase)` : `0 m (0% change)`);
+          } else {
+            queueDiffStr = `${diff >= 0 ? '+' : ''}${diff} m`;
+          }
+        }
+
+        let dosDiffStr = '—';
+        if (baselineMode === 'road_wise' && roadBaseline.degreeOfSaturation !== null && roadBaseline.degreeOfSaturation !== undefined) {
+          const diff = xCrit - roadBaseline.degreeOfSaturation;
+          if (roadBaseline.degreeOfSaturation > 0) {
+            const pct = Math.abs(Math.round((diff / roadBaseline.degreeOfSaturation) * 100));
+            dosDiffStr = diff < 0 ? `${diff.toFixed(2)} (${pct}% reduction)` : (diff > 0 ? `+${diff.toFixed(2)} (${pct}% increase)` : `0.00 (0% change)`);
+          } else {
+            dosDiffStr = `${diff >= 0 ? '+' : ''}${diff.toFixed(2)}`;
+          }
         }
 
         simTableBody.innerHTML = `
           <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 0.75rem 1rem; font-weight: 700;">Cycle Length (C)</td>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Cycle Length (s)</td>
             <td style="padding: 0.75rem 1rem;">${baseCycleStr}</td>
             <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${websterCycleC0} s</td>
             <td style="padding: 0.75rem 1rem; color: var(--accent-primary);">${websterCycleC0 - existingCycle > 0 ? `+${websterCycleC0 - existingCycle}` : `${websterCycleC0 - existingCycle}`} s</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 0.75rem 1rem; font-weight: 700;">Green Split (g₁ / g₂)</td>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Effective Green Split (Phase 1 / Phase 2)</td>
             <td style="padding: 0.75rem 1rem;">${baseGreenStr}</td>
             <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${g1}s / ${g2}s</td>
             <td style="padding: 0.75rem 1rem; color: var(--accent-primary);">Proportional</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 0.75rem 1rem; font-weight: 700;">Est. Avg Delay (d)</td>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Critical Approach Avg. Delay (s/veh)</td>
             <td style="padding: 0.75rem 1rem;">${baseDelayStr}</td>
-            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${isOversaturated ? 'Phase Failure / Oversaturated' : `${avgDelayProposed} s/veh`}</td>
+            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${isCritOversaturated ? 'Phase Failure / Oversaturated' : `${dCritProposed} s/veh`}</td>
             <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${delayDiffStr}</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 0.75rem 1rem; font-weight: 700;">Est. Max Queue (Q)</td>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Critical Approach Queue (m)</td>
             <td style="padding: 0.75rem 1rem;">${baseQueueStr}</td>
-            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">≈ ${maxQVehRounded} vehicles (≈ ${maxQMetersRounded} m)</td>
-            <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
+            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">≈ ${qVehCritRounded} vehicles (≈ ${qMetersCritRounded} m)</td>
+            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${queueDiffStr}</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 0.75rem 1rem; font-weight: 700;">Degree of Saturation (v/c)</td>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Critical Approach Degree of Saturation (v/c)</td>
             <td style="padding: 0.75rem 1rem;">${baseDOSStr}</td>
-            <td style="padding: 0.75rem 1rem; color: ${isOversaturated ? '#ef4444' : 'var(--success)'}; font-weight: 700;">${isOversaturated ? `${parseFloat(maxDOS.toFixed(2))} (Oversaturated)` : parseFloat(maxDOS.toFixed(2))}</td>
-            <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">${isOversaturated ? '⚠️ Phase Failure' : (maxDOS < 0.85 ? '✓ Capacity Satisfied' : '⚠️ High Saturation')}</td>
+            <td style="padding: 0.75rem 1rem; color: ${isCritOversaturated ? '#ef4444' : 'var(--success)'}; font-weight: 700;">${isCritOversaturated ? `${parseFloat(xCrit.toFixed(2))} (Oversaturated)` : parseFloat(xCrit.toFixed(2))}</td>
+            <td style="padding: 0.75rem 1rem; color: ${isCritOversaturated ? '#ef4444' : 'var(--success)'}; font-weight: 700;">${isCritOversaturated ? '⚠️ Phase Failure' : dosDiffStr}</td>
           </tr>
           <tr>
-            <td style="padding: 0.75rem 1rem; font-weight: 700;">Level of Service (LOS)</td>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Critical Approach Level of Service (LOS)</td>
             <td style="padding: 0.75rem 1rem;">${baseLOSStr}</td>
-            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${losProposed}</td>
-            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${losProposed} Compliant</td>
+            <td style="padding: 0.75rem 1rem; color: ${isCritOversaturated ? '#ef4444' : 'var(--success)'}; font-weight: 700;">${propLOSStr}</td>
+            <td style="padding: 0.75rem 1rem; color: ${losDiffStr.includes('Improved') ? 'var(--success)' : (losDiffStr.includes('Worsened') ? '#ef4444' : 'var(--text-secondary)')}; font-weight: 700;">${losDiffStr}</td>
           </tr>
         `;
       }

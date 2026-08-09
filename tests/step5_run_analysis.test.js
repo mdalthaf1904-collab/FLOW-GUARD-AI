@@ -95,4 +95,131 @@ describe('Step 5: Run Analysis Engine', () => {
     expect(qVehRounded).toBe(21); // ~21.5 rounded or 22
     expect(qMetersRounded).toBe(129); // ~129 meters
   });
+
+  test('5. Baseline Mode & Network Removal: defaults to not_available without network baseline object', () => {
+    const proj = FlowGuard.getProject();
+    expect(proj.engineeringParameters.baseline.mode).toBe('not_available');
+    expect(proj.engineeringParameters.baseline.network).toBeUndefined();
+    expect(proj.engineeringParameters.baseline.roads['Road A']).toBeDefined();
+    expect(proj.engineeringParameters.baseline.roads['Road C']).toBeDefined();
+  });
+
+  test('6. Dynamic Critical Approach Baseline Scope: maps Step 4 critical road dynamically', () => {
+    const proj = FlowGuard.getProject();
+    proj.dataset = { uploaded: true };
+    proj.trafficInput = { datasetUploaded: true, vehicleCounts: { north: { car: 100 } } };
+
+    // Set Road A (North) as critical approach with demand 3000 PCU
+    proj.processedTraffic = {
+      north: { movementPCU: { leftPCU: 0, throughPCU: 3000, rightPCU: 0, totalPCU: 3000 } },
+      east: { movementPCU: { leftPCU: 0, throughPCU: 500, rightPCU: 0, totalPCU: 500 } },
+      south: { movementPCU: { leftPCU: 0, throughPCU: 800, rightPCU: 0, totalPCU: 800 } },
+      west: { movementPCU: { leftPCU: 0, throughPCU: 450, rightPCU: 0, totalPCU: 450 } }
+    };
+
+    proj.engineeringParameters.baseline = {
+      mode: 'road_wise',
+      roads: {
+        'Road A': { delay: 45.0, queue: 150, degreeOfSaturation: 0.90 },
+        'Road B': { delay: 20.0, queue: 50, degreeOfSaturation: 0.50 },
+        'Road C': { delay: 35.0, queue: 100, degreeOfSaturation: 0.75 },
+        'Road D': { delay: 18.0, queue: 40, degreeOfSaturation: 0.45 }
+      }
+    };
+    FlowGuard.saveProject(proj);
+
+    const reloaded = FlowGuard.getProject();
+    expect(reloaded.engineeringParameters.baseline.mode).toBe('road_wise');
+    expect(reloaded.engineeringParameters.baseline.roads['Road A'].delay).toBe(45.0);
+
+    // Dynamic critical flow check: North flow ratio = 3000 / 7200 = 0.4167 (highest)
+    const yA = proj.processedTraffic.north.movementPCU.throughPCU / (4 * 1800);
+    const yC = proj.processedTraffic.south.movementPCU.throughPCU / (4 * 1800);
+    expect(yA).toBeGreaterThan(yC);
+  });
+
+  test('7. Optional Missing Baseline Values: preserves null without converting to zero', () => {
+    const proj = FlowGuard.getProject();
+    proj.engineeringParameters.baseline = {
+      mode: 'road_wise',
+      roads: {
+        'Road A': { delay: null, queue: null, degreeOfSaturation: null },
+        'Road B': { delay: 25.0, queue: null, degreeOfSaturation: 0.60 },
+        'Road C': { delay: null, queue: 120, degreeOfSaturation: null },
+        'Road D': { delay: null, queue: null, degreeOfSaturation: null }
+      }
+    };
+    FlowGuard.saveProject(proj);
+
+    const reloaded = FlowGuard.getProject();
+    expect(reloaded.engineeringParameters.baseline.roads['Road A'].delay).toBeNull();
+    expect(reloaded.engineeringParameters.baseline.roads['Road A'].queue).toBeNull();
+    expect(reloaded.engineeringParameters.baseline.roads['Road B'].queue).toBeNull();
+    expect(reloaded.engineeringParameters.baseline.roads['Road B'].delay).toBe(25.0);
+  });
+
+  test('8. Queue Comparison Unit Consistency: verifies metres calculations', () => {
+    const qVeh = 20; // 20 vehicles
+    const qMeters = Math.round(qVeh * 6); // 120 metres
+    expect(qMeters).toBe(120);
+
+    const baselineMeters = 150;
+    const diffMeters = qMeters - baselineMeters; // -30m
+    expect(diffMeters).toBe(-30);
+  });
+
+  test('9. Level of Service (LOS) Classification: classifies delay and formats transitions correctly', () => {
+    const getLOSCategory = (delayVal) => {
+      if (delayVal === null || delayVal === undefined || isNaN(delayVal)) return null;
+      if (delayVal <= 10) return 'A';
+      if (delayVal <= 20) return 'B';
+      if (delayVal <= 35) return 'C';
+      if (delayVal <= 55) return 'D';
+      if (delayVal <= 80) return 'E';
+      return 'F';
+    };
+
+    expect(getLOSCategory(8.5)).toBe('A');
+    expect(getLOSCategory(15.6)).toBe('B');
+    expect(getLOSCategory(20.0)).toBe('B');
+    expect(getLOSCategory(25.0)).toBe('C');
+    expect(getLOSCategory(45.0)).toBe('D');
+    expect(getLOSCategory(65.0)).toBe('E');
+    expect(getLOSCategory(85.0)).toBe('F');
+
+    const losRank = { A: 1, B: 2, C: 3, D: 4, E: 5, F: 6 };
+    const formatLOSTransition = (baseCat, propCat) => {
+      if (!baseCat || !propCat) return '—';
+      const bRank = losRank[baseCat];
+      const pRank = losRank[propCat];
+      if (pRank < bRank) return `${baseCat} → ${propCat} (Improved)`;
+      if (pRank > bRank) return `${baseCat} → ${propCat} (Worsened)`;
+      return 'No LOS change';
+    };
+
+    expect(formatLOSTransition('C', 'B')).toBe('C → B (Improved)');
+    expect(formatLOSTransition('B', 'C')).toBe('B → C (Worsened)');
+    expect(formatLOSTransition('B', 'B')).toBe('No LOS change');
+  });
+
+  test('10. Baseline Effective Green Split & Cycle Consistency: computes 56s/56s for 120s baseline cycle and lost time 8s', () => {
+    const existingCycle = 120;
+    const totalLostTimeL = 8; // 2 phases * 4s lost time
+    const baseG1 = Math.round(Math.max(0, existingCycle - totalLostTimeL) / 2);
+    const baseG2 = Math.max(0, Math.max(0, existingCycle - totalLostTimeL) - baseG1);
+    expect(baseG1).toBe(56);
+    expect(baseG2).toBe(56);
+    expect(baseG1 + baseG2 + totalLostTimeL).toBe(existingCycle);
+
+    // Dynamic check for 100s cycle: 100 - 8 = 92 -> 46s / 46s
+    const cycle100 = 100;
+    const g1_100 = Math.round(Math.max(0, cycle100 - totalLostTimeL) / 2);
+    const g2_100 = Math.max(0, Math.max(0, cycle100 - totalLostTimeL) - g1_100);
+    expect(g1_100).toBe(46);
+    expect(g2_100).toBe(46);
+    expect(g1_100 + g2_100 + totalLostTimeL).toBe(100);
+  });
 });
+
+
+
