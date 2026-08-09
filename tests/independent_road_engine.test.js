@@ -55,6 +55,8 @@ describe('FlowGuard AI - Independent Road PCU Calculation Model', () => {
 
   test('Intersection totals equal the sum of independent road calculations', () => {
     const proj = FlowGuard.getProject();
+    proj.dataset = { uploaded: true, records: [{ time: '08:00', road: 'Road A', key: 'north', movement: 'Through', vehicleType: 'Car', count: 100 }] };
+    FlowGuard.recomputeProjectData(proj);
     FlowGuard.saveProject(proj);
 
     const processed = FlowGuard.getProject().processedTraffic;

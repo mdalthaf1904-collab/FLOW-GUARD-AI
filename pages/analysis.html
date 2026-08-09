@@ -370,52 +370,64 @@
         <section id="wizard-section-3" class="wizard-section-panel" style="display: none;">
           <div style="margin-bottom: 1.5rem;">
             <h2 class="section-header-title" style="font-size: 1.05rem;">3. ENGINEERING PARAMETERS &amp; DESIGN ASSUMPTIONS</h2>
-            <p style="font-size: 0.82rem; color: var(--text-secondary);">Configure signal control constraints, base saturation flow, and IRC:106 PCU equivalence factors per IRC:93 and IRC:106 guidelines for Webster signal optimization.</p>
+            <p style="font-size: 0.82rem; color: var(--text-secondary);">Configure signal control parameters, saturation flow, PCU factors, phase structure, pedestrian safety, and baseline performance before Traffic Summary.</p>
           </div>
 
           <div class="eng-panels-grid">
-            <!-- SECTION 1 — SIGNAL CONTROL PARAMETERS -->
+
+            <!-- 1. SIGNAL CONTROL PARAMETERS CARD -->
             <div class="eng-panel-card">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">⏱️</div>
                   <div>
-                    <div class="eng-panel-title">1. Signal Control Parameters</div>
-                    <div class="eng-panel-subtitle">Controller type, phase bounds, lost time &amp; clearance intervals</div>
+                    <div class="eng-panel-title">SIGNAL CONTROL PARAMETERS</div>
+                    <div class="eng-panel-subtitle">Shared intersection signal parameter &amp; Webster bounds</div>
                   </div>
                 </div>
-                <span class="badge badge-low">IRC:93 Standard</span>
+                <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                  <span class="badge badge-low" style="background: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Engineering Input</span>
+                  <span class="badge badge-low" style="background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3);">Shared intersection signal parameter</span>
+                </div>
               </div>
 
               <div class="eng-fields-grid">
                 <div class="control-field-group">
                   <label class="control-field-label">Minimum Green Time (s)</label>
-                  <input type="number" id="engMinGreen" class="control-field-select" value="7" min="3" max="30">
-                  <span class="input-val-check" id="valCheckMinGreen" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (5–15s)</span>
+                  <input type="number" id="engMinGreen" class="control-field-select" value="7" min="1" max="60">
+                  <span class="input-val-check" id="valCheckMinGreen" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&lt; Max Green)</span>
                 </div>
+
                 <div class="control-field-group">
                   <label class="control-field-label">Maximum Green Time (s)</label>
-                  <input type="number" id="engMaxGreen" class="control-field-select" value="90" min="30" max="180">
-                  <span class="input-val-check" id="valCheckMaxGreen" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (30–180s)</span>
+                  <input type="number" id="engMaxGreen" class="control-field-select" value="90" min="10" max="300">
+                  <span class="input-val-check" id="valCheckMaxGreen" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&gt; Min Green)</span>
                 </div>
+
                 <div class="control-field-group">
-                  <label class="control-field-label">Yellow / Amber Interval (s)</label>
-                  <input type="number" id="engAmberTime" class="control-field-select" value="3.0" min="2.0" max="6.0" step="0.5">
-                  <span class="input-val-check" id="valCheckAmber" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (3–5s)</span>
+                  <label class="control-field-label">Yellow / Amber Time (s)</label>
+                  <input type="number" id="engAmberTime" class="control-field-select" value="3.0" min="0.5" max="10.0" step="0.5">
+                  <span class="input-val-check" id="valCheckAmber" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&gt; 0s)</span>
                 </div>
+
                 <div class="control-field-group">
-                  <label class="control-field-label">All Red Interval (s)</label>
-                  <input type="number" id="engAllRedTime" class="control-field-select" value="2.0" min="1.0" max="6.0" step="0.5">
-                  <span class="input-val-check" id="valCheckAllRed" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (1–3s)</span>
+                  <label class="control-field-label">All-Red Time (s)</label>
+                  <input type="number" id="engAllRedTime" class="control-field-select" value="2.0" min="0.0" max="10.0" step="0.5">
+                  <span class="input-val-check" id="valCheckAllRed" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (≥ 0s)</span>
                 </div>
+
                 <div class="control-field-group">
-                  <label class="control-field-label">Startup Lost Time l₁ (s)</label>
-                  <input type="number" id="engStartupLost" class="control-field-select" value="2.0" min="0.0" max="5.0" step="0.5">
+                  <label class="control-field-label">Start-Up Lost Time L1 (s)</label>
+                  <input type="number" id="engStartupLost" class="control-field-select" value="2.0" min="0.0" max="10.0" step="0.5">
+                  <span class="input-val-check" id="valCheckStartupLost" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (≥ 0s)</span>
                 </div>
+
                 <div class="control-field-group">
-                  <label class="control-field-label">Clearance Lost Time l₂ (s)</label>
-                  <input type="number" id="engClearanceLost" class="control-field-select" value="2.0" min="0.0" max="5.0" step="0.5">
+                  <label class="control-field-label">Clearance Lost Time L2 (s)</label>
+                  <input type="number" id="engClearanceLost" class="control-field-select" value="2.0" min="0.0" max="10.0" step="0.5">
+                  <span class="input-val-check" id="valCheckClearanceLost" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (≥ 0s)</span>
                 </div>
+
                 <div class="control-field-group">
                   <label class="control-field-label">Number of Signal Phases</label>
                   <select id="engNumPhases" class="control-field-select">
@@ -424,19 +436,22 @@
                     <option value="4" selected>4 Phases</option>
                   </select>
                 </div>
+
                 <div class="control-field-group">
                   <label class="control-field-label">Controller Type</label>
                   <select id="engControllerType" class="control-field-select">
                     <option value="Fixed Time" selected>Fixed Time</option>
-                    <option value="Semi Actuated">Semi Actuated</option>
-                    <option value="Fully Actuated">Fully Actuated</option>
+                    <option value="Semi-Actuated">Semi-Actuated</option>
+                    <option value="Fully-Actuated">Fully-Actuated</option>
+                    <option value="Adaptive Dynamic">Adaptive Dynamic</option>
                   </select>
                 </div>
+
                 <div class="control-field-group" style="grid-column: span 2;">
-                  <label class="control-field-label">Cycle Length Constraint Mode</label>
+                  <label class="control-field-label">Cycle Length Mode</label>
                   <div style="display: flex; gap: 1rem; margin-top: 0.25rem;">
                     <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; cursor: pointer; color: var(--text-primary);">
-                      <input type="radio" name="cycleConstraint" value="auto" checked> Auto Webster Optimum
+                      <input type="radio" name="cycleConstraint" value="auto" checked> Auto Webster Optimization
                     </label>
                     <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; cursor: pointer; color: var(--text-primary);">
                       <input type="radio" name="cycleConstraint" value="manual"> Manual Fixed Cycle
@@ -446,213 +461,426 @@
                     </label>
                   </div>
                 </div>
+
+                <div class="control-field-group" style="grid-column: span 2;">
+                  <label class="control-field-label">Existing Cycle Length (s) <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;">— Shared Intersection-Wide Parameter</span></label>
+                  <input type="number" id="engExistingCycle" class="control-field-select" value="120" min="20" max="300" step="5" style="max-width: 250px;">
+                </div>
               </div>
             </div>
 
-            <!-- SECTION 2 — BASE SATURATION FLOW SETTINGS -->
+            <!-- 2. BASE SATURATION FLOW CARD -->
             <div class="eng-panel-card">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">📊</div>
                   <div>
-                    <div class="eng-panel-title">2. Base Saturation Flow Rate</div>
-                    <div class="eng-panel-subtitle">Base saturation rate per lane for Webster optimization</div>
+                    <div class="eng-panel-title">BASE SATURATION FLOW</div>
+                    <div class="eng-panel-subtitle">Base saturation flow rate S₀ per lane</div>
                   </div>
                 </div>
-                <span class="badge badge-low">IRC:93 Standard</span>
+                <span class="badge" id="satFlowSourceBadge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">Inherited from Step 1</span>
               </div>
 
               <div class="control-field-group" style="margin-bottom: 0.75rem;">
-                <label class="control-field-label">Base Saturation Flow S₀ (PCU/hr/lane)</label>
-                <input type="number" id="engBaseSatFlow" class="control-field-select" value="1800" min="1000" max="2500" step="50">
-                <span class="input-val-check" id="valCheckSatFlow" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (1400–2200 PCU/h/ln)</span>
+                <label class="control-field-label">Base Saturation Flow S₀ (PCU/h/lane)</label>
+                <input type="number" id="engBaseSatFlow" class="control-field-select" value="1800" min="500" max="3000" step="50">
+                <span class="input-val-check" id="valCheckSatFlow" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&gt; 0 PCU/h/ln)</span>
               </div>
-              <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.5rem; line-height: 1.4;">
-                Standard base saturation flow rate per lane per IRC:93. Default is <strong>1800 PCU/hr/lane</strong> for Indian urban signalized intersections.
-              </p>
+
+              <div style="background: rgba(15,23,42,0.6); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.78rem; color: var(--accent-primary); font-weight: 600;">Default engineering assumption</div>
+                <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.25rem; line-height: 1.4;">
+                  Standard base saturation flow rate S₀ per lane. Inherits Step 1 geometry values if available, or allows manual override. Saturation flow calculations occur in Step 4.
+                </p>
+              </div>
             </div>
 
-            <!-- SECTION 3 — PCU CONFIGURATION (FULL WIDTH) -->
+            <!-- 3. PCU EQUIVALENCE FACTORS CARD (FULL WIDTH) -->
             <div class="eng-panel-card full-width">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">🚗</div>
                   <div>
-                    <div class="eng-panel-title">3. Passenger Car Unit (PCU) Configuration</div>
-                    <div class="eng-panel-subtitle">IRC:106-1990 equivalence factors for Indian heterogeneous traffic</div>
+                    <div class="eng-panel-title">PCU EQUIVALENCE FACTORS</div>
+                    <div class="eng-panel-subtitle">Passenger Car Unit equivalence factors for raw vehicle count conversion in Step 4</div>
                   </div>
                 </div>
-                <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                  <input type="text" id="pcuSearchInput" class="mini-input-field" placeholder="🔍 Search vehicle..." style="width: 150px; font-size: 0.78rem; padding: 4px 8px;">
-                  <button id="btnTogglePCUTable" class="btn-ghost" style="padding: 4px 10px; font-size: 0.75rem;">▲ Collapse Table</button>
-                  <button id="btnResetPCU" class="btn-ghost" style="padding: 4px 10px; font-size: 0.75rem;">↺ Restore IRC Defaults</button>
+                <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                  <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; cursor: pointer; color: var(--text-primary); background: rgba(15,23,42,0.6); padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border-color);">
+                    <input type="checkbox" id="engAllowPcuOverride"> Allow Manual PCU Override
+                  </label>
+                  <button id="btnResetPCU" class="btn-ghost" style="padding: 4px 10px; font-size: 0.75rem;">↺ Restore Defaults</button>
                 </div>
               </div>
 
-              <div id="pcuTableContainer" style="overflow-x: auto; transition: all 0.2s ease;">
+              <div id="pcuTableContainer" style="overflow-x: auto;">
                 <table class="pcu-table" id="pcuTable" style="width: 100%;">
                   <thead>
                     <tr>
-                      <th>Vehicle Classification</th>
-                      <th>IRC:106 Stream (&lt; 5%)</th>
-                      <th>IRC:106 Stream (≥ 5%)</th>
-                      <th style="text-align: right;">Configured PCU Factor (Editable)</th>
+                      <th>Vehicle Type (Step 2 Header)</th>
+                      <th style="text-align: right;">Default PCU Factor</th>
+                      <th style="text-align: right;">Configured PCU Factor</th>
+                      <th style="text-align: center;">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <!-- FAST VEHICLES HEADER -->
-                    <tr style="background: rgba(30, 41, 59, 0.8);">
-                      <td colspan="4" style="font-weight: 700; color: #38bdf8; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase;">⚡ FAST VEHICLES</td>
+                    <tr data-veh-key="Cars">
+                      <td><strong>Cars</strong></td>
+                      <td style="text-align: right; color: var(--text-secondary);">1.0</td>
+                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="Cars" value="1.0" step="0.1" min="0.1" disabled style="width: 90px; text-align: right;"></td>
+                      <td style="text-align: center;"><span class="pcu-status-tag" style="font-size:0.75rem; color:var(--text-secondary);">Standard</span></td>
                     </tr>
-                    <tr data-veh-name="two wheelers motorcycle scooter moped">
-                      <td><strong>Two Wheelers (Motorcycle / Scooter)</strong></td>
-                      <td>0.5</td>
-                      <td>0.8</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="motorcycle" value="0.5" step="0.1" min="0.1"></td>
+                    <tr data-veh-key="Bikes">
+                      <td><strong>Bikes</strong></td>
+                      <td style="text-align: right; color: var(--text-secondary);">0.5</td>
+                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="Bikes" value="0.5" step="0.1" min="0.1" disabled style="width: 90px; text-align: right;"></td>
+                      <td style="text-align: center;"><span class="pcu-status-tag" style="font-size:0.75rem; color:var(--text-secondary);">Standard</span></td>
                     </tr>
-                    <tr data-veh-name="passenger car jeep van">
-                      <td><strong>Passenger Car / Jeep / Van</strong></td>
-                      <td>1.0</td>
-                      <td>1.0</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="car" value="1.0" step="0.1" min="0.1"></td>
+                    <tr data-veh-key="AutoRickshaw">
+                      <td><strong>AutoRickshaw</strong></td>
+                      <td style="text-align: right; color: var(--text-secondary);">1.0</td>
+                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="AutoRickshaw" value="1.0" step="0.1" min="0.1" disabled style="width: 90px; text-align: right;"></td>
+                      <td style="text-align: center;"><span class="pcu-status-tag" style="font-size:0.75rem; color:var(--text-secondary);">Standard</span></td>
                     </tr>
-                    <tr data-veh-name="auto-rickshaw 3-wheeler">
-                      <td><strong>Auto-Rickshaw</strong></td>
-                      <td>1.2</td>
-                      <td>2.0</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="autorickshaw" value="1.2" step="0.1" min="0.1"></td>
+                    <tr data-veh-key="LCV">
+                      <td><strong>LCV</strong></td>
+                      <td style="text-align: right; color: var(--text-secondary);">3.0</td>
+                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="LCV" value="3.0" step="0.1" min="0.1" disabled style="width: 90px; text-align: right;"></td>
+                      <td style="text-align: center;"><span class="pcu-status-tag" style="font-size:0.75rem; color:var(--text-secondary);">Standard</span></td>
                     </tr>
-                    <tr data-veh-name="light commercial vehicle lcv">
-                      <td><strong>Light Commercial Vehicle (LCV)</strong></td>
-                      <td>1.4</td>
-                      <td>2.0</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="lcv" value="1.4" step="0.1" min="0.1"></td>
+                    <tr data-veh-key="Bus">
+                      <td><strong>Bus</strong></td>
+                      <td style="text-align: right; color: var(--text-secondary);">3.0</td>
+                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="Bus" value="3.0" step="0.1" min="0.1" disabled style="width: 90px; text-align: right;"></td>
+                      <td style="text-align: center;"><span class="pcu-status-tag" style="font-size:0.75rem; color:var(--text-secondary);">Standard</span></td>
                     </tr>
-                    <tr data-veh-name="truck bus hgv coach">
-                      <td><strong>Truck / Bus</strong></td>
-                      <td>2.2</td>
-                      <td>3.7</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="bus" value="2.2" step="0.1" min="0.1"></td>
+                    <tr data-veh-key="HCV">
+                      <td><strong>HCV</strong></td>
+                      <td style="text-align: right; color: var(--text-secondary);">3.0</td>
+                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="HCV" value="3.0" step="0.1" min="0.1" disabled style="width: 90px; text-align: right;"></td>
+                      <td style="text-align: center;"><span class="pcu-status-tag" style="font-size:0.75rem; color:var(--text-secondary);">Standard</span></td>
                     </tr>
-                    <tr data-veh-name="agricultural tractor trailer">
-                      <td><strong>Agricultural Tractor / Trailer</strong></td>
-                      <td>4.0</td>
-                      <td>5.0</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="tractor" value="4.0" step="0.1" min="0.1"></td>
-                    </tr>
-
-                    <!-- SLOW VEHICLES HEADER -->
-                    <tr style="background: rgba(30, 41, 59, 0.8);">
-                      <td colspan="4" style="font-weight: 700; color: #fcd34d; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase;">🚲 SLOW VEHICLES</td>
-                    </tr>
-                    <tr data-veh-name="pedal cycle bicycle">
-                      <td><strong>Pedal Cycle</strong></td>
-                      <td>0.4</td>
-                      <td>0.5</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="bicycle" value="0.4" step="0.1" min="0.1"></td>
-                    </tr>
-                    <tr data-veh-name="cycle rickshaw">
-                      <td><strong>Cycle Rickshaw</strong></td>
-                      <td>1.5</td>
-                      <td>2.0</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="cyclerickshaw" value="1.5" step="0.1" min="0.1"></td>
-                    </tr>
-                    <tr data-veh-name="tonga horse drawn vehicle">
-                      <td><strong>Tonga (Horse Drawn Vehicle)</strong></td>
-                      <td>1.5</td>
-                      <td>2.0</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="tonga" value="1.5" step="0.1" min="0.1"></td>
-                    </tr>
-                    <tr data-veh-name="hand cart cart">
-                      <td><strong>Hand Cart</strong></td>
-                      <td>2.0</td>
-                      <td>3.0</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="cart" value="2.0" step="0.1" min="0.1"></td>
+                    <tr data-veh-key="Bicycle">
+                      <td><strong>Bicycle</strong></td>
+                      <td style="text-align: right; color: var(--text-secondary);">0.4</td>
+                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="Bicycle" value="0.4" step="0.1" min="0.1" disabled style="width: 90px; text-align: right;"></td>
+                      <td style="text-align: center;"><span class="pcu-status-tag" style="font-size:0.75rem; color:var(--text-secondary);">Standard</span></td>
                     </tr>
                   </tbody>
                 </table>
               </div>
+              <p style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 0.5rem; line-height: 1.4;">
+                💡 <em>Step 2 contains raw vehicle counts (e.g. Cars = 70). Step 3 stores PCU equivalence factors (e.g. 1.0). Step 4 computes PCU demand (70 × 1.0 = 70 PCU). Raw traffic counts remain untouched.</em>
+              </p>
             </div>
 
-            <!-- SECTION 4 — ENGINEERING MODEL SUMMARY -->
+            <!-- 4. PHASE STRUCTURE CARD -->
+            <div class="eng-panel-card">
+              <div class="eng-panel-header">
+                <div class="eng-panel-title-group">
+                  <div class="eng-panel-icon">🚦</div>
+                  <div>
+                    <div class="eng-panel-title">INTERSECTION PHASE CONFIGURATION</div>
+                    <div class="eng-panel-subtitle">Signal phase approach mapping for 4-road intersection</div>
+                  </div>
+                </div>
+                <span class="badge badge-low" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Phase Assignment Only</span>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 0.85rem; margin-top: 0.25rem;">
+                <div style="background: rgba(15,23,42,0.7); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.85rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                    <strong style="color: var(--accent-primary); font-size: 0.88rem;">PHASE 1 — NORTH / SOUTH</strong>
+                    <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">Configured</span>
+                  </div>
+                  <div style="font-size: 0.82rem; color: var(--text-primary); display: flex; gap: 1rem;">
+                    <span>• Road A — Northbound</span>
+                    <span>• Road C — Southbound</span>
+                  </div>
+                </div>
+
+                <div style="background: rgba(15,23,42,0.7); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.85rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                    <strong style="color: #fcd34d; font-size: 0.88rem;">PHASE 2 — EAST / WEST</strong>
+                    <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">Configured</span>
+                  </div>
+                  <div style="font-size: 0.82rem; color: var(--text-primary); display: flex; gap: 1rem;">
+                    <span>• Road B — Eastbound</span>
+                    <span>• Road D — Westbound</span>
+                  </div>
+                </div>
+              </div>
+              <p style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                Note: Defines signal phase approach grouping. Critical flow ratios are computed in Step 4.
+              </p>
+            </div>
+
+            <!-- 5. PEDESTRIAN & SAFETY PARAMETERS CARD -->
+            <div class="eng-panel-card">
+              <div class="eng-panel-header">
+                <div class="eng-panel-title-group">
+                  <div class="eng-panel-icon">🚶</div>
+                  <div>
+                    <div class="eng-panel-title">PEDESTRIAN &amp; SAFETY PARAMETERS</div>
+                    <div class="eng-panel-subtitle">Walk interval &amp; safety clearance inputs</div>
+                  </div>
+                </div>
+                <span class="badge badge-low">Engineering Input</span>
+              </div>
+
+              <div class="eng-fields-grid">
+                <div class="control-field-group">
+                  <label class="control-field-label">Minimum Initial Walk Time (s)</label>
+                  <input type="number" id="engMinWalkTime" class="control-field-select" value="7" min="4" max="30">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Pedestrian Walking Speed (m/s)</label>
+                  <input type="number" id="engWalkSpeed" class="control-field-select" value="1.2" min="0.5" max="2.5" step="0.1">
+                  <span class="input-val-check" id="valCheckWalkSpeed" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&gt; 0 m/s)</span>
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Pedestrian Clearance Calculation</label>
+                  <select id="engPedClearanceCalc" class="control-field-select">
+                    <option value="ENABLED" selected>ENABLED</option>
+                    <option value="DISABLED">DISABLED</option>
+                  </select>
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Synthetic Incident Event</label>
+                  <select id="engIncidentEvent" class="control-field-select">
+                    <option value="None" selected>None</option>
+                    <option value="Minor Shoulder Blockage">Minor Shoulder Blockage</option>
+                    <option value="Single Lane Closure">Single Lane Closure</option>
+                    <option value="Emergency Preemption">Emergency Vehicle Preemption</option>
+                  </select>
+                </div>
+              </div>
+              <p style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                Engineering inputs only. Pedestrian clearance time calculations occur in Step 4.
+              </p>
+            </div>
+
+            <!-- 6. BASELINE / OBSERVED PERFORMANCE CARD (FULL WIDTH) -->
             <div class="eng-panel-card full-width">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
-                  <div class="eng-panel-icon">📋</div>
+                  <div class="eng-panel-icon">📉</div>
                   <div>
-                    <div class="eng-panel-title">4. Engineering Model Assumptions Summary</div>
-                    <div class="eng-panel-subtitle">Selected design assumptions prior to running Webster optimization</div>
+                    <div class="eng-panel-title">BASELINE / OBSERVED PERFORMANCE</div>
+                    <div class="eng-panel-subtitle">Optional existing-condition observed metrics for BEFORE vs AFTER evaluation</div>
                   </div>
                 </div>
-                <span class="badge badge-low" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">✓ DESIGN INPUTS READY</span>
+                <span class="badge badge-low" style="background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3);">Optional Inputs</span>
+              </div>
+
+              <div style="margin-bottom: 1rem;">
+                <label class="control-field-label" style="margin-bottom: 0.4rem;">Baseline Data Mode</label>
+                <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                  <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer; color: var(--text-primary);">
+                    <input type="radio" name="baselineMode" value="not_available" checked> Not Available
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer; color: var(--text-primary);">
+                    <input type="radio" name="baselineMode" value="network"> Network-wide
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer; color: var(--text-primary);">
+                    <input type="radio" name="baselineMode" value="road_wise"> Road-wise
+                  </label>
+                </div>
+              </div>
+
+              <!-- NETWORK-WIDE CONTAINER -->
+              <div id="baselineNetworkContainer" style="display: none; background: rgba(15,23,42,0.6); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-weight: 700; color: var(--accent-primary); font-size: 0.82rem; margin-bottom: 0.75rem;">NETWORK-WIDE OBSERVED METRICS</div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                  <div class="control-field-group">
+                    <label class="control-field-label">Existing Average Delay (s/veh)</label>
+                    <input type="number" id="baseline_delay_network" class="control-field-select" placeholder="Not Available" min="0" step="0.1">
+                  </div>
+                  <div class="control-field-group">
+                    <label class="control-field-label">Existing Queue Length (m)</label>
+                    <input type="number" id="baseline_queue_network" class="control-field-select" placeholder="Not Available" min="0" step="1">
+                  </div>
+                  <div class="control-field-group">
+                    <label class="control-field-label">Existing Degree of Saturation (v/c)</label>
+                    <input type="number" id="baseline_dos_network" class="control-field-select" placeholder="Not Available" min="0" max="2.0" step="0.01">
+                  </div>
+                </div>
+              </div>
+
+              <!-- ROAD-WISE CONTAINER -->
+              <div id="baselineRoadwiseContainer" style="display: none; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
+                <!-- ROAD A -->
+                <div style="background: rgba(15,23,42,0.6); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-weight: 700; color: var(--accent-primary); font-size: 0.8rem; margin-bottom: 0.5rem;">ROAD A — NORTHBOUND</div>
+                  <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Average Delay (s)</label>
+                      <input type="number" id="baseline_delay_road_a" class="control-field-select" placeholder="Not Available" min="0" step="0.1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Queue Length (m)</label>
+                      <input type="number" id="baseline_queue_road_a" class="control-field-select" placeholder="Not Available" min="0" step="1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Degree of Saturation</label>
+                      <input type="number" id="baseline_dos_road_a" class="control-field-select" placeholder="Not Available" min="0" step="0.01">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ROAD B -->
+                <div style="background: rgba(15,23,42,0.6); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-weight: 700; color: var(--accent-primary); font-size: 0.8rem; margin-bottom: 0.5rem;">ROAD B — EASTBOUND</div>
+                  <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Average Delay (s)</label>
+                      <input type="number" id="baseline_delay_road_b" class="control-field-select" placeholder="Not Available" min="0" step="0.1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Queue Length (m)</label>
+                      <input type="number" id="baseline_queue_road_b" class="control-field-select" placeholder="Not Available" min="0" step="1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Degree of Saturation</label>
+                      <input type="number" id="baseline_dos_road_b" class="control-field-select" placeholder="Not Available" min="0" step="0.01">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ROAD C -->
+                <div style="background: rgba(15,23,42,0.6); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-weight: 700; color: var(--accent-primary); font-size: 0.8rem; margin-bottom: 0.5rem;">ROAD C — SOUTHBOUND</div>
+                  <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Average Delay (s)</label>
+                      <input type="number" id="baseline_delay_road_c" class="control-field-select" placeholder="Not Available" min="0" step="0.1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Queue Length (m)</label>
+                      <input type="number" id="baseline_queue_road_c" class="control-field-select" placeholder="Not Available" min="0" step="1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Degree of Saturation</label>
+                      <input type="number" id="baseline_dos_road_c" class="control-field-select" placeholder="Not Available" min="0" step="0.01">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ROAD D -->
+                <div style="background: rgba(15,23,42,0.6); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-weight: 700; color: var(--accent-primary); font-size: 0.8rem; margin-bottom: 0.5rem;">ROAD D — WESTBOUND</div>
+                  <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Average Delay (s)</label>
+                      <input type="number" id="baseline_delay_road_d" class="control-field-select" placeholder="Not Available" min="0" step="0.1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Queue Length (m)</label>
+                      <input type="number" id="baseline_queue_road_d" class="control-field-select" placeholder="Not Available" min="0" step="1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Degree of Saturation</label>
+                      <input type="number" id="baseline_dos_road_d" class="control-field-select" placeholder="Not Available" min="0" step="0.01">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 9. ENGINEERING READY SUMMARY CARD (FULL WIDTH) -->
+            <div class="eng-panel-card full-width" style="border: 1px solid rgba(56,189,248,0.3); background: rgba(15,23,42,0.9);">
+              <div class="eng-panel-header">
+                <div class="eng-panel-title-group">
+                  <div class="eng-panel-icon" style="background: rgba(16,185,129,0.15); color: var(--success);">✓</div>
+                  <div>
+                    <div class="eng-panel-title">ENGINEERING PARAMETERS READY</div>
+                    <div class="eng-panel-subtitle">Summary of validated signal parameters prepared for Step 4 Traffic Summary handoff</div>
+                  </div>
+                </div>
+                <span class="badge" id="summaryValidationStatusBadge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">✓ Parameters Validated</span>
               </div>
 
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Signal Type</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAssumpController">Fixed Time</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Signal Phases</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryPhasesVal">4</div>
                 </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Controller Type</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="summaryAssumpControllerType">Fixed Time</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Phase 1</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="summaryPhase1Val">North / South</div>
                 </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Phase 2</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: #fcd34d; margin-top: 0.2rem;" id="summaryPhase2Val">East / West</div>
+                </div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Base Saturation Flow</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAssumpBaseSat">1800 PCU/hr/lane</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryBaseSatVal">1800 PCU/h/lane</div>
                 </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Selected IRC Standard</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--success); margin-top: 0.2rem;">IRC:93 / IRC:106</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Existing Cycle</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryExistingCycleVal">120 s</div>
                 </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Number of Phases</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAssumpPhases">4 Phases</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Amber Interval</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAmberVal">3 s</div>
                 </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">PCU Standard</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--success); margin-top: 0.2rem;">IRC:106-1990</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">All-Red Interval</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAllRedVal">2 s</div>
+                </div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Minimum Green</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryMinGreenVal">7 s</div>
+                </div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">PCU Factors</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--success); margin-top: 0.2rem;" id="summaryPcuFactorsVal">Standard</div>
+                </div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Baseline Data</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-secondary); margin-top: 0.2rem;" id="summaryBaselineVal">Not Available</div>
                 </div>
               </div>
 
-              <!-- SINGLE NAVIGATION BUTTON -->
-              <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; align-items: center;">
-                <button class="btn-primary-cyan" style="font-size: 0.95rem; padding: 12px 24px; font-weight: 700;" onclick="FlowGuard.setWizardStep(4)">
-                  Next → Traffic Summary
-                </button>
-              </div>
+              <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.75rem; line-height: 1.4; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.6rem;">
+                ⓘ <em>These parameters are prepared for Step 4 Traffic Summary. Traffic counts remain unchanged. PCU conversion and traffic-performance calculations occur in Step 4.</em>
+              </p>
             </div>
+
           </div>
         </section>
 
         <!-- STEP 4 SECTION: TRAFFIC SUMMARY ENGINEERING DASHBOARD -->
         <section id="wizard-section-4" class="wizard-section-panel" style="display: none;">
           <div style="margin-bottom: 1.5rem;">
-            <h2 class="section-header-title" style="font-size: 1.05rem;">4. TRAFFIC SUMMARY &amp; ENGINEERING DASHBOARD
-            </h2>
-            <p style="font-size: 0.82rem; color: var(--text-secondary);">Centralized pre-analysis engineering dashboard
-              summarizing the uploaded traffic survey, carriageway geometry, vehicle composition, PCU factors, and
-              signal parameters prior to Webster optimization.</p>
+            <h2 class="section-header-title" style="font-size: 1.05rem;">4. TRAFFIC SUMMARY &amp; ENGINEERING DASHBOARD</h2>
+            <p style="font-size: 0.82rem; color: var(--text-secondary);">Centralized pre-analysis engineering dashboard summarizing carriageway geometry (Step 1), validated raw traffic dataset (Step 2), and engineering parameters (Step 3) prior to Webster optimization.</p>
           </div>
 
           <div class="summary-dash-grid">
 
-            <!-- SECTION 1: SURVEY OVERVIEW -->
+            <!-- 1. SURVEY OVERVIEW CARD -->
             <div class="summary-dash-card full-width">
               <div class="summary-dash-header">
                 <div class="summary-dash-title-group">
-                  <div class="summary-dash-icon">🗺️</div>
+                  <div class="summary-dash-icon">📊</div>
                   <div>
                     <div class="summary-dash-title">1. Survey Overview</div>
-                    <div class="summary-dash-subtitle">Carriageway survey metadata, intervals &amp; total vehicle volume</div>
+                    <div class="summary-dash-subtitle">Carriageway survey metadata, record counts &amp; total vehicle volume</div>
                   </div>
                 </div>
-                <span class="badge badge-low">Survey Metadata</span>
+                <span class="badge badge-low" id="sumDashOverviewBadge">Survey Metadata</span>
               </div>
 
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
                 <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Input Mode</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashMethod">--</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashMethod">Awaiting Dataset Upload</div>
                 </div>
                 <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Survey Duration</div>
@@ -668,11 +896,11 @@
                 </div>
                 <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Roads</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashRoads">0</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashRoads">4 (From Geometry Setup)</div>
                 </div>
                 <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Time Intervals</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTimeIntervals">0</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTimeIntervals">--</div>
                 </div>
                 <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total Vehicles</div>
@@ -680,7 +908,7 @@
                 </div>
                 <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total PCU</div>
-                  <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTotalPCU">0</div>
+                  <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTotalPCU">0.0</div>
                 </div>
                 <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Peak Interval</div>
@@ -688,76 +916,81 @@
                 </div>
                 <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Peak Interval PCU</div>
-                  <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashPeakPCU">0</div>
+                  <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashPeakPCU">0.0</div>
+                </div>
+                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Peak Hour Factor (PHF)</div>
+                  <div style="font-size: 1rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="sumDashPHF">--</div>
                 </div>
                 <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Status</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="sumDashStatus">Awaiting Dataset Upload</div>
+                  <div style="font-size: 0.9rem; font-weight: 700; color: #f59e0b; margin-top: 0.2rem;" id="sumDashStatus">⚠ Please upload a traffic survey file in Step 2</div>
                 </div>
               </div>
             </div>
 
-            <!-- SECTION 2: ROAD-WISE ENGINEERING CARDS (ROADS A-D) -->
+            <!-- 2. ROAD-WISE ENGINEERING SUMMARY (ROADS A-D) -->
             <div class="summary-dash-card full-width">
               <div class="summary-dash-header">
                 <div class="summary-dash-title-group">
                   <div class="summary-dash-icon">🚦</div>
                   <div>
-                    <div class="summary-dash-title">2–5. Road-wise Engineering Cards</div>
-                    <div class="summary-dash-subtitle">Independent approach geometry, traffic volume, vehicle composition, PCU, peak hour, and Webster inputs for Roads A–D</div>
+                    <div class="summary-dash-title">2. Road-wise Engineering Summary</div>
+                    <div class="summary-dash-subtitle">Independent approach geometry, raw volume, converted PCU, peak analysis, and Webster inputs for Roads A–D</div>
                   </div>
                 </div>
-                <span class="badge badge-low">Approach Analysis</span>
+                <span class="badge badge-low">Approach Cards</span>
               </div>
 
               <!-- 4 Independent Engineering Cards Grid (Road A-North, Road B-East, Road C-South, Road D-West) -->
-              <div id="sumDashApproachCardsGrid"
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem;">
-                <!-- Dynamically populated from project.processedTraffic -->
+              <div id="sumDashApproachCardsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem;">
+                <!-- Dynamically rendered by renderTrafficSummaryDashboard() -->
               </div>
             </div>
 
-            <!-- SECTION 6: INTERSECTION SUMMARY -->
+            <!-- 3. INTERSECTION / PHASE SUMMARY -->
             <div class="summary-dash-card full-width">
               <div class="summary-dash-header">
                 <div class="summary-dash-title-group">
-                  <div class="summary-dash-icon">🌐</div>
+                  <div class="summary-dash-icon">⚡</div>
                   <div>
-                    <div class="summary-dash-title">6. Intersection Summary</div>
-                    <div class="summary-dash-subtitle">Network-wide traffic demand aggregation &amp; critical approach highlights</div>
+                    <div class="summary-dash-title">3. Intersection / Phase Summary</div>
+                    <div class="summary-dash-subtitle">Pre-analysis flow ratio aggregation for Phase 1 (N/S) &amp; Phase 2 (E/W)</div>
                   </div>
                 </div>
-                <span class="badge badge-low">Network Aggregation</span>
+                <span class="badge badge-low">Phase Summary</span>
               </div>
 
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
                 <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Most Congested Road</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashMostCongestedRoad">--</div>
+                  <div style="font-size: 0.72rem; color: var(--accent-primary); text-transform: uppercase; font-weight: 700;">Phase 1 (Road A + Road C)</div>
+                  <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.3rem;">Critical Movement: <strong style="color: var(--text-primary);" id="phase1CritMove">--</strong></div>
+                  <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Critical Flow (q₁): <strong style="color: var(--text-primary);" id="phase1CritFlow">None</strong></div>
+                  <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Saturation Flow (s₁): <strong style="color: var(--text-primary);" id="phase1SatFlow">Awaiting Data</strong></div>
+                  <div style="font-size: 0.95rem; font-weight: 800; color: var(--accent-primary); margin-top: 0.4rem;">Phase 1 Ratio (y₁): <span id="phase1FlowRatioY">--</span></div>
                 </div>
+
                 <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Highest Approach PCU</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashHighestApproachPCU">0</div>
+                  <div style="font-size: 0.72rem; color: #fcd34d; text-transform: uppercase; font-weight: 700;">Phase 2 (Road B + Road D)</div>
+                  <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.3rem;">Critical Movement: <strong style="color: var(--text-primary);" id="phase2CritMove">--</strong></div>
+                  <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Critical Flow (q₂): <strong style="color: var(--text-primary);" id="phase2CritFlow">None</strong></div>
+                  <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Saturation Flow (s₂): <strong style="color: var(--text-primary);" id="phase2SatFlow">Awaiting Data</strong></div>
+                  <div style="font-size: 0.95rem; font-weight: 800; color: #fcd34d; margin-top: 0.4rem;">Phase 2 Ratio (y₂): <span id="phase2FlowRatioY">--</span></div>
                 </div>
+
                 <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Peak Interval Overall</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashPeakIntervalOverall">--</div>
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Intersection Total Flow Ratio</div>
+                  <div style="font-size: 1.25rem; font-weight: 800; color: var(--success); margin-top: 0.3rem;" id="sumDashTotalFlowRatioY">--</div>
+                  <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem;">Sum of Configured Phase Ratios (Y = y₁ + y₂)</div>
                 </div>
+
                 <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total Network Vehicles</div>
-                  <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTotalNetworkVehicles">0</div>
-                </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total Network PCU</div>
-                  <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTotalNetworkPCU">0</div>
-                </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Status</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="sumDashNetworkStatus">Awaiting Dataset Upload</div>
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Pre-Analysis Status</div>
+                  <div style="font-size: 0.9rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.3rem;" id="sumDashPreAnalysisStatus">Awaiting Validated Dataset</div>
+                  <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem;">Prepared for Step 5 Webster Signal Optimization</div>
                 </div>
               </div>
             </div>
-          </div>
 
           </div>
         </section>

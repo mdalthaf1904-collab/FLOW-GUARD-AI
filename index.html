@@ -7,7 +7,7 @@
   <meta name="description"
     content="FlowGuard AI — Intersection Traffic & Lane Configuration Analysis Dashboard. High-fidelity decision support tool aligned with IRC:93 and IRC:106 standards.">
   <title>FlowGuard AI | Intersection Traffic &amp; Lane Configuration Analysis</title>
-  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="css/styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -41,17 +41,13 @@
     </div>
 
     <ul class="nav-links">
-      <li><a href="../index.html" class="nav-link">Home</a></li>
-      <li><a href="analysis.html" class="nav-link active">Analysis</a></li>
-      <li><a href="simulation.html" class="nav-link">Simulation</a></li>
-      <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-      <li><a href="controller.html" class="nav-link">Controller</a></li>
-      <li><a href="validation.html" class="nav-link">Validation</a></li>
+      <li><a href="index.html" class="nav-link active">Home</a></li>
+      <li><a href="pages/analysis.html" class="nav-link">Analysis</a></li>
     </ul>
 
     <div class="top-navbar-right-info">
       <span>Project: <strong>Demo Project</strong></span>
-      <span>Status: <strong class="status-badge-progress" id="wizardStatusBadge">STEP 1 / 9: GEOMETRY</strong></span>
+      <span>Status: <strong class="status-badge-progress" id="wizardStatusBadge">STEP 1 / 4: GEOMETRY</strong></span>
       <span style="font-size: 1.1rem; cursor: pointer; opacity: 0.7;">⚙</span>
     </div>
   </nav>
@@ -92,28 +88,12 @@
               <span class="wizard-step-subtitle">Set analysis constraints</span>
             </div>
           </li>
-
+          
           <li class="wizard-step-item" data-step-id="4" onclick="FlowGuard.setWizardStep(4)">
             <span class="wizard-step-num">4</span>
             <div class="wizard-step-content">
               <span class="wizard-step-title">Traffic Summary</span>
               <span class="wizard-step-subtitle">Review PCU demand summary</span>
-            </div>
-          </li>
-
-          <li class="wizard-step-item" data-step-id="5" onclick="FlowGuard.setWizardStep(5)">
-            <span class="wizard-step-num">5</span>
-            <div class="wizard-step-content">
-              <span class="wizard-step-title">Run Analysis</span>
-              <span class="wizard-step-subtitle">Execute Webster optimization</span>
-            </div>
-          </li>
-
-          <li class="wizard-step-item" data-step-id="6" onclick="FlowGuard.setWizardStep(6)">
-            <span class="wizard-step-num">6</span>
-            <div class="wizard-step-content">
-              <span class="wizard-step-title">Results &amp; Reports</span>
-              <span class="wizard-step-subtitle">View results &amp; PDF report</span>
             </div>
           </li>
         </ul>
@@ -126,224 +106,527 @@
       </div>
     </aside>
 
-    <main class="main-content-scroll">
-
+    <!-- Main Content Area -->
+    <main class="main-viewport">
       <div style="margin-bottom: 1.5rem;">
-        <h1 style="font-size: 1.3rem; font-weight: 700; color: var(--text-primary);" id="wizardHeaderTitle">1.
+        <h1 style="font-size: 1.3rem; font-weight: 700; color: var(--text-primary);" id="wizardHeaderTitle">
           INTERSECTION GEOMETRY</h1>
         <p style="font-size: 0.82rem; color: var(--text-secondary);" id="wizardHeaderSubtitle">Configure intersection
           details, input traffic data, and run engineering analysis.</p>
       </div>
 
-      <!-- STEP 1 SECTION -->
+      <!-- STEP 1 SECTION: INTERSECTION GEOMETRY SETUP -->
       <section id="wizard-section-1" class="wizard-section-panel" style="display: block;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem;">
-          <h2 class="section-header-title" style="font-size: 1.05rem; margin-bottom: 0;">1. INTERSECTION GEOMETRY</h2>
-          <div style="display: flex; gap: 0.5rem; align-items: center;">
-            <span class="badge"
-              style="background: rgba(16,185,129,0.12); color: var(--success); border: 1px solid rgba(16,185,129,0.3); font-size: 0.72rem; font-weight: 700;">✓
-              Completed</span>
-            <button
-              style="background: rgba(56,189,248,0.12); color: var(--accent-primary); border: 1px solid rgba(56,189,248,0.3); font-size: 0.72rem; font-weight: 700; padding: 2px 10px; border-radius: 4px; cursor: pointer;">Edit</button>
-          </div>
+        <div style="margin-bottom: 1.5rem;">
+          <h2 class="section-header-title" style="font-size: 1.05rem;">1. INTERSECTION GEOMETRY &amp; PHYSICAL SETUP</h2>
+          <p style="font-size: 0.82rem; color: var(--text-secondary);">Define physical carriageway geometry, incoming lanes, lane width, speed limits, and approach configurations prior to traffic data ingestion.</p>
         </div>
 
-        <div class="control-bar-panel">
-          <div class="control-bar-grid">
-            <div class="control-field-group">
-              <label class="control-field-label">Road Geometry</label>
-              <select class="control-field-select" id="workflowConfigTypeSelector">
-                <option value="4CROSS" selected>4-Arm Cross (A + B + C + D)</option>
-                <option value="3NO_SOUTH">3-Arm T-Junction (No South)</option>
-                <option value="3NO_NORTH">3-Arm T-Junction (No North)</option>
-                <option value="3NO_EAST">3-Arm T-Junction (No East)</option>
-                <option value="3NO_WEST">3-Arm T-Junction (No West)</option>
-              </select>
-            </div>
-
-            <div class="control-field-group">
-              <label class="control-field-label">Day Type</label>
-              <select class="control-field-select" id="workflowDayTypeSelector">
-                <option value="Weekday" selected>Weekday</option>
-                <option value="Weekend">Weekend</option>
-              </select>
-            </div>
-
-            <div class="control-field-group">
-              <label class="control-field-label">Survey Duration</label>
-              <select class="control-field-select" id="workflowDurationSelector">
-                <option value="15" selected>15 Minutes</option>
-                <option value="60">60 Minutes (1 Hour)</option>
-              </select>
-            </div>
-
-            <div class="control-field-group">
-              <label class="control-field-label">Input Mode</label>
-              <select class="control-field-select" id="workflowInputModeSelector">
-                <option value="historical" selected>Historical Dataset Upload</option>
-              </select>
-            </div>
-
-            <div class="control-field-group">
-              <label class="control-field-label">Active Roads</label>
-              <div class="active-road-chips" id="workflowActiveRoadsChips">
-                <span class="road-chip">Road A ✕</span>
-                <span class="road-chip">Road B ✕</span>
-                <span class="road-chip">Road C ✕</span>
-                <span class="road-chip">Road D ✕</span>
+        <!-- SECTION 1 — INTERSECTION MASTER NODE -->
+        <div class="eng-panel-card full-width" style="margin-bottom: 1.5rem;">
+          <div class="eng-panel-header">
+            <div class="eng-panel-title-group">
+              <div class="eng-panel-icon">🌐</div>
+              <div>
+                <div class="eng-panel-title">INTERSECTION MASTER NODE</div>
+                <div class="eng-panel-subtitle">Global intersection parameters, environment classification &amp; site remarks</div>
               </div>
             </div>
+            <span class="badge badge-low" style="background: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Master Node</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div class="control-field-group">
+              <label class="control-field-label">Intersection Name</label>
+              <input type="text" class="control-field-select" id="geomIntersectionName" value="Signalized Intersection Optimization Project" placeholder="Enter Intersection Name...">
+            </div>
+
+            <div class="control-field-group">
+              <label class="control-field-label">Number of Legs</label>
+              <select class="control-field-select" id="geomConfigType">
+                <option value="4CROSS" selected>4-Way Cross Intersection (4 Legs)</option>
+                <option value="3NO_NORTH">3-Way T-Intersection (No North Leg)</option>
+                <option value="3NO_EAST">3-Way T-Intersection (No East Leg)</option>
+                <option value="3NO_SOUTH">3-Way T-Intersection (No South Leg)</option>
+                <option value="3NO_WEST">3-Way T-Intersection (No West Leg)</option>
+              </select>
+            </div>
+
+            <div class="control-field-group">
+              <label class="control-field-label">Environment Type</label>
+              <select class="control-field-select" id="geomEnvironmentType">
+                <option value="Urban CBD" selected>Urban CBD (Central Business District)</option>
+                <option value="Suburban Commercial">Suburban Commercial Arterial</option>
+                <option value="Industrial / Freight">Industrial / Freight Corridor</option>
+                <option value="Residential Sub-arterial">Residential Sub-arterial</option>
+              </select>
+            </div>
+
+            <div class="control-field-group">
+              <label class="control-field-label">Base Saturation (S₀)</label>
+              <input type="number" class="control-field-select" id="geomBaseSaturation" value="1800" min="1000" max="3000" step="50">
+              <span style="font-size: 0.7rem; color: var(--text-secondary);">PCU/hr/lane (Lane-based base S₀)</span>
+            </div>
+
+            <div class="control-field-group" style="grid-column: span 2;">
+              <label class="control-field-label">Notes &amp; Site Remarks</label>
+              <input type="text" class="control-field-select" id="geomNotes" value="Standard 4-Arm Urban Intersection Setup" placeholder="Enter geometry remarks...">
+            </div>
           </div>
         </div>
 
-        <div class="schematic-view-grid">
-          <div class="schematic-main-card">
-            <div
-              style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1rem; width: 100%; text-align: left;">
-              Schematic Diagram
-            </div>
-
-            <svg width="420" height="320" viewBox="0 0 360 280"
-              style="background: rgba(7,12,24,0.7); border-radius: 8px;">
-              <rect x="140" y="0" width="80" height="280" fill="#0f172a" />
-              <rect x="0" y="100" width="360" height="80" fill="#0f172a" />
-
-              <line x1="140" y1="0" x2="140" y2="100" stroke="#334155" stroke-width="2" />
-              <line x1="220" y1="0" x2="220" y2="100" stroke="#334155" stroke-width="2" />
-              <line x1="140" y1="180" x2="140" y2="280" stroke="#334155" stroke-width="2" />
-              <line x1="220" y1="180" x2="220" y2="280" stroke="#334155" stroke-width="2" />
-
-              <line x1="0" y1="100" x2="140" y2="100" stroke="#334155" stroke-width="2" />
-              <line x1="0" y1="180" x2="140" y2="180" stroke="#334155" stroke-width="2" />
-              <line x1="220" y1="100" x2="360" y2="100" stroke="#334155" stroke-width="2" />
-              <line x1="220" y1="180" x2="360" y2="180" stroke="#334155" stroke-width="2" />
-
-              <line x1="180" y1="0" x2="180" y2="100" stroke="#f59e0b" stroke-width="2" />
-              <line x1="180" y1="180" x2="180" y2="280" stroke="#f59e0b" stroke-width="2" />
-              <line x1="0" y1="140" x2="140" y2="140" stroke="#f59e0b" stroke-width="2" />
-              <line x1="220" y1="140" x2="360" y2="140" stroke="#f59e0b" stroke-width="2" />
-
-              <line x1="180" y1="100" x2="220" y2="100" stroke="#ffffff" stroke-width="3" />
-              <line x1="140" y1="180" x2="180" y2="180" stroke="#ffffff" stroke-width="3" />
-              <line x1="140" y1="100" x2="140" y2="140" stroke="#ffffff" stroke-width="3" />
-              <line x1="220" y1="140" x2="220" y2="180" stroke="#ffffff" stroke-width="3" />
-
-              <g transform="translate(145, 12)">
-                <rect width="70" height="16" rx="4" fill="#0369a1" />
-                <text x="35" y="11" fill="#ffffff" font-size="8" font-weight="700" text-anchor="middle">ROAD A —
-                  NORTH</text>
-              </g>
-              <g transform="translate(275, 132)">
-                <rect width="65" height="16" rx="4" fill="#0369a1" />
-                <text x="32" y="11" fill="#ffffff" font-size="8" font-weight="700" text-anchor="middle">ROAD B —
-                  EAST</text>
-              </g>
-              <g transform="translate(145, 252)">
-                <rect width="70" height="16" rx="4" fill="#0369a1" />
-                <text x="35" y="11" fill="#ffffff" font-size="8" font-weight="700" text-anchor="middle">ROAD C —
-                  SOUTH</text>
-              </g>
-              <g transform="translate(20, 132)">
-                <rect width="65" height="16" rx="4" fill="#0369a1" />
-                <text x="32" y="11" fill="#ffffff" font-size="8" font-weight="700" text-anchor="middle">ROAD D —
-                  WEST</text>
-              </g>
-
-              <path d="M 200 35 L 200 80" stroke="#38bdf8" stroke-width="4" />
-              <text x="200" y="55" fill="#38bdf8" font-size="9" font-weight="700">IN</text>
-              <path d="M 160 80 L 160 35" stroke="#10b981" stroke-width="4" />
-              <text x="148" y="55" fill="#10b981" font-size="9" font-weight="700">OUT</text>
-
-              <path d="M 325 160 L 240 160" stroke="#38bdf8" stroke-width="4" />
-              <text x="280" y="155" fill="#38bdf8" font-size="9" font-weight="700">IN</text>
-              <path d="M 240 120 L 325 120" stroke="#10b981" stroke-width="4" />
-              <text x="280" y="115" fill="#10b981" font-size="9" font-weight="700">OUT</text>
-
-              <path d="M 160 245 L 160 200" stroke="#38bdf8" stroke-width="4" />
-              <text x="148" y="225" fill="#38bdf8" font-size="9" font-weight="700">IN</text>
-              <path d="M 200 200 L 200 245" stroke="#10b981" stroke-width="4" />
-              <text x="200" y="225" fill="#10b981" font-size="9" font-weight="700">OUT</text>
-
-              <path d="M 35 120 L 120 120" stroke="#38bdf8" stroke-width="4" />
-              <text x="70" y="115" fill="#38bdf8" font-size="9" font-weight="700">IN</text>
-              <path d="M 120 160 L 35 160" stroke="#10b981" stroke-width="4" />
-              <text x="70" y="155" fill="#10b981" font-size="9" font-weight="700">OUT</text>
-
-              <g transform="translate(225, 40)">
-                <rect width="80" height="22" rx="4" fill="#0f172a" stroke="#1e293b" />
-                <text x="40" y="10" fill="#94a3b8" font-size="7" font-weight="700" text-anchor="middle">INBOUND: 850
-                  PCU/h</text>
-                <text x="40" y="18" fill="#94a3b8" font-size="6.5" text-anchor="middle">v/c Ratio: 1.89</text>
-              </g>
-            </svg>
+        <!-- SECTION 2 — APPROACH CONFIGURATOR (2 x 2 GRID) -->
+        <div style="margin-bottom: 1.5rem;">
+          <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">
+            Approach Configurator
           </div>
 
-          <div class="schematic-side-stack">
-            <div class="schematic-side-card">
-              <h4>Legend</h4>
-              <ul
-                style="list-style: none; font-size: 0.78rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 0.5rem;">
-                <li style="display: flex; align-items: center; gap: 0.5rem;"><span
-                    style="color: var(--accent-primary); font-weight: 700;">➔ IN</span> (Towards Intersection)</li>
-                <li style="display: flex; align-items: center; gap: 0.5rem;"><span
-                    style="color: var(--success); font-weight: 700;">➔ OUT</span> (Away from Intersection)</li>
-                <li style="display: flex; align-items: center; gap: 0.5rem;"><span
-                    style="color: #f59e0b; font-weight: 700;">━━</span> Centre Line</li>
-                <li style="display: flex; align-items: center; gap: 0.5rem;"><span
-                    style="color: #ffffff; font-weight: 700;">━━</span> Stop Line (IN only)</li>
-              </ul>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;" id="geomApproachGrid">
+
+            <!-- CARD A: APPROACH 1 — NORTHBOUND -->
+            <div class="eng-panel-card" style="margin-bottom: 0;">
+              <div class="eng-panel-header" style="margin-bottom: 0.85rem;">
+                <div class="eng-panel-title-group">
+                  <div class="eng-panel-icon" style="color: var(--accent-primary);">⬆</div>
+                  <div>
+                    <div class="eng-panel-title">APPROACH 1 — NORTHBOUND</div>
+                    <div class="eng-panel-subtitle">North Entry Approach (Road A)</div>
+                  </div>
+                </div>
+                <span class="badge" style="background: rgba(56,189,248,0.15); color: var(--accent-primary); border: 1px solid rgba(56,189,248,0.3);">ACTIVE / CYAN</span>
+              </div>
+
+              <div class="eng-fields-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.85rem;">
+                <div class="control-field-group">
+                  <label class="control-field-label">Road Designation</label>
+                  <input type="text" class="control-field-select" id="geomRoadA_Name" value="Road A">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Approach Width</label>
+                  <select class="control-field-select" id="geomRoadA_WidthSelect" onchange="FlowGuard.toggleCustomWidth('A'); FlowGuard.validateApproachGeometry('A');">
+                    <option value="7">7 m</option>
+                    <option value="10.5">10.5 m</option>
+                    <option value="14" selected>14 m</option>
+                    <option value="17.5">17.5 m</option>
+                    <option value="21">21 m</option>
+                    <option value="custom">Custom Width...</option>
+                  </select>
+                  <input type="number" class="control-field-select" id="geomRoadA_WidthCustom" style="display:none; margin-top:0.4rem;" placeholder="Width in metres..." step="0.5" min="1" oninput="FlowGuard.validateApproachGeometry('A')">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Lane Width (m)</label>
+                  <input type="number" class="control-field-select" id="geomRoadA_LaneWidth" value="3.5" min="2.0" max="6.0" step="0.1" oninput="FlowGuard.validateApproachGeometry('A')">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Speed Limit (km/h)</label>
+                  <input type="number" class="control-field-select" id="geomRoadA_Speed" value="40" min="10" max="120" step="5">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Incoming Lanes</label>
+                  <select class="control-field-select" id="geomRoadA_Lanes" onchange="FlowGuard.validateApproachGeometry('A')">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4" selected>4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                  </select>
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Lane Config</label>
+                  <select class="control-field-select" id="geomRoadA_LaneConfigSelect" onchange="FlowGuard.toggleCustomLaneConfig('A'); FlowGuard.validateApproachGeometry('A');">
+                    <option value="L1 | T1">L1 | T1</option>
+                    <option value="L1 | T2">L1 | T2</option>
+                    <option value="L1 | T2 | R1" selected>L1 | T2 | R1</option>
+                    <option value="L2 | T2 | R1">L2 | T2 | R1</option>
+                    <option value="custom">Custom Config...</option>
+                  </select>
+                  <input type="text" class="control-field-select" id="geomRoadA_LaneConfigCustom" style="display:none; margin-top:0.4rem;" placeholder="e.g. L1 | T2 | R1" oninput="FlowGuard.validateApproachGeometry('A')">
+                </div>
+              </div>
+
+              <!-- B. Physical Width Validation Box -->
+              <div id="geomWidthValidationBox_A" style="margin-top:0.6rem; padding:0.5rem 0.65rem; background:rgba(15,23,42,0.6); border:1px solid rgba(16,185,129,0.3); border-radius:6px; font-size:0.75rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem; color:var(--text-secondary);">
+                  <span>Minimum Required Width: <strong id="geomMinWidthVal_A" style="color:var(--text-primary);">14 m</strong></span>
+                  <span style="font-size:0.7rem; color:var(--text-secondary);">Calculated: <span id="geomWidthCalc_A">3.5 m × 4 lanes</span></span>
+                </div>
+                <div id="geomWidthStatusMsg_A" style="font-weight:700; color:#10b981;">
+                  ✓ Approach width satisfies configured lane requirement.
+                </div>
+              </div>
+
+              <!-- A. Lane Configuration Validation Box -->
+              <div id="geomValidationMsg_A" style="display:none; margin-top:0.4rem; padding:0.4rem 0.65rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:6px; font-size:0.75rem; color:#f59e0b; font-weight:700;">⚠️ Lane configuration total does not match incoming lanes.</div>
+
+              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem;">
+                <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
+                  <span>Includes Pedestrian Crosswalk</span>
+                  <input type="checkbox" id="geomRoadA_Crosswalk" checked style="accent-color: var(--accent-primary);">
+                </label>
+                <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
+                  <span>Exclusive Transit Lane</span>
+                  <input type="checkbox" id="geomRoadA_Transit" style="accent-color: var(--accent-primary);">
+                </label>
+                <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
+                  <span>Channelized Left Turn</span>
+                  <input type="checkbox" id="geomRoadA_ChannelLeft" style="accent-color: var(--accent-primary);">
+                </label>
+              </div>
             </div>
 
-            <div class="schematic-side-card">
-              <h4>Notes</h4>
-              <ul style="font-size: 0.75rem; color: var(--text-secondary); padding-left: 0.85rem; line-height: 1.5;">
-                <li>• IN = Towards Intersection</li>
-                <li>• OUT = Away from Intersection</li>
-                <li>• Green/Blue = Flow Direction</li>
-                <li>• Stop line only on IN lanes</li>
-              </ul>
+            <!-- CARD B: APPROACH 2 — EASTBOUND -->
+            <div class="eng-panel-card" style="margin-bottom: 0;">
+              <div class="eng-panel-header" style="margin-bottom: 0.85rem;">
+                <div class="eng-panel-title-group">
+                  <div class="eng-panel-icon" style="color: var(--accent-primary);">➔</div>
+                  <div>
+                    <div class="eng-panel-title">APPROACH 2 — EASTBOUND</div>
+                    <div class="eng-panel-subtitle">East Entry Approach (Road B)</div>
+                  </div>
+                </div>
+                <span class="badge" style="background: rgba(56,189,248,0.15); color: var(--accent-primary); border: 1px solid rgba(56,189,248,0.3);">ACTIVE / CYAN</span>
+              </div>
+
+              <div class="eng-fields-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.85rem;">
+                <div class="control-field-group">
+                  <label class="control-field-label">Road Designation</label>
+                  <input type="text" class="control-field-select" id="geomRoadB_Name" value="Road B">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Approach Width</label>
+                  <select class="control-field-select" id="geomRoadB_WidthSelect" onchange="FlowGuard.toggleCustomWidth('B'); FlowGuard.validateApproachGeometry('B');">
+                    <option value="7">7 m</option>
+                    <option value="10.5">10.5 m</option>
+                    <option value="14" selected>14 m</option>
+                    <option value="17.5">17.5 m</option>
+                    <option value="21">21 m</option>
+                    <option value="custom">Custom Width...</option>
+                  </select>
+                  <input type="number" class="control-field-select" id="geomRoadB_WidthCustom" style="display:none; margin-top:0.4rem;" placeholder="Width in metres..." step="0.5" min="1" oninput="FlowGuard.validateApproachGeometry('B')">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Lane Width (m)</label>
+                  <input type="number" class="control-field-select" id="geomRoadB_LaneWidth" value="3.5" min="2.0" max="6.0" step="0.1" oninput="FlowGuard.validateApproachGeometry('B')">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Speed Limit (km/h)</label>
+                  <input type="number" class="control-field-select" id="geomRoadB_Speed" value="40" min="10" max="120" step="5">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Incoming Lanes</label>
+                  <select class="control-field-select" id="geomRoadB_Lanes" onchange="FlowGuard.validateApproachGeometry('B')">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4" selected>4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                  </select>
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Lane Config</label>
+                  <select class="control-field-select" id="geomRoadB_LaneConfigSelect" onchange="FlowGuard.toggleCustomLaneConfig('B'); FlowGuard.validateApproachGeometry('B');">
+                    <option value="L1 | T1">L1 | T1</option>
+                    <option value="L1 | T2">L1 | T2</option>
+                    <option value="L1 | T2 | R1" selected>L1 | T2 | R1</option>
+                    <option value="L2 | T2 | R1">L2 | T2 | R1</option>
+                    <option value="custom">Custom Config...</option>
+                  </select>
+                  <input type="text" class="control-field-select" id="geomRoadB_LaneConfigCustom" style="display:none; margin-top:0.4rem;" placeholder="e.g. L1 | T2 | R1" oninput="FlowGuard.validateApproachGeometry('B')">
+                </div>
+              </div>
+
+              <!-- B. Physical Width Validation Box -->
+              <div id="geomWidthValidationBox_B" style="margin-top:0.6rem; padding:0.5rem 0.65rem; background:rgba(15,23,42,0.6); border:1px solid rgba(16,185,129,0.3); border-radius:6px; font-size:0.75rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem; color:var(--text-secondary);">
+                  <span>Minimum Required Width: <strong id="geomMinWidthVal_B" style="color:var(--text-primary);">14 m</strong></span>
+                  <span style="font-size:0.7rem; color:var(--text-secondary);">Calculated: <span id="geomWidthCalc_B">3.5 m × 4 lanes</span></span>
+                </div>
+                <div id="geomWidthStatusMsg_B" style="font-weight:700; color:#10b981;">
+                  ✓ Approach width satisfies configured lane requirement.
+                </div>
+              </div>
+
+              <!-- A. Lane Configuration Validation Box -->
+              <div id="geomValidationMsg_B" style="display:none; margin-top:0.4rem; padding:0.4rem 0.65rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:6px; font-size:0.75rem; color:#f59e0b; font-weight:700;">⚠️ Lane configuration total does not match incoming lanes.</div>
+
+              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem;">
+                <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
+                  <span>Includes Pedestrian Crosswalk</span>
+                  <input type="checkbox" id="geomRoadB_Crosswalk" checked style="accent-color: var(--accent-primary);">
+                </label>
+                <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
+                  <span>Exclusive Transit Lane</span>
+                  <input type="checkbox" id="geomRoadB_Transit" style="accent-color: var(--accent-primary);">
+                </label>
+                <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
+                  <span>Channelized Left Turn</span>
+                  <input type="checkbox" id="geomRoadB_ChannelLeft" style="accent-color: var(--accent-primary);">
+                </label>
+              </div>
             </div>
+
+            <!-- CARD C: APPROACH 3 — SOUTHBOUND -->
+            <div class="eng-panel-card" style="margin-bottom: 0;">
+              <div class="eng-panel-header" style="margin-bottom: 0.85rem;">
+                <div class="eng-panel-title-group">
+                  <div class="eng-panel-icon" style="color: var(--accent-primary);">⬇</div>
+                  <div>
+                    <div class="eng-panel-title">APPROACH 3 — SOUTHBOUND</div>
+                    <div class="eng-panel-subtitle">South Entry Approach (Road C)</div>
+                  </div>
+                </div>
+                <span class="badge" style="background: rgba(56,189,248,0.15); color: var(--accent-primary); border: 1px solid rgba(56,189,248,0.3);">ACTIVE / CYAN</span>
+              </div>
+
+              <div class="eng-fields-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.85rem;">
+                <div class="control-field-group">
+                  <label class="control-field-label">Road Designation</label>
+                  <input type="text" class="control-field-select" id="geomRoadC_Name" value="Road C">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Approach Width</label>
+                  <select class="control-field-select" id="geomRoadC_WidthSelect" onchange="FlowGuard.toggleCustomWidth('C'); FlowGuard.validateApproachGeometry('C');">
+                    <option value="7">7 m</option>
+                    <option value="10.5">10.5 m</option>
+                    <option value="14" selected>14 m</option>
+                    <option value="17.5">17.5 m</option>
+                    <option value="21">21 m</option>
+                    <option value="custom">Custom Width...</option>
+                  </select>
+                  <input type="number" class="control-field-select" id="geomRoadC_WidthCustom" style="display:none; margin-top:0.4rem;" placeholder="Width in metres..." step="0.5" min="1" oninput="FlowGuard.validateApproachGeometry('C')">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Lane Width (m)</label>
+                  <input type="number" class="control-field-select" id="geomRoadC_LaneWidth" value="3.5" min="2.0" max="6.0" step="0.1" oninput="FlowGuard.validateApproachGeometry('C')">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Speed Limit (km/h)</label>
+                  <input type="number" class="control-field-select" id="geomRoadC_Speed" value="40" min="10" max="120" step="5">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Incoming Lanes</label>
+                  <select class="control-field-select" id="geomRoadC_Lanes" onchange="FlowGuard.validateApproachGeometry('C')">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4" selected>4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                  </select>
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Lane Config</label>
+                  <select class="control-field-select" id="geomRoadC_LaneConfigSelect" onchange="FlowGuard.toggleCustomLaneConfig('C'); FlowGuard.validateApproachGeometry('C');">
+                    <option value="L1 | T1">L1 | T1</option>
+                    <option value="L1 | T2">L1 | T2</option>
+                    <option value="L1 | T2 | R1" selected>L1 | T2 | R1</option>
+                    <option value="L2 | T2 | R1">L2 | T2 | R1</option>
+                    <option value="custom">Custom Config...</option>
+                  </select>
+                  <input type="text" class="control-field-select" id="geomRoadC_LaneConfigCustom" style="display:none; margin-top:0.4rem;" placeholder="e.g. L1 | T2 | R1" oninput="FlowGuard.validateApproachGeometry('C')">
+                </div>
+              </div>
+
+              <!-- B. Physical Width Validation Box -->
+              <div id="geomWidthValidationBox_C" style="margin-top:0.6rem; padding:0.5rem 0.65rem; background:rgba(15,23,42,0.6); border:1px solid rgba(16,185,129,0.3); border-radius:6px; font-size:0.75rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem; color:var(--text-secondary);">
+                  <span>Minimum Required Width: <strong id="geomMinWidthVal_C" style="color:var(--text-primary);">14 m</strong></span>
+                  <span style="font-size:0.7rem; color:var(--text-secondary);">Calculated: <span id="geomWidthCalc_C">3.5 m × 4 lanes</span></span>
+                </div>
+                <div id="geomWidthStatusMsg_C" style="font-weight:700; color:#10b981;">
+                  ✓ Approach width satisfies configured lane requirement.
+                </div>
+              </div>
+
+              <!-- A. Lane Configuration Validation Box -->
+              <div id="geomValidationMsg_C" style="display:none; margin-top:0.4rem; padding:0.4rem 0.65rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:6px; font-size:0.75rem; color:#f59e0b; font-weight:700;">⚠️ Lane configuration total does not match incoming lanes.</div>
+
+              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem;">
+                <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
+                  <span>Includes Pedestrian Crosswalk</span>
+                  <input type="checkbox" id="geomRoadC_Crosswalk" checked style="accent-color: var(--accent-primary);">
+                </label>
+                <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
+                  <span>Exclusive Transit Lane</span>
+                  <input type="checkbox" id="geomRoadC_Transit" style="accent-color: var(--accent-primary);">
+                </label>
+                <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
+                  <span>Channelized Left Turn</span>
+                  <input type="checkbox" id="geomRoadC_ChannelLeft" style="accent-color: var(--accent-primary);">
+                </label>
+              </div>
+            </div>
+
+            <!-- CARD D: APPROACH 4 — WESTBOUND -->
+            <div class="eng-panel-card" style="margin-bottom: 0;">
+              <div class="eng-panel-header" style="margin-bottom: 0.85rem;">
+                <div class="eng-panel-title-group">
+                  <div class="eng-panel-icon" style="color: var(--accent-primary);">⬅</div>
+                  <div>
+                    <div class="eng-panel-title">APPROACH 4 — WESTBOUND</div>
+                    <div class="eng-panel-subtitle">West Entry Approach (Road D)</div>
+                  </div>
+                </div>
+                <span class="badge" style="background: rgba(56,189,248,0.15); color: var(--accent-primary); border: 1px solid rgba(56,189,248,0.3);">ACTIVE / CYAN</span>
+              </div>
+
+              <div class="eng-fields-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.85rem;">
+                <div class="control-field-group">
+                  <label class="control-field-label">Road Designation</label>
+                  <input type="text" class="control-field-select" id="geomRoadD_Name" value="Road D">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Approach Width</label>
+                  <select class="control-field-select" id="geomRoadD_WidthSelect" onchange="FlowGuard.toggleCustomWidth('D'); FlowGuard.validateApproachGeometry('D');">
+                    <option value="7">7 m</option>
+                    <option value="10.5">10.5 m</option>
+                    <option value="14" selected>14 m</option>
+                    <option value="17.5">17.5 m</option>
+                    <option value="21">21 m</option>
+                    <option value="custom">Custom Width...</option>
+                  </select>
+                  <input type="number" class="control-field-select" id="geomRoadD_WidthCustom" style="display:none; margin-top:0.4rem;" placeholder="Width in metres..." step="0.5" min="1" oninput="FlowGuard.validateApproachGeometry('D')">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Lane Width (m)</label>
+                  <input type="number" class="control-field-select" id="geomRoadD_LaneWidth" value="3.5" min="2.0" max="6.0" step="0.1" oninput="FlowGuard.validateApproachGeometry('D')">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Speed Limit (km/h)</label>
+                  <input type="number" class="control-field-select" id="geomRoadD_Speed" value="40" min="10" max="120" step="5">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Incoming Lanes</label>
+                  <select class="control-field-select" id="geomRoadD_Lanes" onchange="FlowGuard.validateApproachGeometry('D')">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4" selected>4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                  </select>
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Lane Config</label>
+                  <select class="control-field-select" id="geomRoadD_LaneConfigSelect" onchange="FlowGuard.toggleCustomLaneConfig('D'); FlowGuard.validateApproachGeometry('D');">
+                    <option value="L1 | T1">L1 | T1</option>
+                    <option value="L1 | T2">L1 | T2</option>
+                    <option value="L1 | T2 | R1" selected>L1 | T2 | R1</option>
+                    <option value="L2 | T2 | R1">L2 | T2 | R1</option>
+                    <option value="custom">Custom Config...</option>
+                  </select>
+                  <input type="text" class="control-field-select" id="geomRoadD_LaneConfigCustom" style="display:none; margin-top:0.4rem;" placeholder="e.g. L1 | T2 | R1" oninput="FlowGuard.validateApproachGeometry('D')">
+                </div>
+              </div>
+
+              <!-- B. Physical Width Validation Box -->
+              <div id="geomWidthValidationBox_D" style="margin-top:0.6rem; padding:0.5rem 0.65rem; background:rgba(15,23,42,0.6); border:1px solid rgba(16,185,129,0.3); border-radius:6px; font-size:0.75rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem; color:var(--text-secondary);">
+                  <span>Minimum Required Width: <strong id="geomMinWidthVal_D" style="color:var(--text-primary);">14 m</strong></span>
+                  <span style="font-size:0.7rem; color:var(--text-secondary);">Calculated: <span id="geomWidthCalc_D">3.5 m × 4 lanes</span></span>
+                </div>
+                <div id="geomWidthStatusMsg_D" style="font-weight:700; color:#10b981;">
+                  ✓ Approach width satisfies configured lane requirement.
+                </div>
+              </div>
+
+              <!-- A. Lane Configuration Validation Box -->
+              <div id="geomValidationMsg_D" style="display:none; margin-top:0.4rem; padding:0.4rem 0.65rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:6px; font-size:0.75rem; color:#f59e0b; font-weight:700;">⚠️ Lane configuration total does not match incoming lanes.</div>
+
+              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem;">
+                <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
+                  <span>Includes Pedestrian Crosswalk</span>
+                  <input type="checkbox" id="geomRoadD_Crosswalk" checked style="accent-color: var(--accent-primary);">
+                </label>
+                <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
+                  <span>Exclusive Transit Lane</span>
+                  <input type="checkbox" id="geomRoadD_Transit" style="accent-color: var(--accent-primary);">
+                </label>
+                <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
+                  <span>Channelized Left Turn</span>
+                  <input type="checkbox" id="geomRoadD_ChannelLeft" style="accent-color: var(--accent-primary);">
+                </label>
+              </div>
+            </div>
+
           </div>
+        </div>
+
+        <!-- SAVE & PROCEED ACTION BAR -->
+        <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+          <button class="btn-ghost-reset" id="btnResetGeometry" onclick="FlowGuard.resetGeometryDefaults()">↺ Reset All Geometry Defaults</button>
+          <button class="btn-primary-cyan" style="font-size: 0.95rem; padding: 12px 24px; font-weight: 700;" onclick="FlowGuard.saveGeometryAndProceed()">
+            SAVE GEOMETRY &amp; PROCEED TO TRAFFIC INPUT →
+          </button>
         </div>
       </section>
 
       <!-- STEP 2 SECTION: TRAFFIC INPUT MODE -->
       <section id="wizard-section-2" class="wizard-section-panel" style="display: none;">
         <div style="margin-bottom: 1.25rem;">
-          <h2 class="section-header-title" style="font-size: 1.05rem; margin-bottom: 0.2rem;">Historical Dataset Upload</h2>
-          <p style="font-size: 0.82rem; color: var(--text-secondary);">Upload your historical traffic survey dataset (.csv, .xlsx, .xls) for automated traffic analysis.</p>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 class="section-header-title" style="font-size: 1.05rem; margin-bottom: 0.2rem;">2. TRAFFIC INPUT MODE — HISTORICAL DATASET UPLOAD</h2>
+            <span class="badge" id="step2StatusBadge" style="background: rgba(148,163,184,0.12); color: var(--text-secondary); border: 1px solid var(--border-color);">Awaiting Dataset</span>
+          </div>
+          <p style="font-size: 0.82rem; color: var(--text-secondary);">Upload your historical traffic survey dataset (.xlsx, .xls, .csv) with sheet 'Traffic_Input' to ingest survey records.</p>
         </div>
 
         <!-- HISTORICAL DATASET UPLOAD CONTAINER -->
         <div id="submode-upload" class="input-subpanel" style="display: block;">
-          <!-- Validation Error Banner -->
+          <!-- Validation Alert Banner -->
           <div id="uploadErrorBanner"
             style="display: none; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.4); color: #fca5a5; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.85rem; line-height: 1.5;">
             <strong>⚠️ Dataset Validation Alert:</strong> <span id="uploadErrorText">Error message goes here</span>
           </div>
 
+          <!-- Success Alert Banner -->
+          <div id="uploadSuccessBanner"
+            style="display: none; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.4); color: #6ee7b7; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.85rem; line-height: 1.5;">
+            <strong>✓ Dataset Validated:</strong> <span id="uploadSuccessText">Dataset parsed and validated successfully.</span>
+          </div>
+
           <!-- Upload Progress Indicator -->
           <div id="uploadProgressContainer"
             style="display: none; background: var(--bg-panel); border: 1px solid var(--border-color); padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.25rem;">
-            <div
-              style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
-              <span id="uploadProgressText">Processing dataset...</span>
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+              <span id="uploadProgressText">Reading Excel sheet 'Traffic_Input'...</span>
               <span id="uploadProgressPct">0%</span>
             </div>
             <div style="width: 100%; height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden;">
-              <div id="uploadProgressBar"
-                style="width: 0%; height: 100%; background: var(--accent-primary); transition: width 0.2s ease;"></div>
+              <div id="uploadProgressBar" style="width: 0%; height: 100%; background: var(--accent-primary); transition: width 0.2s ease;"></div>
             </div>
           </div>
 
-          <!-- Drag & Drop Card -->
+          <!-- Drag & Drop Zone Card -->
           <div class="card" id="datasetDropzone"
-            style="padding: 2.5rem 2rem; text-align: center; border: 2px dashed var(--border-color); cursor: pointer; transition: all 0.2s ease;">
-            <div style="font-size: 2.8rem; margin-bottom: 0.5rem;">📂</div>
-            <h3 style="color: var(--text-primary); font-size: 1.1rem; margin-bottom: 0.5rem;">Drag &amp; Drop CSV /
-              Excel File Here</h3>
-            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.25rem;">Supports .csv, .xlsx,
-              .xls data files formatted with traffic count records.</p>
+            style="padding: 2.5rem 2rem; text-align: center; border: 2px dashed var(--border-color); cursor: pointer; transition: all 0.2s ease; margin-bottom: 1.5rem;">
+            <div style="font-size: 2.8rem; margin-bottom: 0.5rem;">📊</div>
+            <h3 style="color: var(--text-primary); font-size: 1.1rem; margin-bottom: 0.5rem;">Drag &amp; Drop Excel / CSV File Here</h3>
+            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+              Supports <strong>.xlsx, .xls, .csv</strong> files containing sheet <code>Traffic_Input</code> with 8 expected columns.
+            </p>
 
             <input type="file" id="csvFileInput" accept=".csv, .xlsx, .xls" style="display: none;">
             <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
@@ -363,56 +646,65 @@
       <!-- STEP 3 SECTION: ENGINEERING PARAMETERS -->
       <section id="wizard-section-3" class="wizard-section-panel" style="display: none;">
         <div style="margin-bottom: 1.5rem;">
-          <h2 class="section-header-title"        <!-- STEP 3 SECTION: ENGINEERING PARAMETERS -->
-        <section id="wizard-section-3" class="wizard-section-panel" style="display: none;">
-          <div style="margin-bottom: 1.5rem;">
-            <h2 class="section-header-title" style="font-size: 1.05rem;">3. ENGINEERING PARAMETERS &amp; DESIGN ASSUMPTIONS</h2>
-            <p style="font-size: 0.82rem; color: var(--text-secondary);">Configure signal control constraints, base saturation flow, and IRC:106 PCU equivalence factors per IRC:93 and IRC:106 guidelines for Webster signal optimization.</p>
-          </div>
+          <h2 class="section-header-title" style="font-size: 1.05rem;">3. ENGINEERING PARAMETERS &amp; DESIGN ASSUMPTIONS</h2>
+          <p style="font-size: 0.82rem; color: var(--text-secondary);">Configure signal control parameters, saturation flow, PCU factors, phase structure, pedestrian safety, and baseline performance before Traffic Summary.</p>
+        </div>
 
           <div class="eng-panels-grid">
-            <!-- SECTION 1 — SIGNAL CONTROL PARAMETERS -->
+
+            <!-- 1. SIGNAL CONTROL PARAMETERS CARD -->
             <div class="eng-panel-card">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">⏱️</div>
                   <div>
-                    <div class="eng-panel-title">1. Signal Control Parameters</div>
-                    <div class="eng-panel-subtitle">Controller type, phase bounds, lost time &amp; clearance intervals</div>
+                    <div class="eng-panel-title">SIGNAL CONTROL PARAMETERS</div>
+                    <div class="eng-panel-subtitle">Shared intersection signal parameter &amp; Webster bounds</div>
                   </div>
                 </div>
-                <span class="badge badge-low">IRC:93 Standard</span>
+                <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                  <span class="badge badge-low" style="background: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Engineering Input</span>
+                  <span class="badge badge-low" style="background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3);">Shared intersection signal parameter</span>
+                </div>
               </div>
 
               <div class="eng-fields-grid">
                 <div class="control-field-group">
                   <label class="control-field-label">Minimum Green Time (s)</label>
-                  <input type="number" id="engMinGreen" class="control-field-select" value="7" min="3" max="30">
-                  <span class="input-val-check" id="valCheckMinGreen" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (5–15s)</span>
+                  <input type="number" id="engMinGreen" class="control-field-select" value="7" min="1" max="60">
+                  <span class="input-val-check" id="valCheckMinGreen" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&lt; Max Green)</span>
                 </div>
+
                 <div class="control-field-group">
                   <label class="control-field-label">Maximum Green Time (s)</label>
-                  <input type="number" id="engMaxGreen" class="control-field-select" value="90" min="30" max="180">
-                  <span class="input-val-check" id="valCheckMaxGreen" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (30–180s)</span>
+                  <input type="number" id="engMaxGreen" class="control-field-select" value="90" min="10" max="300">
+                  <span class="input-val-check" id="valCheckMaxGreen" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&gt; Min Green)</span>
                 </div>
+
                 <div class="control-field-group">
-                  <label class="control-field-label">Yellow / Amber Interval (s)</label>
-                  <input type="number" id="engAmberTime" class="control-field-select" value="3.0" min="2.0" max="6.0" step="0.5">
-                  <span class="input-val-check" id="valCheckAmber" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (3–5s)</span>
+                  <label class="control-field-label">Yellow / Amber Time (s)</label>
+                  <input type="number" id="engAmberTime" class="control-field-select" value="3.0" min="0.5" max="10.0" step="0.5">
+                  <span class="input-val-check" id="valCheckAmber" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&gt; 0s)</span>
                 </div>
+
                 <div class="control-field-group">
-                  <label class="control-field-label">All Red Interval (s)</label>
-                  <input type="number" id="engAllRedTime" class="control-field-select" value="2.0" min="1.0" max="6.0" step="0.5">
-                  <span class="input-val-check" id="valCheckAllRed" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (1–3s)</span>
+                  <label class="control-field-label">All-Red Time (s)</label>
+                  <input type="number" id="engAllRedTime" class="control-field-select" value="2.0" min="0.0" max="10.0" step="0.5">
+                  <span class="input-val-check" id="valCheckAllRed" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (≥ 0s)</span>
                 </div>
+
                 <div class="control-field-group">
-                  <label class="control-field-label">Startup Lost Time l₁ (s)</label>
-                  <input type="number" id="engStartupLost" class="control-field-select" value="2.0" min="0.0" max="5.0" step="0.5">
+                  <label class="control-field-label">Start-Up Lost Time L1 (s)</label>
+                  <input type="number" id="engStartupLost" class="control-field-select" value="2.0" min="0.0" max="10.0" step="0.5">
+                  <span class="input-val-check" id="valCheckStartupLost" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (≥ 0s)</span>
                 </div>
+
                 <div class="control-field-group">
-                  <label class="control-field-label">Clearance Lost Time l₂ (s)</label>
-                  <input type="number" id="engClearanceLost" class="control-field-select" value="2.0" min="0.0" max="5.0" step="0.5">
+                  <label class="control-field-label">Clearance Lost Time L2 (s)</label>
+                  <input type="number" id="engClearanceLost" class="control-field-select" value="2.0" min="0.0" max="10.0" step="0.5">
+                  <span class="input-val-check" id="valCheckClearanceLost" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (≥ 0s)</span>
                 </div>
+
                 <div class="control-field-group">
                   <label class="control-field-label">Number of Signal Phases</label>
                   <select id="engNumPhases" class="control-field-select">
@@ -421,19 +713,22 @@
                     <option value="4" selected>4 Phases</option>
                   </select>
                 </div>
+
                 <div class="control-field-group">
                   <label class="control-field-label">Controller Type</label>
                   <select id="engControllerType" class="control-field-select">
                     <option value="Fixed Time" selected>Fixed Time</option>
-                    <option value="Semi Actuated">Semi Actuated</option>
-                    <option value="Fully Actuated">Fully Actuated</option>
+                    <option value="Semi-Actuated">Semi-Actuated</option>
+                    <option value="Fully-Actuated">Fully-Actuated</option>
+                    <option value="Adaptive Dynamic">Adaptive Dynamic</option>
                   </select>
                 </div>
+
                 <div class="control-field-group" style="grid-column: span 2;">
-                  <label class="control-field-label">Cycle Length Constraint Mode</label>
+                  <label class="control-field-label">Cycle Length Mode</label>
                   <div style="display: flex; gap: 1rem; margin-top: 0.25rem;">
                     <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; cursor: pointer; color: var(--text-primary);">
-                      <input type="radio" name="cycleConstraint" value="auto" checked> Auto Webster Optimum
+                      <input type="radio" name="cycleConstraint" value="auto" checked> Auto Webster Optimization
                     </label>
                     <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; cursor: pointer; color: var(--text-primary);">
                       <input type="radio" name="cycleConstraint" value="manual"> Manual Fixed Cycle
@@ -443,219 +738,426 @@
                     </label>
                   </div>
                 </div>
+
+                <div class="control-field-group" style="grid-column: span 2;">
+                  <label class="control-field-label">Existing Cycle Length (s) <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;">— Shared Intersection-Wide Parameter</span></label>
+                  <input type="number" id="engExistingCycle" class="control-field-select" value="120" min="20" max="300" step="5" style="max-width: 250px;">
+                </div>
               </div>
             </div>
 
-            <!-- SECTION 2 — BASE SATURATION FLOW SETTINGS -->
+            <!-- 2. BASE SATURATION FLOW CARD -->
             <div class="eng-panel-card">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">📊</div>
                   <div>
-                    <div class="eng-panel-title">2. Base Saturation Flow Rate</div>
-                    <div class="eng-panel-subtitle">Base saturation rate per lane for Webster optimization</div>
+                    <div class="eng-panel-title">BASE SATURATION FLOW</div>
+                    <div class="eng-panel-subtitle">Base saturation flow rate S₀ per lane</div>
                   </div>
                 </div>
-                <span class="badge badge-low">IRC:93 Standard</span>
+                <span class="badge" id="satFlowSourceBadge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">Inherited from Step 1</span>
               </div>
 
               <div class="control-field-group" style="margin-bottom: 0.75rem;">
-                <label class="control-field-label">Base Saturation Flow S₀ (PCU/hr/lane)</label>
-                <input type="number" id="engBaseSatFlow" class="control-field-select" value="1800" min="1000" max="2500" step="50">
-                <span class="input-val-check" id="valCheckSatFlow" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (1400–2200 PCU/h/ln)</span>
+                <label class="control-field-label">Base Saturation Flow S₀ (PCU/h/lane)</label>
+                <input type="number" id="engBaseSatFlow" class="control-field-select" value="1800" min="500" max="3000" step="50">
+                <span class="input-val-check" id="valCheckSatFlow" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&gt; 0 PCU/h/ln)</span>
               </div>
-              <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.5rem; line-height: 1.4;">
-                Standard base saturation flow rate per lane per IRC:93. Default is <strong>1800 PCU/hr/lane</strong> for Indian urban signalized intersections.
-              </p>
+
+              <div style="background: rgba(15,23,42,0.6); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.78rem; color: var(--accent-primary); font-weight: 600;">Default engineering assumption</div>
+                <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.25rem; line-height: 1.4;">
+                  Standard base saturation flow rate S₀ per lane. Inherits Step 1 geometry values if available, or allows manual override. Saturation flow calculations occur in Step 4.
+                </p>
+              </div>
             </div>
 
-            <!-- SECTION 3 — PCU CONFIGURATION (FULL WIDTH) -->
+            <!-- 3. PCU EQUIVALENCE FACTORS CARD (FULL WIDTH) -->
             <div class="eng-panel-card full-width">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">🚗</div>
                   <div>
-                    <div class="eng-panel-title">3. Passenger Car Unit (PCU) Configuration</div>
-                    <div class="eng-panel-subtitle">IRC:106-1990 equivalence factors for Indian heterogeneous traffic</div>
+                    <div class="eng-panel-title">PCU EQUIVALENCE FACTORS</div>
+                    <div class="eng-panel-subtitle">Passenger Car Unit equivalence factors for raw vehicle count conversion in Step 4</div>
                   </div>
                 </div>
-                <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                  <input type="text" id="pcuSearchInput" class="mini-input-field" placeholder="🔍 Search vehicle..." style="width: 150px; font-size: 0.78rem; padding: 4px 8px;">
-                  <button id="btnTogglePCUTable" class="btn-ghost" style="padding: 4px 10px; font-size: 0.75rem;">▲ Collapse Table</button>
-                  <button id="btnResetPCU" class="btn-ghost" style="padding: 4px 10px; font-size: 0.75rem;">↺ Restore IRC Defaults</button>
+                <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                  <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; cursor: pointer; color: var(--text-primary); background: rgba(15,23,42,0.6); padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border-color);">
+                    <input type="checkbox" id="engAllowPcuOverride"> Allow Manual PCU Override
+                  </label>
+                  <button id="btnResetPCU" class="btn-ghost" style="padding: 4px 10px; font-size: 0.75rem;">↺ Restore Defaults</button>
                 </div>
               </div>
 
-              <div id="pcuTableContainer" style="overflow-x: auto; transition: all 0.2s ease;">
+              <div id="pcuTableContainer" style="overflow-x: auto;">
                 <table class="pcu-table" id="pcuTable" style="width: 100%;">
                   <thead>
                     <tr>
-                      <th>Vehicle Classification</th>
-                      <th>IRC:106 Stream (&lt; 5%)</th>
-                      <th>IRC:106 Stream (≥ 5%)</th>
-                      <th style="text-align: right;">Configured PCU Factor (Editable)</th>
+                      <th>Vehicle Type (Step 2 Header)</th>
+                      <th style="text-align: right;">Default PCU Factor</th>
+                      <th style="text-align: right;">Configured PCU Factor</th>
+                      <th style="text-align: center;">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <!-- FAST VEHICLES HEADER -->
-                    <tr style="background: rgba(30, 41, 59, 0.8);">
-                      <td colspan="4" style="font-weight: 700; color: #38bdf8; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase;">⚡ FAST VEHICLES</td>
+                    <tr data-veh-key="Cars">
+                      <td><strong>Cars</strong></td>
+                      <td style="text-align: right; color: var(--text-secondary);">1.0</td>
+                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="Cars" value="1.0" step="0.1" min="0.1" disabled style="width: 90px; text-align: right;"></td>
+                      <td style="text-align: center;"><span class="pcu-status-tag" style="font-size:0.75rem; color:var(--text-secondary);">Standard</span></td>
                     </tr>
-                    <tr data-veh-name="two wheelers motorcycle scooter moped">
-                      <td><strong>Two Wheelers (Motorcycle / Scooter)</strong></td>
-                      <td>0.5</td>
-                      <td>0.8</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="motorcycle" value="0.5" step="0.1" min="0.1"></td>
+                    <tr data-veh-key="Bikes">
+                      <td><strong>Bikes</strong></td>
+                      <td style="text-align: right; color: var(--text-secondary);">0.5</td>
+                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="Bikes" value="0.5" step="0.1" min="0.1" disabled style="width: 90px; text-align: right;"></td>
+                      <td style="text-align: center;"><span class="pcu-status-tag" style="font-size:0.75rem; color:var(--text-secondary);">Standard</span></td>
                     </tr>
-                    <tr data-veh-name="passenger car jeep van">
-                      <td><strong>Passenger Car / Jeep / Van</strong></td>
-                      <td>1.0</td>
-                      <td>1.0</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="car" value="1.0" step="0.1" min="0.1"></td>
+                    <tr data-veh-key="AutoRickshaw">
+                      <td><strong>AutoRickshaw</strong></td>
+                      <td style="text-align: right; color: var(--text-secondary);">1.0</td>
+                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="AutoRickshaw" value="1.0" step="0.1" min="0.1" disabled style="width: 90px; text-align: right;"></td>
+                      <td style="text-align: center;"><span class="pcu-status-tag" style="font-size:0.75rem; color:var(--text-secondary);">Standard</span></td>
                     </tr>
-                    <tr data-veh-name="auto-rickshaw 3-wheeler">
-                      <td><strong>Auto-Rickshaw</strong></td>
-                      <td>1.2</td>
-                      <td>2.0</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="autorickshaw" value="1.2" step="0.1" min="0.1"></td>
+                    <tr data-veh-key="LCV">
+                      <td><strong>LCV</strong></td>
+                      <td style="text-align: right; color: var(--text-secondary);">3.0</td>
+                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="LCV" value="3.0" step="0.1" min="0.1" disabled style="width: 90px; text-align: right;"></td>
+                      <td style="text-align: center;"><span class="pcu-status-tag" style="font-size:0.75rem; color:var(--text-secondary);">Standard</span></td>
                     </tr>
-                    <tr data-veh-name="light commercial vehicle lcv">
-                      <td><strong>Light Commercial Vehicle (LCV)</strong></td>
-                      <td>1.4</td>
-                      <td>2.0</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="lcv" value="1.4" step="0.1" min="0.1"></td>
+                    <tr data-veh-key="Bus">
+                      <td><strong>Bus</strong></td>
+                      <td style="text-align: right; color: var(--text-secondary);">3.0</td>
+                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="Bus" value="3.0" step="0.1" min="0.1" disabled style="width: 90px; text-align: right;"></td>
+                      <td style="text-align: center;"><span class="pcu-status-tag" style="font-size:0.75rem; color:var(--text-secondary);">Standard</span></td>
                     </tr>
-                    <tr data-veh-name="truck bus hgv coach">
-                      <td><strong>Truck / Bus</strong></td>
-                      <td>2.2</td>
-                      <td>3.7</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="bus" value="2.2" step="0.1" min="0.1"></td>
+                    <tr data-veh-key="HCV">
+                      <td><strong>HCV</strong></td>
+                      <td style="text-align: right; color: var(--text-secondary);">3.0</td>
+                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="HCV" value="3.0" step="0.1" min="0.1" disabled style="width: 90px; text-align: right;"></td>
+                      <td style="text-align: center;"><span class="pcu-status-tag" style="font-size:0.75rem; color:var(--text-secondary);">Standard</span></td>
                     </tr>
-                    <tr data-veh-name="agricultural tractor trailer">
-                      <td><strong>Agricultural Tractor / Trailer</strong></td>
-                      <td>4.0</td>
-                      <td>5.0</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="tractor" value="4.0" step="0.1" min="0.1"></td>
-                    </tr>
-
-                    <!-- SLOW VEHICLES HEADER -->
-                    <tr style="background: rgba(30, 41, 59, 0.8);">
-                      <td colspan="4" style="font-weight: 700; color: #fcd34d; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase;">🚲 SLOW VEHICLES</td>
-                    </tr>
-                    <tr data-veh-name="pedal cycle bicycle">
-                      <td><strong>Pedal Cycle</strong></td>
-                      <td>0.4</td>
-                      <td>0.5</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="bicycle" value="0.4" step="0.1" min="0.1"></td>
-                    </tr>
-                    <tr data-veh-name="cycle rickshaw">
-                      <td><strong>Cycle Rickshaw</strong></td>
-                      <td>1.5</td>
-                      <td>2.0</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="cyclerickshaw" value="1.5" step="0.1" min="0.1"></td>
-                    </tr>
-                    <tr data-veh-name="tonga horse drawn vehicle">
-                      <td><strong>Tonga (Horse Drawn Vehicle)</strong></td>
-                      <td>1.5</td>
-                      <td>2.0</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="tonga" value="1.5" step="0.1" min="0.1"></td>
-                    </tr>
-                    <tr data-veh-name="hand cart cart">
-                      <td><strong>Hand Cart</strong></td>
-                      <td>2.0</td>
-                      <td>3.0</td>
-                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="cart" value="2.0" step="0.1" min="0.1"></td>
+                    <tr data-veh-key="Bicycle">
+                      <td><strong>Bicycle</strong></td>
+                      <td style="text-align: right; color: var(--text-secondary);">0.4</td>
+                      <td style="text-align: right;"><input type="number" class="pcu-edit-input" data-vehicle="Bicycle" value="0.4" step="0.1" min="0.1" disabled style="width: 90px; text-align: right;"></td>
+                      <td style="text-align: center;"><span class="pcu-status-tag" style="font-size:0.75rem; color:var(--text-secondary);">Standard</span></td>
                     </tr>
                   </tbody>
                 </table>
               </div>
+              <p style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 0.5rem; line-height: 1.4;">
+                💡 <em>Step 2 contains raw vehicle counts (e.g. Cars = 70). Step 3 stores PCU equivalence factors (e.g. 1.0). Step 4 computes PCU demand (70 × 1.0 = 70 PCU). Raw traffic counts remain untouched.</em>
+              </p>
             </div>
 
-            <!-- SECTION 4 — ENGINEERING MODEL SUMMARY -->
+            <!-- 4. PHASE STRUCTURE CARD -->
+            <div class="eng-panel-card">
+              <div class="eng-panel-header">
+                <div class="eng-panel-title-group">
+                  <div class="eng-panel-icon">🚦</div>
+                  <div>
+                    <div class="eng-panel-title">INTERSECTION PHASE CONFIGURATION</div>
+                    <div class="eng-panel-subtitle">Signal phase approach mapping for 4-road intersection</div>
+                  </div>
+                </div>
+                <span class="badge badge-low" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Phase Assignment Only</span>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 0.85rem; margin-top: 0.25rem;">
+                <div style="background: rgba(15,23,42,0.7); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.85rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                    <strong style="color: var(--accent-primary); font-size: 0.88rem;">PHASE 1 — NORTH / SOUTH</strong>
+                    <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">Configured</span>
+                  </div>
+                  <div style="font-size: 0.82rem; color: var(--text-primary); display: flex; gap: 1rem;">
+                    <span>• Road A — Northbound</span>
+                    <span>• Road C — Southbound</span>
+                  </div>
+                </div>
+
+                <div style="background: rgba(15,23,42,0.7); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.85rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                    <strong style="color: #fcd34d; font-size: 0.88rem;">PHASE 2 — EAST / WEST</strong>
+                    <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">Configured</span>
+                  </div>
+                  <div style="font-size: 0.82rem; color: var(--text-primary); display: flex; gap: 1rem;">
+                    <span>• Road B — Eastbound</span>
+                    <span>• Road D — Westbound</span>
+                  </div>
+                </div>
+              </div>
+              <p style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                Note: Defines signal phase approach grouping. Critical flow ratios are computed in Step 4.
+              </p>
+            </div>
+
+            <!-- 5. PEDESTRIAN & SAFETY PARAMETERS CARD -->
+            <div class="eng-panel-card">
+              <div class="eng-panel-header">
+                <div class="eng-panel-title-group">
+                  <div class="eng-panel-icon">🚶</div>
+                  <div>
+                    <div class="eng-panel-title">PEDESTRIAN &amp; SAFETY PARAMETERS</div>
+                    <div class="eng-panel-subtitle">Walk interval &amp; safety clearance inputs</div>
+                  </div>
+                </div>
+                <span class="badge badge-low">Engineering Input</span>
+              </div>
+
+              <div class="eng-fields-grid">
+                <div class="control-field-group">
+                  <label class="control-field-label">Minimum Initial Walk Time (s)</label>
+                  <input type="number" id="engMinWalkTime" class="control-field-select" value="7" min="4" max="30">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Pedestrian Walking Speed (m/s)</label>
+                  <input type="number" id="engWalkSpeed" class="control-field-select" value="1.2" min="0.5" max="2.5" step="0.1">
+                  <span class="input-val-check" id="valCheckWalkSpeed" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&gt; 0 m/s)</span>
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Pedestrian Clearance Calculation</label>
+                  <select id="engPedClearanceCalc" class="control-field-select">
+                    <option value="ENABLED" selected>ENABLED</option>
+                    <option value="DISABLED">DISABLED</option>
+                  </select>
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Synthetic Incident Event</label>
+                  <select id="engIncidentEvent" class="control-field-select">
+                    <option value="None" selected>None</option>
+                    <option value="Minor Shoulder Blockage">Minor Shoulder Blockage</option>
+                    <option value="Single Lane Closure">Single Lane Closure</option>
+                    <option value="Emergency Preemption">Emergency Vehicle Preemption</option>
+                  </select>
+                </div>
+              </div>
+              <p style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                Engineering inputs only. Pedestrian clearance time calculations occur in Step 4.
+              </p>
+            </div>
+
+            <!-- 6. BASELINE / OBSERVED PERFORMANCE CARD (FULL WIDTH) -->
             <div class="eng-panel-card full-width">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
-                  <div class="eng-panel-icon">📋</div>
+                  <div class="eng-panel-icon">📉</div>
                   <div>
-                    <div class="eng-panel-title">4. Engineering Model Assumptions Summary</div>
-                    <div class="eng-panel-subtitle">Selected design assumptions prior to running Webster optimization</div>
+                    <div class="eng-panel-title">BASELINE / OBSERVED PERFORMANCE</div>
+                    <div class="eng-panel-subtitle">Optional existing-condition observed metrics for BEFORE vs AFTER evaluation</div>
                   </div>
                 </div>
-                <span class="badge badge-low" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">✓ DESIGN INPUTS READY</span>
+                <span class="badge badge-low" style="background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3);">Optional Inputs</span>
+              </div>
+
+              <div style="margin-bottom: 1rem;">
+                <label class="control-field-label" style="margin-bottom: 0.4rem;">Baseline Data Mode</label>
+                <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                  <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer; color: var(--text-primary);">
+                    <input type="radio" name="baselineMode" value="not_available" checked> Not Available
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer; color: var(--text-primary);">
+                    <input type="radio" name="baselineMode" value="network"> Network-wide
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer; color: var(--text-primary);">
+                    <input type="radio" name="baselineMode" value="road_wise"> Road-wise
+                  </label>
+                </div>
+              </div>
+
+              <!-- NETWORK-WIDE CONTAINER -->
+              <div id="baselineNetworkContainer" style="display: none; background: rgba(15,23,42,0.6); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-weight: 700; color: var(--accent-primary); font-size: 0.82rem; margin-bottom: 0.75rem;">NETWORK-WIDE OBSERVED METRICS</div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                  <div class="control-field-group">
+                    <label class="control-field-label">Existing Average Delay (s/veh)</label>
+                    <input type="number" id="baseline_delay_network" class="control-field-select" placeholder="Not Available" min="0" step="0.1">
+                  </div>
+                  <div class="control-field-group">
+                    <label class="control-field-label">Existing Queue Length (m)</label>
+                    <input type="number" id="baseline_queue_network" class="control-field-select" placeholder="Not Available" min="0" step="1">
+                  </div>
+                  <div class="control-field-group">
+                    <label class="control-field-label">Existing Degree of Saturation (v/c)</label>
+                    <input type="number" id="baseline_dos_network" class="control-field-select" placeholder="Not Available" min="0" max="2.0" step="0.01">
+                  </div>
+                </div>
+              </div>
+
+              <!-- ROAD-WISE CONTAINER -->
+              <div id="baselineRoadwiseContainer" style="display: none; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
+                <!-- ROAD A -->
+                <div style="background: rgba(15,23,42,0.6); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-weight: 700; color: var(--accent-primary); font-size: 0.8rem; margin-bottom: 0.5rem;">ROAD A — NORTHBOUND</div>
+                  <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Average Delay (s)</label>
+                      <input type="number" id="baseline_delay_road_a" class="control-field-select" placeholder="Not Available" min="0" step="0.1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Queue Length (m)</label>
+                      <input type="number" id="baseline_queue_road_a" class="control-field-select" placeholder="Not Available" min="0" step="1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Degree of Saturation</label>
+                      <input type="number" id="baseline_dos_road_a" class="control-field-select" placeholder="Not Available" min="0" step="0.01">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ROAD B -->
+                <div style="background: rgba(15,23,42,0.6); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-weight: 700; color: var(--accent-primary); font-size: 0.8rem; margin-bottom: 0.5rem;">ROAD B — EASTBOUND</div>
+                  <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Average Delay (s)</label>
+                      <input type="number" id="baseline_delay_road_b" class="control-field-select" placeholder="Not Available" min="0" step="0.1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Queue Length (m)</label>
+                      <input type="number" id="baseline_queue_road_b" class="control-field-select" placeholder="Not Available" min="0" step="1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Degree of Saturation</label>
+                      <input type="number" id="baseline_dos_road_b" class="control-field-select" placeholder="Not Available" min="0" step="0.01">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ROAD C -->
+                <div style="background: rgba(15,23,42,0.6); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-weight: 700; color: var(--accent-primary); font-size: 0.8rem; margin-bottom: 0.5rem;">ROAD C — SOUTHBOUND</div>
+                  <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Average Delay (s)</label>
+                      <input type="number" id="baseline_delay_road_c" class="control-field-select" placeholder="Not Available" min="0" step="0.1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Queue Length (m)</label>
+                      <input type="number" id="baseline_queue_road_c" class="control-field-select" placeholder="Not Available" min="0" step="1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Degree of Saturation</label>
+                      <input type="number" id="baseline_dos_road_c" class="control-field-select" placeholder="Not Available" min="0" step="0.01">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ROAD D -->
+                <div style="background: rgba(15,23,42,0.6); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-weight: 700; color: var(--accent-primary); font-size: 0.8rem; margin-bottom: 0.5rem;">ROAD D — WESTBOUND</div>
+                  <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Average Delay (s)</label>
+                      <input type="number" id="baseline_delay_road_d" class="control-field-select" placeholder="Not Available" min="0" step="0.1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Queue Length (m)</label>
+                      <input type="number" id="baseline_queue_road_d" class="control-field-select" placeholder="Not Available" min="0" step="1">
+                    </div>
+                    <div>
+                      <label class="control-field-label" style="font-size:0.75rem;">Existing Degree of Saturation</label>
+                      <input type="number" id="baseline_dos_road_d" class="control-field-select" placeholder="Not Available" min="0" step="0.01">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 9. ENGINEERING READY SUMMARY CARD (FULL WIDTH) -->
+            <div class="eng-panel-card full-width" style="border: 1px solid rgba(56,189,248,0.3); background: rgba(15,23,42,0.9);">
+              <div class="eng-panel-header">
+                <div class="eng-panel-title-group">
+                  <div class="eng-panel-icon" style="background: rgba(16,185,129,0.15); color: var(--success);">✓</div>
+                  <div>
+                    <div class="eng-panel-title">ENGINEERING PARAMETERS READY</div>
+                    <div class="eng-panel-subtitle">Summary of validated signal parameters prepared for Step 4 Traffic Summary handoff</div>
+                  </div>
+                </div>
+                <span class="badge" id="summaryValidationStatusBadge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">✓ Parameters Validated</span>
               </div>
 
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Signal Type</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAssumpController">Fixed Time</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Signal Phases</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryPhasesVal">4</div>
                 </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Controller Type</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="summaryAssumpControllerType">Fixed Time</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Phase 1</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="summaryPhase1Val">North / South</div>
                 </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Phase 2</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: #fcd34d; margin-top: 0.2rem;" id="summaryPhase2Val">East / West</div>
+                </div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Base Saturation Flow</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAssumpBaseSat">1800 PCU/hr/lane</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryBaseSatVal">1800 PCU/h/lane</div>
                 </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Selected IRC Standard</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--success); margin-top: 0.2rem;">IRC:93 / IRC:106</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Existing Cycle</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryExistingCycleVal">120 s</div>
                 </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Number of Phases</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAssumpPhases">4 Phases</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Amber Interval</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAmberVal">3 s</div>
                 </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">PCU Standard</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--success); margin-top: 0.2rem;">IRC:106-1990</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">All-Red Interval</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAllRedVal">2 s</div>
+                </div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Minimum Green</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryMinGreenVal">7 s</div>
+                </div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">PCU Factors</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--success); margin-top: 0.2rem;" id="summaryPcuFactorsVal">Standard</div>
+                </div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Baseline Data</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-secondary); margin-top: 0.2rem;" id="summaryBaselineVal">Not Available</div>
                 </div>
               </div>
 
-              <!-- SINGLE NAVIGATION BUTTON -->
-              <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; align-items: center;">
-                <button class="btn-primary-cyan" style="font-size: 0.95rem; padding: 12px 24px; font-weight: 700;" onclick="FlowGuard.setWizardStep(4)">
-                  Next → Traffic Summary
-                </button>
-              </div>
+              <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.75rem; line-height: 1.4; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.6rem;">
+                ⓘ <em>These parameters are prepared for Step 4 Traffic Summary. Traffic counts remain unchanged. PCU conversion and traffic-performance calculations occur in Step 4.</em>
+              </p>
             </div>
+
           </div>
-        </section>        onclick="FlowGuard.setWizardStep(4)">
-                Continue to Traffic Summary →
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
 
       <!-- STEP 4 SECTION: TRAFFIC SUMMARY ENGINEERING DASHBOARD -->
       <section id="wizard-section-4" class="wizard-section-panel" style="display: none;">
         <div style="margin-bottom: 1.5rem;">
-          <h2 class="section-header-title" style="font-size: 1.05rem;">4. TRAFFIC SUMMARY &amp; ENGINEERING DASHBOARD
-          </h2>
-          <p style="font-size: 0.82rem; color: var(--text-secondary);">Centralized pre-analysis engineering dashboard
-            summarizing the uploaded traffic survey, carriageway geometry, vehicle composition, PCU factors, and signal
-            parameters prior to Webster optimization.</p>
+          <h2 class="section-header-title" style="font-size: 1.05rem;">4. TRAFFIC SUMMARY &amp; ENGINEERING DASHBOARD</h2>
+          <p style="font-size: 0.82rem; color: var(--text-secondary);">Centralized pre-analysis engineering dashboard summarizing carriageway geometry (Step 1), validated raw traffic dataset (Step 2), and engineering parameters (Step 3) prior to Webster optimization.</p>
         </div>
 
         <div class="summary-dash-grid">
 
-          <!-- SECTION 1: SURVEY OVERVIEW -->
+          <!-- 1. SURVEY OVERVIEW CARD -->
           <div class="summary-dash-card full-width">
             <div class="summary-dash-header">
               <div class="summary-dash-title-group">
-                <div class="summary-dash-icon">MAP</div>
+                <div class="summary-dash-icon">📊</div>
                 <div>
                   <div class="summary-dash-title">1. Survey Overview</div>
-                  <div class="summary-dash-subtitle">Carriageway survey metadata, intervals &amp; total vehicle volume</div>
+                  <div class="summary-dash-subtitle">Carriageway survey metadata, record counts &amp; total vehicle volume</div>
                 </div>
               </div>
-              <span class="badge badge-low">Survey Metadata</span>
+              <span class="badge badge-low" id="sumDashOverviewBadge">Survey Metadata</span>
             </div>
 
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
               <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                 <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Input Mode</div>
-                <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashMethod">--</div>
+                <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashMethod">Awaiting Dataset Upload</div>
               </div>
               <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                 <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Survey Duration</div>
@@ -671,11 +1173,11 @@
               </div>
               <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                 <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Roads</div>
-                <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashRoads">0</div>
+                <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashRoads">4 (From Geometry Setup)</div>
               </div>
               <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                 <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Time Intervals</div>
-                <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTimeIntervals">0</div>
+                <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTimeIntervals">--</div>
               </div>
               <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                 <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total Vehicles</div>
@@ -683,7 +1185,7 @@
               </div>
               <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                 <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total PCU</div>
-                <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTotalPCU">0</div>
+                <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTotalPCU">0.0</div>
               </div>
               <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                 <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Peak Interval</div>
@@ -691,73 +1193,78 @@
               </div>
               <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                 <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Peak Interval PCU</div>
-                <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashPeakPCU">0</div>
+                <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashPeakPCU">0.0</div>
+              </div>
+              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Peak Hour Factor (PHF)</div>
+                <div style="font-size: 1rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="sumDashPHF">--</div>
               </div>
               <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                 <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Status</div>
-                <div style="font-size: 1rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="sumDashStatus">Awaiting Dataset Upload</div>
+                <div style="font-size: 0.9rem; font-weight: 700; color: #f59e0b; margin-top: 0.2rem;" id="sumDashStatus">⚠ Please upload a traffic survey file in Step 2</div>
               </div>
             </div>
           </div>
 
-            <!-- SECTION 2: ROAD-WISE ENGINEERING CARDS (ROADS A-D) -->
-            <div class="summary-dash-card full-width">
-              <div class="summary-dash-header">
-                <div class="summary-dash-title-group">
-                  <div class="summary-dash-icon">SIGN</div>
-                  <div>
-                    <div class="summary-dash-title">2–5. Road-wise Engineering Cards</div>
-                    <div class="summary-dash-subtitle">Independent approach geometry, traffic volume, vehicle composition, PCU, peak hour, and Webster inputs for Roads A–D</div>
-                  </div>
+          <!-- 2. ROAD-WISE ENGINEERING SUMMARY (ROADS A-D) -->
+          <div class="summary-dash-card full-width">
+            <div class="summary-dash-header">
+              <div class="summary-dash-title-group">
+                <div class="summary-dash-icon">🚦</div>
+                <div>
+                  <div class="summary-dash-title">2. Road-wise Engineering Summary</div>
+                  <div class="summary-dash-subtitle">Independent approach geometry, raw volume, converted PCU, peak analysis, and Webster inputs for Roads A–D</div>
                 </div>
-                <span class="badge badge-low">Approach Analysis</span>
               </div>
-
-              <!-- 4 Independent Engineering Cards Grid (Road A-North, Road B-East, Road C-South, Road D-West) -->
-              <div id="sumDashApproachCardsGrid"
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem;">
-                <!-- Dynamically populated from project.processedTraffic -->
-              </div>
+              <span class="badge badge-low">Approach Cards</span>
             </div>
 
-            <!-- SECTION 6: INTERSECTION SUMMARY -->
-            <div class="summary-dash-card full-width">
-              <div class="summary-dash-header">
-                <div class="summary-dash-title-group">
-                  <div class="summary-dash-icon">MAP</div>
-                  <div>
-                    <div class="summary-dash-title">6. Intersection Summary</div>
-                    <div class="summary-dash-subtitle">Network-wide traffic demand aggregation &amp; critical approach highlights</div>
-                  </div>
+            <!-- 4 Independent Engineering Cards Grid (Road A-North, Road B-East, Road C-South, Road D-West) -->
+            <div id="sumDashApproachCardsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem;">
+              <!-- Dynamically rendered by renderTrafficSummaryDashboard() -->
+            </div>
+          </div>
+
+          <!-- 3. INTERSECTION / PHASE SUMMARY -->
+          <div class="summary-dash-card full-width">
+            <div class="summary-dash-header">
+              <div class="summary-dash-title-group">
+                <div class="summary-dash-icon">⚡</div>
+                <div>
+                  <div class="summary-dash-title">3. Intersection / Phase Summary</div>
+                  <div class="summary-dash-subtitle">Pre-analysis flow ratio aggregation for Phase 1 (N/S) &amp; Phase 2 (E/W)</div>
                 </div>
-                <span class="badge badge-low">Network Aggregation</span>
+              </div>
+              <span class="badge badge-low">Phase Summary</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.72rem; color: var(--accent-primary); text-transform: uppercase; font-weight: 700;">Phase 1 (Road A + Road C)</div>
+                <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.3rem;">Critical Movement: <strong style="color: var(--text-primary);" id="phase1CritMove">--</strong></div>
+                <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Critical Flow (q₁): <strong style="color: var(--text-primary);" id="phase1CritFlow">None</strong></div>
+                <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Saturation Flow (s₁): <strong style="color: var(--text-primary);" id="phase1SatFlow">Awaiting Data</strong></div>
+                <div style="font-size: 0.95rem; font-weight: 800; color: var(--accent-primary); margin-top: 0.4rem;">Phase 1 Ratio (y₁): <span id="phase1FlowRatioY">--</span></div>
               </div>
 
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Most Congested Road</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashMostCongestedRoad">--</div>
-                </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Highest Approach PCU</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashHighestApproachPCU">0</div>
-                </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Peak Interval Overall</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashPeakIntervalOverall">--</div>
-                </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total Network Vehicles</div>
-                  <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTotalNetworkVehicles">0</div>
-                </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total Network PCU</div>
-                  <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="sumDashTotalNetworkPCU">0</div>
-                </div>
-                <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Status</div>
-                  <div style="font-size: 1rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="sumDashNetworkStatus">Awaiting Dataset Upload</div>
-                </div>
+              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.72rem; color: #fcd34d; text-transform: uppercase; font-weight: 700;">Phase 2 (Road B + Road D)</div>
+                <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.3rem;">Critical Movement: <strong style="color: var(--text-primary);" id="phase2CritMove">--</strong></div>
+                <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Critical Flow (q₂): <strong style="color: var(--text-primary);" id="phase2CritFlow">None</strong></div>
+                <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Saturation Flow (s₂): <strong style="color: var(--text-primary);" id="phase2SatFlow">Awaiting Data</strong></div>
+                <div style="font-size: 0.95rem; font-weight: 800; color: #fcd34d; margin-top: 0.4rem;">Phase 2 Ratio (y₂): <span id="phase2FlowRatioY">--</span></div>
+              </div>
+
+              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Intersection Total Flow Ratio</div>
+                <div style="font-size: 1.25rem; font-weight: 800; color: var(--success); margin-top: 0.3rem;" id="sumDashTotalFlowRatioY">--</div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem;">Sum of Configured Phase Ratios (Y = y₁ + y₂)</div>
+              </div>
+
+              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Pre-Analysis Status</div>
+                <div style="font-size: 0.9rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.3rem;" id="sumDashPreAnalysisStatus">Awaiting Validated Dataset</div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem;">Prepared for Step 5 Webster Signal Optimization</div>
               </div>
             </div>
           </div>
@@ -765,158 +1272,7 @@
         </div>
       </section>
 
-  <!-- STEP 5 SECTION: RUN ANALYSIS -->
-  <section id="wizard-section-5" class="wizard-section-panel" style="display: none;">
-    <div
-      style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-      <div>
-        <h2 class="section-header-title"
-          style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0;">5. RUN TRAFFIC ENGINEERING
-          ANALYSIS</h2>
-        <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 2px 0 0 0;">Execute 15-stage multi-objective
-          Webster signal optimization, capacity calculation &amp; IRC:93 compliance validation.</p>
-      </div>
-      <div style="display: flex; gap: 0.75rem;">
-        <button class="btn-ghost-reset" id="btnResetAnalysisEngine" onclick="FlowGuard.resetAnalysisStages()">↺ Reset
-          Pipeline</button>
-        <button class="btn-primary-cyan" id="btnStartAnalysisEngine"
-          style="font-size: 0.9rem; padding: 10px 20px; font-weight: 700;"
-          onclick="FlowGuard.runFullAnalysisPipeline()">▶ Start 15-Stage Analysis</button>
-      </div>
-    </div>
-
-    <!-- Engine Control & Status Overview Card -->
-    <div class="analysis-execution-control-card" style="margin-bottom: 1rem;">
-      <div class="engine-status-bar">
-        <div class="engine-status-info">
-          <span class="engine-status-label">PIPELINE STATUS:</span>
-          <span class="engine-status-badge badge-idle" id="analysisPipelineStatusBadge">READY FOR EXECUTION</span>
-        </div>
-        <div class="engine-kpi-group">
-          <div class="engine-kpi-item">
-            <span class="engine-kpi-label">Completed Stages</span>
-            <span class="engine-kpi-val" id="kpiStagesProgress">0 / 15</span>
-          </div>
-          <div class="engine-kpi-item">
-            <span class="engine-kpi-label">Total Processing Time</span>
-            <span class="engine-kpi-val" id="kpiTotalExecutionTime">0 ms</span>
-          </div>
-          <div class="engine-kpi-item">
-            <span class="engine-kpi-label">IRC Compliance</span>
-            <span class="engine-kpi-val" id="kpiIRCComplianceStatus"
-              style="color: var(--text-secondary);">Pending</span>
-          </div>
-          <div class="engine-kpi-item">
-            <span class="engine-kpi-label">Engine Speed</span>
-            <select id="analysisEngineSpeed" class="mini-speed-select">
-              <option value="normal" selected>Normal (Animated)</option>
-              <option value="fast">Fast (Instant)</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <!-- Animated Overall Progress Bar -->
-      <div class="analysis-overall-progress-container" style="margin-top: 0.75rem;">
-        <div class="progress-bar-label-wrap">
-          <span>Overall Execution Progress</span>
-          <span id="analysisOverallProgressPct"
-            style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-primary);">0%</span>
-        </div>
-        <div class="progress-bar-track">
-          <div id="analysisOverallProgressBar" class="progress-bar-fill" style="width: 0%;"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 15 Animated Analysis Stages Grid Header -->
-    <div class="analysis-stages-header"
-      style="margin-top: 0.85rem; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
-      <h3
-        style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px; margin: 0;">
-        <span>⚡</span> 15-Stage Engineering Execution Pipeline
-      </h3>
-      <span style="font-size: 0.78rem; color: var(--text-secondary);">Real-time execution log &amp; stage
-        benchmarks</span>
-    </div>
-
-    <!-- Container for the 15 animated stages -->
-    <div class="analysis-stages-grid" id="analysisStagesContainer">
-      <!-- Rendered dynamically by JavaScript -->
-    </div>
-
-    <!-- Stage 15 Completion Banner & Results Summary -->
-    <div id="analysisPipelineCompletionSummary" class="analysis-completion-panel"
-      style="display: none; margin-top: 1.5rem;">
-      <div
-        style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: var(--success); padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 800; font-size: 0.9rem; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
-        <span>✓ OPTIMIZATION SUCCESSFUL — ALL 15 STAGES PASSED</span>
-        <span class="badge" style="background: var(--success); color: #0f172a; font-weight: 800;">100% IRC
-          COMPLIANT</span>
-      </div>
-
-      <div class="completion-header">
-        <div class="completion-title-group">
-          <div class="completion-icon">🎉</div>
-          <div>
-            <h3 class="completion-title">15-Stage Traffic Engineering Analysis Complete</h3>
-            <p class="completion-subtitle">All 15 computational stages executed successfully. Signal timing optimized
-              and validated against IRC:93 and IRC:106.</p>
-          </div>
-        </div>
-        <button class="btn-primary-cyan" style="font-size: 0.95rem; padding: 12px 24px; font-weight: 700;"
-          onclick="FlowGuard.setWizardStep(6)">
-          View Results &amp; Reports →
-        </button>
-      </div>
-
-      <div class="completion-metrics-grid">
-        <div class="completion-metric-card">
-          <span class="cm-label">Total Execution Time</span>
-          <span class="cm-value" id="summaryTotalExecutionTime" style="color: var(--accent-primary);">348 ms</span>
-          <span class="cm-subtext">Async 15-stage pipeline benchmark</span>
-        </div>
-        <div class="completion-metric-card">
-          <span class="cm-label">Stages Completed</span>
-          <span class="cm-value" id="summaryCompletedStages" style="color: var(--success);">15 / 15</span>
-          <span class="cm-subtext">100% Pipeline Execution</span>
-        </div>
-        <div class="completion-metric-card">
-          <span class="cm-label">Webster Cycle Length (C<sub>opt</sub>)</span>
-          <span class="cm-value" id="summaryOptimumCycle">78 s</span>
-          <span class="cm-subtext">Feasible range: 40s - 180s</span>
-        </div>
-        <div class="completion-metric-card">
-          <span class="cm-label">Overall Level of Service (LOS)</span>
-          <span class="cm-value" id="summaryIntersectionLOS" style="color: var(--accent-primary);">LOS B</span>
-          <span class="cm-subtext" id="summaryDelayText">22.1s average delay</span>
-        </div>
-        <div class="completion-metric-card">
-          <span class="cm-label">IRC Validation Status</span>
-          <span class="cm-value" id="summaryIRCGuardrails" style="color: var(--success);">100% Validated</span>
-          <span class="cm-subtext">Pedestrian &amp; Lost Time compliant</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- STEP 6 SECTION: RESULTS & REPORTS -->
-  <section id="wizard-section-6" class="wizard-section-panel" style="display: none;">
-    <div
-      style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-      <div>
-        <h2 class="section-header-title" style="font-size: 1.05rem;">6. RESULTS &amp; ENGINEERING REPORTS</h2>
-        <p style="font-size: 0.82rem; color: var(--text-secondary);">Comprehensive engineering report with optimized
-          signal timings, capacity &amp; v/c analysis, LOS assessment, and 15-section PDF generator.</p>
-      </div>
-      <button class="btn-primary-cyan" onclick="FlowGuard.generateEngineeringReport()">🖨 Print 15-Section PDF
-        Engineering Report</button>
-    </div>
-
-    <div id="engineeringDashboardContainer"></div>
-  </section>
-
-  </main>
+    </main>
   </div>
 
   <!-- Bottom Sticky Action Bar -->
@@ -926,11 +1282,11 @@
     </div>
 
     <div class="action-bar-buttons">
-      <button class="btn-ghost-reset" id="btnWizardPrev" onclick="FlowGuard.setWizardStep(1)">
-        &larr; Previous
+      <button class="btn-ghost-reset" id="btnWizardPrev" style="display: none;">
+        &larr; Previous Step
       </button>
 
-      <button class="btn-ghost-reset" id="btnResetAnalysis">
+      <button class="btn-ghost-reset" id="btnResetAnalysis" onclick="FlowGuard.resetToDefaults()">
         ↺ Reset All
       </button>
 

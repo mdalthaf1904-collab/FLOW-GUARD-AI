@@ -35,6 +35,8 @@ describe('FlowGuard AI - Movement-Based PCU Engine', () => {
   test('Hourly equivalent demands match movement PCU scaling', () => {
     const proj = FlowGuard.getProject();
     proj.geometry.surveyDuration = 15; // 15 mins -> multiplier = 4
+    proj.dataset = { uploaded: true, records: [{ time: '08:00', road: 'Road A', key: 'north', movement: 'Left', vehicleType: 'Car', count: 10 }] };
+    FlowGuard.recomputeProjectData(proj);
     FlowGuard.saveProject(proj);
 
     const processed = FlowGuard.getProject().processedTraffic;
@@ -48,6 +50,8 @@ describe('FlowGuard AI - Movement-Based PCU Engine', () => {
 
   test('processedTraffic stores approachPCU, hourlyDemand, and criticalLaneInputs', () => {
     const proj = FlowGuard.getProject();
+    proj.dataset = { uploaded: true, records: [{ time: '08:00', road: 'Road A', key: 'north', movement: 'Left', vehicleType: 'Car', count: 10 }] };
+    FlowGuard.recomputeProjectData(proj);
     FlowGuard.saveProject(proj);
 
     const processed = FlowGuard.getProject().processedTraffic;

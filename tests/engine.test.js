@@ -28,8 +28,8 @@ describe('FlowGuard AI Civil Engineering Math Engines', () => {
       expect(selectedRoads.west.convertedPCU).toBeGreaterThan(0);
 
       // Verify Road A (north) PCU is not 0
-      // Cars: 50*1.0 = 50, Bikes: 40*0.5 = 20, Auto: 10*0.8 = 8, Bus: 2*3.0 = 6, Truck: 1*3.0 = 3 -> Total = 87 PCU
-      expect(selectedRoads.north.convertedPCU).toEqual(87);
+      // Cars: 50*1.0 = 50, Bikes: 40*0.5 = 20, Auto: 10*0.8 = 8, Bus: 2*3.0 = 6, Truck: 1*1.4 = 1.4 -> Total = 84.6 PCU
+      expect(selectedRoads.north.convertedPCU).toEqual(84.6);
     });
   });
 

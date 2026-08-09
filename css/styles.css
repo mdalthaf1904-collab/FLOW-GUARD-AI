@@ -73,9 +73,9 @@
 
 html,
 body {
+  height: 100vh;
   min-height: 100vh;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background-color: var(--bg-app);
@@ -408,9 +408,12 @@ header.navbar {
    -------------------------------------------------------------------------- */
 .content-area,
 .main-content-scroll,
-.main-container {
+.main-container,
+.main-viewport {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   position: relative;
