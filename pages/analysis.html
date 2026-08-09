@@ -985,138 +985,454 @@
 
       <!-- STEP 5 SECTION: RUN ANALYSIS -->
       <section id="wizard-section-5" class="wizard-section-panel" style="display: none;">
-        <div
-          style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-          <div>
-            <h2 class="section-header-title"
-              style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0;">5. RUN TRAFFIC
-              ENGINEERING ANALYSIS</h2>
-            <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 2px 0 0 0;">Execute 15-stage
-              multi-objective Webster signal optimization, capacity calculation &amp; IRC:93 compliance validation.</p>
-          </div>
-          <div style="display: flex; gap: 0.75rem;">
-            <button class="btn-ghost-reset" id="btnResetAnalysisEngine" onclick="FlowGuard.resetAnalysisStages()">↺
-              Reset Pipeline</button>
-            <button class="btn-primary-cyan" id="btnStartAnalysisEngine"
-              style="font-size: 0.9rem; padding: 10px 20px; font-weight: 700;"
-              onclick="FlowGuard.runFullAnalysisPipeline()">▶ Start 15-Stage Analysis</button>
-          </div>
-        </div>
-
-        <!-- Engine Control & Status Overview Card -->
-        <div class="analysis-execution-control-card" style="margin-bottom: 1rem;">
-          <div class="engine-status-bar">
-            <div class="engine-status-info">
-              <span class="engine-status-label">PIPELINE STATUS:</span>
-              <span class="engine-status-badge badge-idle" id="analysisPipelineStatusBadge">READY FOR EXECUTION</span>
-            </div>
-            <div class="engine-kpi-group">
-              <div class="engine-kpi-item">
-                <span class="engine-kpi-label">Completed Stages</span>
-                <span class="engine-kpi-val" id="kpiStagesProgress">0 / 15</span>
-              </div>
-              <div class="engine-kpi-item">
-                <span class="engine-kpi-label">Total Processing Time</span>
-                <span class="engine-kpi-val" id="kpiTotalExecutionTime">0 ms</span>
-              </div>
-              <div class="engine-kpi-item">
-                <span class="engine-kpi-label">IRC Compliance</span>
-                <span class="engine-kpi-val" id="kpiIRCComplianceStatus"
-                  style="color: var(--text-secondary);">Pending</span>
-              </div>
-              <div class="engine-kpi-item">
-                <span class="engine-kpi-label">Engine Speed</span>
-                <select id="analysisEngineSpeed" class="mini-speed-select">
-                  <option value="normal" selected>Normal (Animated)</option>
-                  <option value="fast">Fast (Instant)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <!-- Animated Overall Progress Bar -->
-          <div class="analysis-overall-progress-container" style="margin-top: 0.75rem;">
-            <div class="progress-bar-label-wrap">
-              <span>Overall Execution Progress</span>
-              <span id="analysisOverallProgressPct"
-                style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-primary);">0%</span>
-            </div>
-            <div class="progress-bar-track">
-              <div id="analysisOverallProgressBar" class="progress-bar-fill" style="width: 0%;"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 15 Animated Analysis Stages Grid Header -->
-        <div class="analysis-stages-header"
-          style="margin-top: 0.85rem; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
-          <h3
-            style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px; margin: 0;">
-            <span>⚡</span> 15-Stage Engineering Execution Pipeline
-          </h3>
-          <span style="font-size: 0.78rem; color: var(--text-secondary);">Real-time execution log &amp; stage
-            benchmarks</span>
-        </div>
-
-        <!-- Container for the 15 animated stages -->
-        <div class="analysis-stages-grid" id="analysisStagesContainer">
-          <!-- Rendered dynamically by JavaScript -->
-        </div>
-
-        <!-- Stage 15 Completion Banner & Results Summary -->
-        <div id="analysisPipelineCompletionSummary" class="analysis-completion-panel"
-          style="display: none; margin-top: 1.5rem;">
-          <div
-            style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: var(--success); padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 800; font-size: 0.9rem; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
-            <span>✓ OPTIMIZATION SUCCESSFUL — ALL 15 STAGES PASSED</span>
-            <span class="badge" style="background: var(--success); color: #0f172a; font-weight: 800;">100% IRC
-              COMPLIANT</span>
-          </div>
-
-          <div class="completion-header">
-            <div class="completion-title-group">
-              <div class="completion-icon">🎉</div>
+        <!-- Header & Control Bar -->
+        <div class="summary-dash-card full-width" style="margin-bottom: 1.5rem;">
+          <div class="summary-dash-header" style="flex-wrap: wrap; gap: 1rem;">
+            <div class="summary-dash-title-group">
+              <div class="summary-dash-icon">⚡</div>
               <div>
-                <h3 class="completion-title">15-Stage Traffic Engineering Analysis Complete</h3>
-                <p class="completion-subtitle">All 15 computational stages executed successfully. Signal timing
-                  optimized and validated against IRC:93 and IRC:106.</p>
+                <div class="summary-dash-title">5. RUN ANALYSIS</div>
+                <div class="summary-dash-subtitle">Offline signal-timing recommendation from validated historical traffic data</div>
               </div>
             </div>
-            <button class="btn-primary-cyan" style="font-size: 0.95rem; padding: 12px 24px; font-weight: 700;"
-              onclick="FlowGuard.setWizardStep(6)">
-              View Results &amp; Reports →
-            </button>
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+              <span class="badge" id="step5HeaderBadge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-weight: 700; padding: 0.4rem 0.85rem; border-radius: 4px;">READY FOR ANALYSIS</span>
+              <button class="btn-primary-cyan" id="btnRunStep5Analysis" style="font-size: 0.9rem; padding: 8px 18px; font-weight: 700;" onclick="FlowGuard.runStep5Analysis()">▶ RUN ANALYSIS</button>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1rem; background: rgba(15,23,42,0.4); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Data Source</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;">Historical Dataset</div>
+            </div>
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Analysis Mode</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;">Offline Recommendation</div>
+            </div>
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Optimization Method</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;">Webster Method (IRC:93)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 1 — ANALYSIS INPUT VALIDATION -->
+        <div class="summary-dash-card full-width" style="margin-bottom: 1.5rem;">
+          <div class="summary-dash-header">
+            <div class="summary-dash-title-group">
+              <div class="summary-dash-icon">📋</div>
+              <div>
+                <div class="summary-dash-title">SECTION 1 — ANALYSIS INPUT VALIDATION</div>
+                <div class="summary-dash-subtitle">Readiness verification across Steps 1–4 pre-analysis constraints</div>
+              </div>
+            </div>
+            <span class="badge badge-low">Input Verification</span>
           </div>
 
-          <div class="completion-metrics-grid">
-            <div class="completion-metric-card">
-              <span class="cm-label">Total Execution Time</span>
-              <span class="cm-value" id="summaryTotalExecutionTime" style="color: var(--accent-primary);">348 ms</span>
-              <span class="cm-subtext">Async 15-stage pipeline benchmark</span>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+            <div class="summary-metric-box" id="valCardStep1" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.85rem; font-weight: 700; color: var(--success);" id="valCardStep1Title">✓ Step 1 Geometry</div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.3rem;" id="valCardStep1Desc">Carriageway geometry &amp; approaches configured</div>
             </div>
-            <div class="completion-metric-card">
-              <span class="cm-label">Stages Completed</span>
-              <span class="cm-value" id="summaryCompletedStages" style="color: var(--success);">15 / 15</span>
-              <span class="cm-subtext">100% Pipeline Execution</span>
+            <div class="summary-metric-box" id="valCardStep2" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.85rem; font-weight: 700; color: var(--success);" id="valCardStep2Title">✓ Step 2 Traffic Dataset</div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.3rem;" id="valCardStep2Desc">Historical survey dataset validated</div>
             </div>
-            <div class="completion-metric-card">
-              <span class="cm-label">Webster Cycle Length (C<sub>opt</sub>)</span>
-              <span class="cm-value" id="summaryOptimumCycle">78 s</span>
-              <span class="cm-subtext">Feasible range: 40s - 180s</span>
+            <div class="summary-metric-box" id="valCardStep3" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.85rem; font-weight: 700; color: var(--success);" id="valCardStep3Title">✓ Step 3 Engineering Params</div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.3rem;" id="valCardStep3Desc">Signal constraints &amp; PCU factors loaded</div>
             </div>
-            <div class="completion-metric-card">
-              <span class="cm-label">Overall Level of Service (LOS)</span>
-              <span class="cm-value" id="summaryIntersectionLOS" style="color: var(--accent-primary);">LOS B</span>
-              <span class="cm-subtext" id="summaryDelayText">22.1s average delay</span>
+            <div class="summary-metric-box" id="valCardStep4" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.85rem; font-weight: 700; color: var(--success);" id="valCardStep4Title">✓ Step 4 Traffic Summary</div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.3rem;" id="valCardStep4Desc">Converted PCU demand &amp; peak analysis ready</div>
             </div>
-            <div class="completion-metric-card">
-              <span class="cm-label">IRC Validation Status</span>
-              <span class="cm-value" id="summaryIRCGuardrails" style="color: var(--success);">100% Validated</span>
-              <span class="cm-subtext">Pedestrian &amp; Lost Time compliant</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; background: rgba(15,23,42,0.4); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Configured Roads</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="step5SpecRoads">4 (From Geometry Setup)</div>
+            </div>
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Intersection Phase Model</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="step5SpecPhases">2 (Phase 1 N/S, Phase 2 E/W)</div>
+            </div>
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Traffic Dataset</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;">Historical Survey</div>
+            </div>
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Base Saturation Flow (S₀)</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="step5SpecBaseSat">1800 PCU/h/lane</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 2 — CONGESTION & CRITICAL DEMAND -->
+        <div class="summary-dash-card full-width" style="margin-bottom: 1.5rem;">
+          <div class="summary-dash-header">
+            <div class="summary-dash-title-group">
+              <div class="summary-dash-icon">🚦</div>
+              <div>
+                <div class="summary-dash-title">SECTION 2 — CONGESTION &amp; CRITICAL DEMAND</div>
+                <div class="summary-dash-subtitle">Authoritative Step 4 road-wise demand, peak analysis, and critical flow values</div>
+              </div>
+            </div>
+            <span class="badge badge-low">Demand Assessment</span>
+          </div>
+
+          <div id="step5RoadCardsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+            <!-- Dynamically populated by renderStep5AnalysisDashboard() -->
+          </div>
+
+          <!-- BOTTLENECK INSIGHT CARD -->
+          <div style="background: rgba(15,23,42,0.8); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+              <div style="font-size: 0.9rem; font-weight: 800; color: #ef4444; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px;">
+                <span>⚠️</span> INSIGHT — CRITICAL APPROACH BOTTLENECK IDENTIFIED
+              </div>
+              <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); font-weight: 800;">CRITICAL BOTTLENECK</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Highest Critical Demand</div>
+                <div style="font-size: 1.1rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="step5BottleneckApproach">—</div>
+              </div>
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Critical Flow (q)</div>
+                <div style="font-size: 1.1rem; font-weight: 800; color: #ef4444; margin-top: 0.2rem;" id="step5BottleneckFlow">—</div>
+              </div>
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Flow Ratio (y)</div>
+                <div style="font-size: 1.1rem; font-weight: 800; color: var(--accent-primary); margin-top: 0.2rem;" id="step5BottleneckRatio">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 3 — INTERSECTION PHASE MODEL -->
+        <div class="summary-dash-card full-width" style="margin-bottom: 1.5rem;">
+          <div class="summary-dash-header">
+            <div class="summary-dash-title-group">
+              <div class="summary-dash-icon">🔀</div>
+              <div>
+                <div class="summary-dash-title">SECTION 3 — INTERSECTION PHASE MODEL</div>
+                <div class="summary-dash-subtitle">Two-phase signal model aggregating Phase 1 (N/S) &amp; Phase 2 (E/W) critical flow ratios</div>
+              </div>
+            </div>
+            <span class="badge badge-low">Two-Phase Model</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+            <!-- Phase 1 Card -->
+            <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.85rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">PHASE 1 — NORTH / SOUTH</div>
+              <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Approaches: <strong style="color: var(--text-primary);">Road A (North) + Road C (South)</strong></div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem;">
+                <div>
+                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Approach</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;" id="step5Phase1CritApp">—</div>
+                </div>
+                <div>
+                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Flow (q₁)</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;" id="step5Phase1CritFlow">—</div>
+                </div>
+              </div>
+              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; color: var(--text-secondary);">Phase 1 Critical Ratio (y₁):</span>
+                <span style="font-size: 1.1rem; font-weight: 800; color: var(--accent-primary);" id="step5Phase1RatioY">—</span>
+              </div>
+            </div>
+
+            <!-- Phase 2 Card -->
+            <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.85rem; font-weight: 800; color: #fcd34d; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">PHASE 2 — EAST / WEST</div>
+              <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Approaches: <strong style="color: var(--text-primary);">Road B (East) + Road D (West)</strong></div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem;">
+                <div>
+                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Approach</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;" id="step5Phase2CritApp">—</div>
+                </div>
+                <div>
+                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Flow (q₂)</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;" id="step5Phase2CritFlow">—</div>
+                </div>
+              </div>
+              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; color: var(--text-secondary);">Phase 2 Critical Ratio (y₂):</span>
+                <span style="font-size: 1.1rem; font-weight: 800; color: #fcd34d;" id="step5Phase2RatioY">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- PHASE SEQUENCE VISUAL -->
+          <div>
+            <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase; margin-bottom: 0.5rem;">Phase Sequence Visual &amp; Proportional Allocation</div>
+            <div id="step5PhaseSequenceTimeline" style="height: 36px; background: rgba(15,23,42,0.9); border-radius: 6px; border: 1px solid var(--border-color); display: flex; overflow: hidden; font-size: 0.75rem; font-weight: 700; text-align: center; line-height: 36px;">
+              <div style="flex: 1; background: rgba(56, 189, 248, 0.3); color: #38bdf8; border-right: 1px solid rgba(255,255,255,0.1);">Phase 1 Green</div>
+              <div style="width: 40px; background: rgba(245, 158, 11, 0.4); color: #fcd34d; border-right: 1px solid rgba(255,255,255,0.1);">Amb</div>
+              <div style="width: 30px; background: rgba(239, 68, 68, 0.4); color: #ef4444; border-right: 1px solid rgba(255,255,255,0.1);">Red</div>
+              <div style="flex: 1; background: rgba(252, 211, 77, 0.3); color: #fcd34d; border-right: 1px solid rgba(255,255,255,0.1);">Phase 2 Green</div>
+              <div style="width: 40px; background: rgba(245, 158, 11, 0.4); color: #fcd34d; border-right: 1px solid rgba(255,255,255,0.1);">Amb</div>
+              <div style="width: 30px; background: rgba(239, 68, 68, 0.4); color: #ef4444;">Red</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 4 — WEBSTER METHOD OPTIMIZATION -->
+        <div class="summary-dash-card full-width" style="margin-bottom: 1.5rem;">
+          <div class="summary-dash-header">
+            <div class="summary-dash-title-group">
+              <div class="summary-dash-icon">📐</div>
+              <div>
+                <div class="summary-dash-title">SECTION 4 — WEBSTER METHOD OPTIMIZATION</div>
+                <div class="summary-dash-subtitle">Webster's isolated-intersection optimum cycle length &amp; effective green allocation</div>
+              </div>
+            </div>
+            <span class="badge badge-low">Webster Optimization</span>
+          </div>
+
+          <!-- Engineering Warning Box (Hidden by default, shown if Y >= 1.00 or G_eff insufficient) -->
+          <div id="step5WebsterWarningBox" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; padding: 1rem; border-radius: 8px; font-weight: 700; margin-bottom: 1.25rem;">
+            ⚠ ENGINEERING WARNING: Webster optimization not valid. Critical flow ratio Y ≥ 1.00 (Intersection is over-saturated).
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+            <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Total Lost Time (L)</div>
+              <div style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="step5WebsterLostTime">—</div>
+            </div>
+            <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Critical Flow Ratio (Y)</div>
+              <div style="font-size: 1.15rem; font-weight: 800; color: var(--accent-primary); margin-top: 0.2rem;" id="step5WebsterTotalY">—</div>
+            </div>
+            <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Optimal Cycle Length (C₀)</div>
+              <div style="font-size: 1.15rem; font-weight: 800; color: var(--success); margin-top: 0.2rem;" id="step5WebsterCycleOpt">—</div>
+            </div>
+            <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Available Effective Green (G_eff)</div>
+              <div style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;" id="step5WebsterGeff">—</div>
+            </div>
+          </div>
+
+          <!-- Formula references box -->
+          <div style="background: rgba(15,23,42,0.4); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-secondary); display: flex; flex-wrap: wrap; gap: 1.5rem;">
+            <div>Y = y₁ + y₂</div>
+            <div>C₀ = (1.5L + 5) / (1 − Y)</div>
+            <div>G_eff = C₀ − L</div>
+            <div>g₁ = G_eff × (y₁ / Y)</div>
+            <div>g₂ = G_eff × (y₂ / Y)</div>
+          </div>
+        </div>
+
+        <!-- SECTION 5 — PROPOSED SIGNAL TIMING PLAN -->
+        <div class="summary-dash-card full-width" style="margin-bottom: 1.5rem;">
+          <div class="summary-dash-header">
+            <div class="summary-dash-title-group">
+              <div class="summary-dash-icon">⏱</div>
+              <div>
+                <div class="summary-dash-title">SECTION 5 — OPTIMIZED SIGNAL TIMING PLAN</div>
+                <div class="summary-dash-subtitle">Recommended signal phase timing allocations and cycle timeline breakdown</div>
+              </div>
+            </div>
+            <span class="badge badge-low">Timing Plan</span>
+          </div>
+
+          <div style="margin-bottom: 1.25rem; font-size: 0.9rem; font-weight: 700; color: var(--text-primary);">
+            Shared Cycle Length: <strong style="color: var(--success); font-size: 1.1rem;" id="step5TimingSharedCycle">—</strong>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+            <!-- Phase 1 Timing Card -->
+            <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.85rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase; margin-bottom: 0.75rem;">PHASE 1 — NORTH / SOUTH</div>
+              <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Approaches: Road A + Road C</div>
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
+                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Green:</span> <strong style="color: var(--success);" id="step5P1Green">—</strong></div>
+                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Amber:</span> <strong style="color: #fcd34d;" id="step5P1Amber">—</strong></div>
+                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">All-Red:</span> <strong style="color: #ef4444;" id="step5P1AllRed">—</strong></div>
+                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Effective Green:</span> <strong style="color: var(--text-primary);" id="step5P1EffGreen">—</strong></div>
+              </div>
+            </div>
+
+            <!-- Phase 2 Timing Card -->
+            <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.85rem; font-weight: 800; color: #fcd34d; text-transform: uppercase; margin-bottom: 0.75rem;">PHASE 2 — EAST / WEST</div>
+              <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Approaches: Road B + Road D</div>
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
+                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Green:</span> <strong style="color: var(--success);" id="step5P2Green">—</strong></div>
+                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Amber:</span> <strong style="color: #fcd34d;" id="step5P2Amber">—</strong></div>
+                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">All-Red:</span> <strong style="color: #ef4444;" id="step5P2AllRed">—</strong></div>
+                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Effective Green:</span> <strong style="color: var(--text-primary);" id="step5P2EffGreen">—</strong></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic Cycle Timeline Bar -->
+          <div>
+            <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase; margin-bottom: 0.5rem;">Cycle Timeline Breakdown</div>
+            <div id="step5CycleTimelineBar" style="height: 40px; background: rgba(15,23,42,0.9); border-radius: 6px; border: 1px solid var(--border-color); display: flex; overflow: hidden; font-size: 0.75rem; font-weight: 700; text-align: center; line-height: 40px;">
+              <!-- Dynamically populated with exact pixel/percent widths by renderStep5AnalysisDashboard() -->
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 6 — BEFORE vs AFTER SIMULATED ESTIMATE -->
+        <div class="summary-dash-card full-width" style="margin-bottom: 1.5rem;">
+          <div class="summary-dash-header">
+            <div class="summary-dash-title-group">
+              <div class="summary-dash-icon">📊</div>
+              <div>
+                <div class="summary-dash-title">SECTION 6 — BEFORE vs AFTER SIMULATED ESTIMATE</div>
+                <div class="summary-dash-subtitle">Comparative evaluation of baseline fixed-time configuration against proposed Webster plan</div>
+              </div>
+            </div>
+            <span class="badge badge-low" style="background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3);">SIMULATED ESTIMATE</span>
+          </div>
+
+          <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #fcd34d; padding: 0.65rem 1rem; border-radius: 6px; font-size: 0.78rem; font-weight: 700; margin-bottom: 1rem;">
+            ⚠ SIMULATED ESTIMATE — Analytical model estimates for decision support. Not guaranteed real-world improvement.
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="eng-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+              <thead>
+                <tr style="background: rgba(30,41,59,0.8); color: var(--text-primary); text-align: left;">
+                  <th style="padding: 0.75rem 1rem;">Metric</th>
+                  <th style="padding: 0.75rem 1rem;">Current / Baseline</th>
+                  <th style="padding: 0.75rem 1rem;">Proposed Webster Plan</th>
+                  <th style="padding: 0.75rem 1rem;">Estimated Change</th>
+                </tr>
+              </thead>
+              <tbody id="step5BeforeAfterTableBody">
+                <!-- Dynamically populated by renderStep5AnalysisDashboard() -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SECTION 7 — BOTTLENECK & RECOMMENDATION -->
+        <div class="summary-dash-card full-width" style="margin-bottom: 1.5rem;">
+          <div class="summary-dash-header">
+            <div class="summary-dash-title-group">
+              <div class="summary-dash-icon">💡</div>
+              <div>
+                <div class="summary-dash-title">SECTION 7 — BOTTLENECK &amp; FLOWGUARD RECOMMENDATION</div>
+                <div class="summary-dash-subtitle">Engineering recommendations and dynamic timing adjustment rationale</div>
+              </div>
+            </div>
+            <span class="badge badge-low">Engineering Recommendation</span>
+          </div>
+
+          <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Primary Bottleneck</div>
+                <div style="font-size: 1.05rem; font-weight: 800; color: #ef4444; margin-top: 0.2rem;" id="step5RecBottleneck">—</div>
+              </div>
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Recommended Phase Priority</div>
+                <div style="font-size: 1.05rem; font-weight: 800; color: var(--accent-primary); margin-top: 0.2rem;" id="step5RecPhase">—</div>
+              </div>
+            </div>
+
+            <div style="margin-bottom: 0.85rem;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 0.2rem;">Reasoning &amp; Critical Demand Rationale</div>
+              <div style="font-size: 0.85rem; color: var(--text-primary); line-height: 1.5;" id="step5RecReason">Awaiting validated traffic dataset.</div>
+            </div>
+
+            <div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 0.2rem;">Recommended Signal Action</div>
+              <div style="font-size: 0.85rem; color: var(--text-primary); line-height: 1.5;" id="step5RecAction">Awaiting analysis execution.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 8 — ASSUMPTIONS & LIMITATIONS -->
+        <div class="summary-dash-card full-width" style="margin-bottom: 1.5rem;">
+          <div class="summary-dash-header">
+            <div class="summary-dash-title-group">
+              <div class="summary-dash-icon">📌</div>
+              <div>
+                <div class="summary-dash-title">SECTION 8 — ASSUMPTIONS &amp; LIMITATIONS</div>
+                <div class="summary-dash-subtitle">Engineering scope, mathematical constraints, and disclaimers</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <span class="badge" style="background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3);">OFFLINE RECOMMENDATION ONLY</span>
+              <span class="badge" style="background: rgba(245,158,11,0.15); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3);">NO REAL-TIME SIGNAL CONTROL</span>
+            </div>
+          </div>
+
+          <ul style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.7; padding-left: 1.25rem; margin: 0;">
+            <li>Analysis uses historical traffic data ingested and validated in Step 2.</li>
+            <li>Webster method is used for preliminary isolated-intersection signal timing optimization.</li>
+            <li>Traffic demand is assumed representative of the analyzed survey period.</li>
+            <li>PCU factors are based on configured Step 3 engineering parameters.</li>
+            <li>Results are analytical/simulated estimates for decision support.</li>
+            <li>Queue spillback from downstream bottlenecks may not be fully represented.</li>
+            <li>Downstream adjacent intersection interactions are not represented in an isolated model.</li>
+            <li>Incident effects or temporary lane blockages are not represented.</li>
+            <li>Real-time stochastic traffic fluctuations are not represented.</li>
+            <li>Actual field implementation requires validation and sign-off by qualified traffic engineers.</li>
+          </ul>
+        </div>
+
+        <!-- SECTION 9 — FINAL ANALYSIS STATUS & ACTIONS -->
+        <div class="summary-dash-card full-width" style="margin-bottom: 1.5rem;">
+          <div class="summary-dash-header">
+            <div class="summary-dash-title-group">
+              <div class="summary-dash-icon">🏁</div>
+              <div>
+                <div class="summary-dash-title">SECTION 9 — FINAL ANALYSIS STATUS</div>
+                <div class="summary-dash-subtitle">Summary metrics, completion status, and report export</div>
+              </div>
+            </div>
+            <span class="badge" id="step5FinalStatusBadge" style="background: rgba(245,158,11,0.15); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); font-weight: 800;">ANALYSIS INCOMPLETE</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+            <!-- Task Checklist -->
+            <div style="background: rgba(15,23,42,0.6); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.82rem; line-height: 1.8;">
+              <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">Pipeline Checklist:</div>
+              <div id="step5Check1" style="color: var(--text-secondary);">✗ Traffic demand analyzed</div>
+              <div id="step5Check2" style="color: var(--text-secondary);">✗ Critical approaches identified</div>
+              <div id="step5Check3" style="color: var(--text-secondary);">✗ Webster optimization completed</div>
+              <div id="step5Check4" style="color: var(--text-secondary);">✗ Signal timing plan generated</div>
+              <div id="step5Check5" style="color: var(--text-secondary);">✗ Before/after simulation completed</div>
+              <div id="step5Check6" style="color: var(--text-secondary);">✗ Recommendation generated</div>
+            </div>
+
+            <!-- Prominent Summary Box -->
+            <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 6px; border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: center;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">RECOMMENDED CYCLE</div>
+              <div style="font-size: 1.75rem; font-weight: 800; color: var(--success); margin-top: 0.1rem;" id="step5SumCycle">—</div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color);">
+                <div>
+                  <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">PHASE 1 GREEN</div>
+                  <div style="font-size: 1.2rem; font-weight: 800; color: var(--accent-primary); margin-top: 0.1rem;" id="step5SumP1Green">—</div>
+                </div>
+                <div>
+                  <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">PHASE 2 GREEN</div>
+                  <div style="font-size: 1.2rem; font-weight: 800; color: #fcd34d; margin-top: 0.1rem;" id="step5SumP2Green">—</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 5 Bottom Action Buttons -->
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+            <button class="btn-ghost-reset" id="btnStep5Back" onclick="FlowGuard.setWizardStep(4)">← BACK TO TRAFFIC SUMMARY</button>
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;" id="step5BottomActionGroup">
+              <button class="btn-secondary-save" id="btnDownloadReportStep5" onclick="FlowGuard.generateEngineeringReport()">🖨 Download Report</button>
+              <button class="btn-primary-cyan" id="btnRunAgainStep5" onclick="FlowGuard.runStep5Analysis()">▶ Run Analysis Again</button>
             </div>
           </div>
         </div>
       </section>
+
 
       <!-- STEP 6 SECTION: RESULTS & REPORTS -->
       <section id="wizard-section-6" class="wizard-section-panel" style="display: none;">

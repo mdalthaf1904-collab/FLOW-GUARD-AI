@@ -3299,6 +3299,7 @@ const FlowGuard = (function () {
       // If Step 5, initialize Analysis Execution Interface UI
       if (numericId === 5) {
         initAnalysisExecutionUI();
+        renderStep5AnalysisDashboard();
       }
 
       // If Step 6, render master engineering results report dashboard
@@ -4593,6 +4594,570 @@ const FlowGuard = (function () {
   }
 
   /**
+   * Step 5 Analysis Execution & Dashboard Renderer
+   * Offline Webster Signal-Timing Recommendation & Performance Simulation Engine
+   */
+  function renderStep5AnalysisDashboard() {
+    if (typeof document === 'undefined') return;
+
+    const project = getProject();
+    const isUploaded = !!(project.dataset && project.dataset.uploaded);
+    const geom = project.geometry || {};
+    const eng = project.engineeringParameters || {};
+    const pt = project.processedTraffic || {};
+
+    const setText = (id, txt) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = txt;
+    };
+
+    // Header badge & button state
+    const headerBadge = document.getElementById('step5HeaderBadge');
+    if (headerBadge) {
+      if (!isUploaded) {
+        headerBadge.textContent = 'WAITING FOR TRAFFIC DATA';
+        headerBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+        headerBadge.style.color = '#ef4444';
+        headerBadge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+      } else {
+        headerBadge.textContent = 'READY FOR ANALYSIS';
+        headerBadge.style.background = 'rgba(56, 189, 248, 0.15)';
+        headerBadge.style.color = '#38bdf8';
+        headerBadge.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+      }
+    }
+
+    const runBtn = document.getElementById('btnRunStep5Analysis');
+    if (runBtn) {
+      runBtn.disabled = !isUploaded;
+      runBtn.style.opacity = isUploaded ? '1' : '0.5';
+      runBtn.style.cursor = isUploaded ? 'pointer' : 'not-allowed';
+    }
+
+    // Section 1: Validation Cards
+    const valCardStep2Title = document.getElementById('valCardStep2Title');
+    const valCardStep2Desc = document.getElementById('valCardStep2Desc');
+    if (valCardStep2Title && valCardStep2Desc) {
+      if (isUploaded) {
+        valCardStep2Title.textContent = '✓ Step 2 Traffic Dataset';
+        valCardStep2Title.style.color = 'var(--success)';
+        valCardStep2Desc.textContent = 'Historical survey dataset validated';
+      } else {
+        valCardStep2Title.textContent = '✗ Step 2 Traffic Dataset';
+        valCardStep2Title.style.color = '#ef4444';
+        valCardStep2Desc.textContent = 'PENDING — Upload & validate traffic dataset';
+      }
+    }
+
+    // Base Saturation Flow read from Step 3
+    const baseSat = (eng.saturation && eng.saturation.baseSaturationFlow) || (geom.baseSaturationFlow) || 1800;
+    setText('step5SpecBaseSat', `${baseSat} PCU/h/lane`);
+
+    // Helper functions for road metrics from Step 4 authoritative state
+    const roadKeys = [
+      { key: 'north', designation: 'Road A', direction: 'NORTHBOUND' },
+      { key: 'east', designation: 'Road B', direction: 'EASTBOUND' },
+      { key: 'south', designation: 'Road C', direction: 'SOUTHBOUND' },
+      { key: 'west', designation: 'Road D', direction: 'WESTBOUND' }
+    ];
+
+    const formatNum = (num, decimals = 0) => {
+      if (num === null || num === undefined || isNaN(num)) return '—';
+      return Number(num).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    };
+
+    const getRoadMetrics = (key) => {
+      const roadData = pt[key] || {};
+      const mvPcu = roadData.movementPCU || {};
+      const peakAnalysis = roadData.peakHourAnalysis || {};
+      const approachesGeom = (geom && geom.approaches) ? geom.approaches : {};
+      const appGeom = approachesGeom[key] || {};
+      const lanesVal = appGeom.incomingLanes !== undefined ? parseInt(appGeom.incomingLanes, 10) : (parseInt(geom.laneCounts ? geom.laneCounts[key] : 2, 10) || 2);
+      const satFlow = baseSat * lanesVal;
+
+      const totalDemandVal = parseFloat(mvPcu.totalPCU || roadData.totalPCU || 0);
+      const leftPCU = parseFloat(mvPcu.leftPCU || 0);
+      const throughPCU = parseFloat(mvPcu.throughPCU || 0);
+      const rightPCU = parseFloat(mvPcu.rightPCU || 0);
+
+      const critFlowVal = isUploaded ? Math.max(leftPCU, throughPCU, rightPCU) : 0;
+      let critMoveStr = '—';
+      if (isUploaded) {
+        if (leftPCU >= throughPCU && leftPCU >= rightPCU) critMoveStr = 'Left Turn';
+        else if (rightPCU >= throughPCU && rightPCU >= leftPCU) critMoveStr = 'Right Turn';
+        else critMoveStr = 'Through';
+      }
+
+      const flowRatioY = (isUploaded && satFlow > 0) ? (critFlowVal / satFlow) : 0;
+
+      return {
+        key,
+        totalDemandVal,
+        totalDemandStr: isUploaded ? `${formatNum(totalDemandVal, 1)} PCU/h` : '—',
+        peakIntervalStr: isUploaded ? (peakAnalysis.peakInterval || '--') : '—',
+        peakPCUStr: isUploaded ? `${formatNum(peakAnalysis.peakIntervalPCU || 0, 1)} PCU` : '—',
+        phfStr: isUploaded ? (peakAnalysis.peakHourFactor !== undefined && peakAnalysis.peakHourFactor !== null ? parseFloat(Number(peakAnalysis.peakHourFactor).toFixed(2)).toFixed(2) : '—') : '—',
+        critMoveStr,
+        critFlowVal,
+        critFlowStr: isUploaded ? `${formatNum(critFlowVal, 1)} PCU/h` : '—',
+        satFlow,
+        satFlowStr: `${formatNum(satFlow)} PCU/h`,
+        flowRatioY,
+        flowRatioYStr: isUploaded ? String(parseFloat(flowRatioY.toFixed(4))) : '—'
+      };
+    };
+
+    const roadMetrics = {};
+    roadKeys.forEach(r => {
+      roadMetrics[r.key] = getRoadMetrics(r.key);
+    });
+
+    // Section 2: Render Road Cards & Bottleneck Identification
+    let winningKey = 'north';
+    let maxFlowRatio = -1;
+
+    roadKeys.forEach(r => {
+      const m = roadMetrics[r.key];
+      if (m.flowRatioY > maxFlowRatio) {
+        maxFlowRatio = m.flowRatioY;
+        winningKey = r.key;
+      }
+    });
+
+    const roadCardsContainer = document.getElementById('step5RoadCardsGrid');
+    if (roadCardsContainer) {
+      let cardsHtml = '';
+      roadKeys.forEach(r => {
+        const m = roadMetrics[r.key];
+        const isWinning = isUploaded && (r.key === winningKey);
+        const roadTitle = geom.roadNames ? (geom.roadNames[r.key] || `${r.designation} — ${r.direction}`) : `${r.designation} — ${r.direction}`;
+        const cardBorder = isWinning ? '2px solid #ef4444' : '1px solid var(--border-color)';
+        const cardBg = isWinning ? 'rgba(239, 68, 68, 0.08)' : 'rgba(15, 23, 42, 0.65)';
+        const badgeHtml = isWinning ? `<span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); font-weight: 800;">CRITICAL BOTTLENECK</span>` : (isUploaded ? `<span class="badge" style="background: rgba(16,185,129,0.15); color: var(--success);">VALIDATED</span>` : `<span class="badge" style="background: rgba(255,255,255,0.06); color: var(--text-secondary);">PENDING</span>`);
+
+        cardsHtml += `
+          <div style="background: ${cardBg}; border: ${cardBorder}; padding: 1.25rem; border-radius: 10px; display: flex; flex-direction: column; gap: 0.85rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.5rem;">
+              <div style="font-size: 0.95rem; font-weight: 800; color: var(--text-primary);">${roadTitle}</div>
+              ${badgeHtml}
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.65rem; font-size: 0.82rem;">
+              <div>Total Demand: <strong style="color: var(--accent-primary);">${m.totalDemandStr}</strong></div>
+              <div>Peak Interval: <strong style="color: var(--text-primary);">${m.peakIntervalStr}</strong></div>
+              <div>Peak PCU: <strong style="color: var(--text-primary);">${m.peakPCUStr}</strong></div>
+              <div>PHF: <strong style="color: var(--text-primary);">${m.phfStr}</strong></div>
+            </div>
+
+            <div style="background: rgba(30, 41, 59, 0.4); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; font-size: 0.8rem;">
+              <div>Critical Movement: <strong style="color: var(--text-primary);">${m.critMoveStr}</strong></div>
+              <div>Critical Flow (q): <strong style="color: #ef4444;">${m.critFlowStr}</strong></div>
+              <div>Sat. Flow (s): <strong style="color: var(--text-primary);">${m.satFlowStr}</strong></div>
+              <div>Flow Ratio (y): <strong style="color: var(--accent-primary);">${m.flowRatioYStr}</strong></div>
+            </div>
+          </div>
+        `;
+      });
+      roadCardsContainer.innerHTML = cardsHtml;
+    }
+
+    const winnerMetric = roadMetrics[winningKey];
+    const winnerTitle = geom.roadNames ? (geom.roadNames[winningKey] || winningKey.toUpperCase()) : winningKey.toUpperCase();
+    setText('step5BottleneckApproach', isUploaded ? `${winnerTitle} (${winnerMetric.critMoveStr})` : '—');
+    setText('step5BottleneckFlow', isUploaded ? winnerMetric.critFlowStr : '—');
+    setText('step5BottleneckRatio', isUploaded ? winnerMetric.flowRatioYStr : '—');
+
+    // Section 3: Intersection Phase Model
+    const yA = roadMetrics.north.flowRatioY;
+    const yB = roadMetrics.east.flowRatioY;
+    const yC = roadMetrics.south.flowRatioY;
+    const yD = roadMetrics.west.flowRatioY;
+
+    // Phase 1 (N/S: Road A + C)
+    const yPhase1 = Math.max(yA, yC);
+    const phase1CritKey = yA >= yC ? 'north' : 'south';
+    const phase1CritRoadName = yA >= yC ? 'Road A (North)' : 'Road C (South)';
+    const phase1CritMoveName = roadMetrics[phase1CritKey].critMoveStr;
+    const phase1CritFlowVal = isUploaded ? roadMetrics[phase1CritKey].critFlowVal : 0;
+
+    // Phase 2 (E/W: Road B + D)
+    const yPhase2 = Math.max(yB, yD);
+    const phase2CritKey = yB >= yD ? 'east' : 'west';
+    const phase2CritRoadName = yB >= yD ? 'Road B (East)' : 'Road D (West)';
+    const phase2CritMoveName = roadMetrics[phase2CritKey].critMoveStr;
+    const phase2CritFlowVal = isUploaded ? roadMetrics[phase2CritKey].critFlowVal : 0;
+
+    const totalY = yPhase1 + yPhase2;
+
+    setText('step5Phase1CritApp', isUploaded ? `${phase1CritRoadName} — ${phase1CritMoveName}` : '—');
+    setText('step5Phase1CritFlow', isUploaded ? `${formatNum(phase1CritFlowVal, 1)} PCU/h` : '—');
+    setText('step5Phase1RatioY', isUploaded ? String(parseFloat(yPhase1.toFixed(4))) : '—');
+
+    setText('step5Phase2CritApp', isUploaded ? `${phase2CritRoadName} — ${phase2CritMoveName}` : '—');
+    setText('step5Phase2CritFlow', isUploaded ? `${formatNum(phase2CritFlowVal, 1)} PCU/h` : '—');
+    setText('step5Phase2RatioY', isUploaded ? String(parseFloat(yPhase2.toFixed(4))) : '—');
+
+    // Section 4: Lost Time & Webster Engine Calculations
+    const sig = eng.signal || {};
+    const amberTime = parseFloat(sig.amber || eng.amberTime || 3.0);
+    const allRedTime = parseFloat(sig.allRed || eng.allRedTime || 2.0);
+    const startupLost = parseFloat(sig.startupLostTime || 2.0);
+    const clearanceLost = parseFloat(sig.clearanceLostTime || 2.0);
+    const minGreenConfig = parseFloat(sig.minGreen || eng.minGreen || 7.0);
+    const maxGreenConfig = parseFloat(sig.maxGreen || eng.maxGreen || 90.0);
+    const existingCycle = parseFloat(sig.existingCycle || eng.cycleLength || 120.0);
+
+    const lostTimePerPhase = (startupLost + clearanceLost) > 0 ? (startupLost + clearanceLost) : (amberTime + allRedTime);
+    const numPhases = 2; // Step 5 Phase Model evaluates 2 phases (Phase 1 N/S, Phase 2 E/W)
+    const totalLostTimeL = numPhases * lostTimePerPhase; // e.g. 2 * 4.0 = 8.0s
+
+    // Lost-time component breakdown per phase for timeline alignment
+    const amberPhase = Math.round(amberTime * (lostTimePerPhase / Math.max(1, (amberTime + allRedTime))));
+    const allRedPhase = Math.max(0, lostTimePerPhase - amberPhase);
+
+    setText('step5WebsterLostTime', `${totalLostTimeL} s (${numPhases} × ${lostTimePerPhase}s/phase)`);
+    setText('step5WebsterTotalY', isUploaded ? String(parseFloat(totalY.toFixed(4))) : '—');
+
+    const warningBox = document.getElementById('step5WebsterWarningBox');
+
+    let websterCycleC0 = null;
+    let gEff = null;
+    let g1 = null;
+    let g2 = null;
+    let isWebsterValid = true;
+    let warningMsg = '';
+
+    if (isUploaded) {
+      if (totalY >= 1.00) {
+        isWebsterValid = false;
+        warningMsg = `⚠ ENGINEERING WARNING: Webster optimization not valid. Critical flow ratio Y = ${parseFloat(totalY.toFixed(4))} ≥ 1.00 (Intersection is over-saturated).`;
+      } else if (totalY <= 0) {
+        isWebsterValid = false;
+        warningMsg = `⚠ ENGINEERING WARNING: Critical flow ratio Y = 0. Awaiting valid traffic demand.`;
+      } else {
+        // Webster Formula C0 = (1.5 * L + 5) / (1 - Y)
+        let calcC0 = Math.round((1.5 * totalLostTimeL + 5) / (1 - totalY));
+        calcC0 = Math.max(40, Math.min(180, calcC0));
+        websterCycleC0 = calcC0;
+
+        gEff = calcC0 - totalLostTimeL;
+
+        // Minimum green feasibility check: G_eff >= G_min1 + G_min2
+        if (gEff < (2 * minGreenConfig)) {
+          isWebsterValid = false;
+          warningMsg = `⚠ ENGINEERING WARNING: Available effective green time (G_eff = ${gEff}s) is insufficient for phase minimum greens (2 × ${minGreenConfig}s = ${2 * minGreenConfig}s).`;
+        } else {
+          // Proportionally allocate green splits: g_i = G_eff * (y_i / Y)
+          let prop1 = totalY > 0 ? (yPhase1 / totalY) : 0.5;
+          let calcG1 = Math.max(minGreenConfig, Math.round(prop1 * gEff));
+          calcG1 = Math.min(maxGreenConfig, calcG1);
+
+          let calcG2 = gEff - calcG1;
+          if (calcG2 < minGreenConfig) {
+            calcG2 = minGreenConfig;
+            calcG1 = Math.max(minGreenConfig, gEff - calcG2);
+          }
+
+          g1 = calcG1;
+          g2 = calcG2;
+
+          // Pedestrian crossing validation if enabled in Step 3
+          const ped = eng.pedestrian || {};
+          if (ped.clearanceEnabled) {
+            const minWalk = parseFloat(ped.minWalkTime || 7.0);
+            const walkSpeed = parseFloat(ped.walkingSpeed || 1.2);
+
+            const crosswalk1 = parseFloat((geom.approaches?.north?.crosswalkWidth) || 14.0);
+            const crosswalk2 = parseFloat((geom.approaches?.east?.crosswalkWidth) || 14.0);
+
+            const reqPed1 = Math.ceil(minWalk + (crosswalk1 / walkSpeed));
+            const reqPed2 = Math.ceil(minWalk + (crosswalk2 / walkSpeed));
+
+            if (g1 < reqPed1) g1 = reqPed1;
+            if (g2 < reqPed2) g2 = reqPed2;
+          }
+        }
+      }
+    }
+
+    if (warningBox) {
+      if (!isWebsterValid && isUploaded) {
+        warningBox.style.display = 'block';
+        warningBox.textContent = warningMsg;
+      } else {
+        warningBox.style.display = 'none';
+      }
+    }
+
+    setText('step5WebsterCycleOpt', (isUploaded && isWebsterValid && websterCycleC0) ? `${websterCycleC0} s` : '—');
+    setText('step5WebsterGeff', (isUploaded && isWebsterValid && gEff !== null) ? `${gEff} s` : '—');
+
+    // Section 5: Signal Timing Plan
+    setText('step5TimingSharedCycle', (isUploaded && isWebsterValid && websterCycleC0) ? `${websterCycleC0} s` : '—');
+
+    setText('step5P1Green', (isUploaded && isWebsterValid && g1 !== null) ? `${g1} s` : '—');
+    setText('step5P1Amber', `${amberPhase} s`);
+    setText('step5P1AllRed', `${allRedPhase} s`);
+    setText('step5P1EffGreen', (isUploaded && isWebsterValid && g1 !== null) ? `${g1} s` : '—');
+
+    setText('step5P2Green', (isUploaded && isWebsterValid && g2 !== null) ? `${g2} s` : '—');
+    setText('step5P2Amber', `${amberPhase} s`);
+    setText('step5P2AllRed', `${allRedPhase} s`);
+    setText('step5P2EffGreen', (isUploaded && isWebsterValid && g2 !== null) ? `${g2} s` : '—');
+
+    // Cycle Timeline Bar Renderer (Sum of all 6 components MUST equal websterCycleC0 EXACTLY)
+    const timelineBar = document.getElementById('step5CycleTimelineBar');
+    const phaseSeqTimeline = document.getElementById('step5PhaseSequenceTimeline');
+
+    if (timelineBar) {
+      if (isUploaded && isWebsterValid && websterCycleC0 && g1 !== null && g2 !== null) {
+        const p1Pct = ((g1 / websterCycleC0) * 100).toFixed(2);
+        const amb1Pct = ((amberPhase / websterCycleC0) * 100).toFixed(2);
+        const red1Pct = ((allRedPhase / websterCycleC0) * 100).toFixed(2);
+        const p2Pct = ((g2 / websterCycleC0) * 100).toFixed(2);
+        const amb2Pct = ((amberPhase / websterCycleC0) * 100).toFixed(2);
+        const red2Pct = (100 - (parseFloat(p1Pct) + parseFloat(amb1Pct) + parseFloat(red1Pct) + parseFloat(p2Pct) + parseFloat(amb2Pct))).toFixed(2);
+
+        const htmlTimeline = `
+          <div style="width: ${p1Pct}%; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center;" title="Phase 1 Green: ${g1}s">PHASE 1 GREEN (${g1}s)</div>
+          <div style="width: ${amb1Pct}%; background: rgba(245, 158, 11, 0.35); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); display: flex; align-items: center; justify-content: center;" title="Amber: ${amberPhase}s">AMBER (${amberPhase}s)</div>
+          <div style="width: ${red1Pct}%; background: rgba(239, 68, 68, 0.35); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); display: flex; align-items: center; justify-content: center;" title="All-Red: ${allRedPhase}s">ALL-RED (${allRedPhase}s)</div>
+          <div style="width: ${p2Pct}%; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center;" title="Phase 2 Green: ${g2}s">PHASE 2 GREEN (${g2}s)</div>
+          <div style="width: ${amb2Pct}%; background: rgba(245, 158, 11, 0.35); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); display: flex; align-items: center; justify-content: center;" title="Amber: ${amberPhase}s">AMBER (${amberPhase}s)</div>
+          <div style="width: ${red2Pct}%; background: rgba(239, 68, 68, 0.35); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); display: flex; align-items: center; justify-content: center;" title="All-Red: ${allRedPhase}s">ALL-RED (${allRedPhase}s)</div>
+        `;
+        timelineBar.innerHTML = htmlTimeline;
+        if (phaseSeqTimeline) phaseSeqTimeline.innerHTML = htmlTimeline;
+      } else {
+        const htmlDefault = `
+          <div style="flex: 1; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center;">Phase 1 Green</div>
+          <div style="width: 50px; background: rgba(245, 158, 11, 0.35); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); display: flex; align-items: center; justify-content: center;">Amb</div>
+          <div style="width: 40px; background: rgba(239, 68, 68, 0.35); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); display: flex; align-items: center; justify-content: center;">Red</div>
+          <div style="flex: 1; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center;">Phase 2 Green</div>
+          <div style="width: 50px; background: rgba(245, 158, 11, 0.35); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); display: flex; align-items: center; justify-content: center;">Amb</div>
+          <div style="width: 40px; background: rgba(239, 68, 68, 0.35); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); display: flex; align-items: center; justify-content: center;">Red</div>
+        `;
+        timelineBar.innerHTML = htmlDefault;
+        if (phaseSeqTimeline) phaseSeqTimeline.innerHTML = htmlDefault;
+      }
+    }
+
+    // Section 6: Before vs After Simulation Table
+    const simTableBody = document.getElementById('step5BeforeAfterTableBody');
+    if (simTableBody) {
+      if (!isUploaded || !isWebsterValid || !websterCycleC0 || g1 === null || g2 === null) {
+        simTableBody.innerHTML = `
+          <tr style="border-bottom: 1px solid var(--border-color);">
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Cycle Length (C)</td>
+            <td style="padding: 0.75rem 1rem;">Not Available</td>
+            <td style="padding: 0.75rem 1rem;">Not Available</td>
+            <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border-color);">
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Green Split (g₁ / g₂)</td>
+            <td style="padding: 0.75rem 1rem;">Not Available</td>
+            <td style="padding: 0.75rem 1rem;">Not Available</td>
+            <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border-color);">
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Est. Avg Delay (d)</td>
+            <td style="padding: 0.75rem 1rem;">Not Available</td>
+            <td style="padding: 0.75rem 1rem;">Not Available</td>
+            <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border-color);">
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Est. Max Queue (Q)</td>
+            <td style="padding: 0.75rem 1rem;">Not Available</td>
+            <td style="padding: 0.75rem 1rem;">Not Available</td>
+            <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border-color);">
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Degree of Saturation (v/c)</td>
+            <td style="padding: 0.75rem 1rem;">Not Available</td>
+            <td style="padding: 0.75rem 1rem;">Not Available</td>
+            <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
+          </tr>
+          <tr>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Level of Service (LOS)</td>
+            <td style="padding: 0.75rem 1rem;">Not Available</td>
+            <td style="padding: 0.75rem 1rem;">Not Available</td>
+            <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
+          </tr>
+        `;
+      } else {
+        // Authoritative Degree of Saturation X_i = q_i / [s_i * (g_i / C0)]
+        const s1 = roadMetrics[phase1CritKey].satFlow;
+        const q1 = phase1CritFlowVal;
+        const cap1 = s1 * (g1 / websterCycleC0);
+        const x1 = cap1 > 0 ? (q1 / cap1) : 0;
+
+        const s2 = roadMetrics[phase2CritKey].satFlow;
+        const q2 = phase2CritFlowVal;
+        const cap2 = s2 * (g2 / websterCycleC0);
+        const x2 = cap2 > 0 ? (q2 / cap2) : 0;
+
+        const maxDOS = Math.max(x1, x2);
+        const isOversaturated = maxDOS >= 1.0;
+
+        // Authoritative Webster 2-Term Delay Model: d = d1 + d2
+        const calcPhaseDelay = (C, g, q, s, x) => {
+          if (!g || !C || !s || s <= 0 || (g / C) <= 0) return 60.0;
+          if (x >= 1.0) return 80.0;
+          const lambda = g / C;
+          const qSec = q / 3600;
+          if (qSec <= 0 || (1 - (lambda * x)) <= 0 || (1 - x) <= 0) return 40.0;
+
+          const term1 = (C * Math.pow(1 - lambda, 2)) / (2 * (1 - (lambda * x)));
+          const term2 = (Math.pow(x, 2)) / (2 * qSec * (1 - x));
+          const d = term1 + term2;
+          return isNaN(d) ? 35.0 : Math.max(2.0, Math.min(180.0, d));
+        };
+
+        const d1 = calcPhaseDelay(websterCycleC0, g1, q1, s1, x1);
+        const d2 = calcPhaseDelay(websterCycleC0, g2, q2, s2, x2);
+        const avgDelayProposed = parseFloat(((d1 + d2) / 2).toFixed(1));
+
+        // Authoritative Queue Calculation: Q_veh = (q / 3600) * (C - g), Q_meters = Q_veh * 6
+        const qVeh1 = (q1 / 3600) * (websterCycleC0 - g1);
+        const qVeh2 = (q2 / 3600) * (websterCycleC0 - g2);
+        const maxQVeh = Math.max(qVeh1, qVeh2);
+        const maxQVehRounded = Math.round(maxQVeh);
+        const maxQMetersRounded = Math.round(maxQVeh * 6);
+
+        // Level of Service LOS
+        const getLOS = (delay) => {
+          if (delay <= 10) return 'LOS A';
+          if (delay <= 20) return 'LOS B';
+          if (delay <= 35) return 'LOS C';
+          if (delay <= 55) return 'LOS D';
+          if (delay <= 80) return 'LOS E';
+          return 'LOS F';
+        };
+
+        const losProposed = isOversaturated ? 'LOS F' : getLOS(avgDelayProposed);
+
+        // Read baseline metrics if present in Step 3
+        const base = (eng.baseline && eng.baseline.network) || {};
+        const baseCycleStr = `${existingCycle} s`;
+        const baseGreenStr = `${Math.round((existingCycle - totalLostTimeL) / 2)}s / ${Math.round((existingCycle - totalLostTimeL) / 2)}s`;
+        const baseDelayStr = base.delay !== null && base.delay !== undefined ? `${base.delay} s/veh` : 'Not Available';
+        const baseQueueStr = base.queue !== null && base.queue !== undefined ? `${base.queue} veh` : 'Not Available';
+        const baseDOSStr = base.degreeOfSaturation !== null && base.degreeOfSaturation !== undefined ? String(base.degreeOfSaturation) : 'Not Available';
+        const baseLOSStr = base.delay !== null && base.delay !== undefined ? getLOS(base.delay) : 'Not Available';
+
+        let delayDiffStr = '—';
+        if (base.delay !== null && base.delay !== undefined) {
+          const diff = avgDelayProposed - base.delay;
+          delayDiffStr = diff < 0 ? `${diff.toFixed(1)} s (${Math.abs(Math.round((diff / base.delay) * 100))}% reduction)` : `+${diff.toFixed(1)} s`;
+        }
+
+        simTableBody.innerHTML = `
+          <tr style="border-bottom: 1px solid var(--border-color);">
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Cycle Length (C)</td>
+            <td style="padding: 0.75rem 1rem;">${baseCycleStr}</td>
+            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${websterCycleC0} s</td>
+            <td style="padding: 0.75rem 1rem; color: var(--accent-primary);">${websterCycleC0 - existingCycle > 0 ? `+${websterCycleC0 - existingCycle}` : `${websterCycleC0 - existingCycle}`} s</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border-color);">
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Green Split (g₁ / g₂)</td>
+            <td style="padding: 0.75rem 1rem;">${baseGreenStr}</td>
+            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${g1}s / ${g2}s</td>
+            <td style="padding: 0.75rem 1rem; color: var(--accent-primary);">Proportional</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border-color);">
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Est. Avg Delay (d)</td>
+            <td style="padding: 0.75rem 1rem;">${baseDelayStr}</td>
+            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${isOversaturated ? 'Phase Failure / Oversaturated' : `${avgDelayProposed} s/veh`}</td>
+            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${delayDiffStr}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border-color);">
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Est. Max Queue (Q)</td>
+            <td style="padding: 0.75rem 1rem;">${baseQueueStr}</td>
+            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">≈ ${maxQVehRounded} vehicles (≈ ${maxQMetersRounded} m)</td>
+            <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border-color);">
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Degree of Saturation (v/c)</td>
+            <td style="padding: 0.75rem 1rem;">${baseDOSStr}</td>
+            <td style="padding: 0.75rem 1rem; color: ${isOversaturated ? '#ef4444' : 'var(--success)'}; font-weight: 700;">${isOversaturated ? `${parseFloat(maxDOS.toFixed(2))} (Oversaturated)` : parseFloat(maxDOS.toFixed(2))}</td>
+            <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">${isOversaturated ? '⚠️ Phase Failure' : (maxDOS < 0.85 ? '✓ Capacity Satisfied' : '⚠️ High Saturation')}</td>
+          </tr>
+          <tr>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Level of Service (LOS)</td>
+            <td style="padding: 0.75rem 1rem;">${baseLOSStr}</td>
+            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${losProposed}</td>
+            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${losProposed} Compliant</td>
+          </tr>
+        `;
+      }
+    }
+
+    // Section 7: Recommendation Card
+    if (!isUploaded) {
+      setText('step5RecBottleneck', '—');
+      setText('step5RecPhase', '—');
+      setText('step5RecReason', 'Awaiting validated traffic dataset.');
+      setText('step5RecAction', 'Awaiting analysis execution.');
+    } else if (!isWebsterValid) {
+      setText('step5RecBottleneck', `${winnerTitle} (${winnerMetric.critMoveStr})`);
+      setText('step5RecPhase', yPhase1 >= yPhase2 ? 'Phase 1 (N/S)' : 'Phase 2 (E/W)');
+      setText('step5RecReason', warningMsg);
+      setText('step5RecAction', 'Critical flow ratio exceeds intersection capacity limit. Geometric or physical capacity expansion recommended prior to signal timing optimization.');
+    } else {
+      setText('step5RecBottleneck', `${winnerTitle} (${winnerMetric.critMoveStr})`);
+      const winningPhaseStr = yPhase1 >= yPhase2 ? 'Phase 1 (North / South)' : 'Phase 2 (East / West)';
+      setText('step5RecPhase', winningPhaseStr);
+      setText('step5RecReason', `Approach ${winnerTitle} exhibits the highest critical flow ratio y = ${winnerMetric.flowRatioYStr} on the ${winnerMetric.critMoveStr} movement under peak interval ${winnerMetric.peakIntervalStr}. Primary critical demand is concentrated on ${winningPhaseStr}.`);
+      setText('step5RecAction', `Implement proposed Webster offline signal timing plan: Shared Cycle C₀ = ${websterCycleC0}s, Phase 1 Green = ${g1}s, Phase 2 Green = ${g2}s. This rebalances phase green splits to match actual critical PCU demand.`);
+    }
+
+    // Section 9: Final Status & Summary Box
+    const finalBadge = document.getElementById('step5FinalStatusBadge');
+
+    const setCheck = (id, text, passed) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.textContent = `${passed ? '✓' : '✗'} ${text}`;
+        el.style.color = passed ? 'var(--success)' : 'var(--text-secondary)';
+      }
+    };
+
+    const hasRun = isUploaded && isWebsterValid;
+
+    if (finalBadge) {
+      if (hasRun) {
+        finalBadge.textContent = '✓ ANALYSIS COMPLETE';
+        finalBadge.style.background = 'rgba(16,185,129,0.15)';
+        finalBadge.style.color = 'var(--success)';
+        finalBadge.style.borderColor = 'rgba(16,185,129,0.3)';
+      } else {
+        finalBadge.textContent = 'ANALYSIS INCOMPLETE';
+        finalBadge.style.background = 'rgba(245,158,11,0.15)';
+        finalBadge.style.color = '#fcd34d';
+        finalBadge.style.borderColor = 'rgba(245,158,11,0.3)';
+      }
+    }
+
+    setCheck('step5Check1', 'Traffic demand analyzed', isUploaded);
+    setCheck('step5Check2', 'Critical approaches identified', isUploaded);
+    setCheck('step5Check3', 'Webster optimization completed', hasRun);
+    setCheck('step5Check4', 'Signal timing plan generated', hasRun);
+    setCheck('step5Check5', 'Before/after simulation completed', hasRun);
+    setCheck('step5Check6', 'Recommendation generated', hasRun);
+
+    setText('step5SumCycle', hasRun ? `${websterCycleC0} s` : '—');
+    setText('step5SumP1Green', hasRun ? `${g1} s` : '—');
+    setText('step5SumP2Green', hasRun ? `${g2} s` : '—');
+  }
+
+  /**
+   * Execute Step 5 Run Analysis Action
+   */
+  function runStep5Analysis() {
+    renderStep5AnalysisDashboard();
+  }
+
+  /**
    * Raw Dataset Preview State (Search, Sort, Pagination)
    */
   let rawDatasetPreviewState = {
@@ -5649,6 +6214,8 @@ const FlowGuard = (function () {
     initEngineeringParametersUI,
     updateEngineeringCalculations,
     renderTrafficSummaryDashboard,
+    renderStep5AnalysisDashboard,
+    runStep5Analysis,
     initAnalysisExecutionUI,
     resetAnalysisStages,
     runFullAnalysisPipeline,
@@ -5694,6 +6261,8 @@ if (typeof window !== 'undefined') {
   window.initEngineeringParametersUI = FlowGuard.initEngineeringParametersUI;
   window.updateEngineeringCalculations = FlowGuard.updateEngineeringCalculations;
   window.renderTrafficSummaryDashboard = FlowGuard.renderTrafficSummaryDashboard;
+  window.renderStep5AnalysisDashboard = FlowGuard.renderStep5AnalysisDashboard;
+  window.runStep5Analysis = FlowGuard.runStep5Analysis;
   window.initAnalysisExecutionUI = FlowGuard.initAnalysisExecutionUI;
   window.resetAnalysisStages = FlowGuard.resetAnalysisStages;
   window.runFullAnalysisPipeline = FlowGuard.runFullAnalysisPipeline;
