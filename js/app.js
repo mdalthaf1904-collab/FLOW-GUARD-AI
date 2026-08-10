@@ -3151,21 +3151,7 @@ const FlowGuard = (function () {
       }
     }
 
-    // Validation Guardrail before advancing from Step 4 to Step 5
-    if (numericId > 4 && currentState.wizardStep === 4) {
-      const proj = loadProject();
-      const ds = (proj && proj.dataset) ? proj.dataset : {};
-      const isUploaded = !!(ds.uploaded || (ds.records && ds.records.length > 0) || (proj.trafficInput && proj.trafficInput.datasetUploaded) || currentState.dataUploaded);
 
-      if (!isUploaded) {
-        if (typeof showNotification === 'function') {
-          showNotification('Please upload and validate a traffic survey dataset in Step 2 before proceeding to Run Analysis.', 'warning');
-        } else if (typeof alert !== 'undefined') {
-          alert('Please upload and validate a traffic survey dataset in Step 2 before proceeding to Run Analysis.');
-        }
-        return;
-      }
-    }
 
     console.log(`[FlowGuard AI] Navigating Wizard to Step ${numericId}`);
 
