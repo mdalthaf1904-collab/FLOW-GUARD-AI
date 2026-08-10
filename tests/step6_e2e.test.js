@@ -62,6 +62,20 @@ function createMockElement(id = '', tag = 'div') {
   return el;
 }
 
+function createMockLocalStorage() {
+  let store = {};
+  return {
+    getItem: (key) => store[key] || null,
+    setItem: (key, value) => { store[key] = String(value); },
+    removeItem: (key) => { delete store[key]; },
+    clear: () => { store = {}; }
+  };
+}
+
+if (!global.localStorage) {
+  global.localStorage = createMockLocalStorage();
+}
+
 function setupGlobalDOM() {
   const store = {};
 
