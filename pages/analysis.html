@@ -42,12 +42,8 @@
 
     <!-- Navigation Links -->
     <ul class="nav-links">
-      <li><a href="../index.html" class="nav-link">Home</a></li>
-      <li><a href="analysis.html" class="nav-link active">Analysis</a></li>
-      <li><a href="simulation.html" class="nav-link">Simulation</a></li>
-      <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-      <li><a href="controller.html" class="nav-link">Controller</a></li>
-      <li><a href="validation.html" class="nav-link">Validation</a></li>
+      <li><a href="../index.html#landing" class="nav-link">FlowGuard AI</a></li>
+      <li><a href="../index.html#analyzer" class="nav-link active">Traffic Analysis</a></li>
     </ul>
 
     <!-- Top Right Status Info -->
@@ -108,15 +104,7 @@
             <span class="wizard-step-num">5</span>
             <div class="wizard-step-content">
               <span class="wizard-step-title">Run Analysis</span>
-              <span class="wizard-step-subtitle">Execute Webster optimization</span>
-            </div>
-          </li>
-
-          <li class="wizard-step-item" data-step-id="6" onclick="FlowGuard.setWizardStep(6)">
-            <span class="wizard-step-num">6</span>
-            <div class="wizard-step-content">
-              <span class="wizard-step-title">Results &amp; Reports</span>
-              <span class="wizard-step-subtitle">View results &amp; PDF report</span>
+              <span class="wizard-step-subtitle">Signal timing &amp; optimization</span>
             </div>
           </li>
         </ul>
@@ -381,13 +369,12 @@
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">⏱️</div>
                   <div>
-                    <div class="eng-panel-title">SIGNAL CONTROL PARAMETERS</div>
+                    <div class="eng-panel-title">SECTION A — SIGNAL CONTROL PARAMETERS</div>
                     <div class="eng-panel-subtitle">Shared intersection signal parameter &amp; Webster bounds</div>
                   </div>
                 </div>
                 <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
                   <span class="badge badge-low" style="background: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Engineering Input</span>
-                  <span class="badge badge-low" style="background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3);">Shared intersection signal parameter</span>
                 </div>
               </div>
 
@@ -405,18 +392,6 @@
                 </div>
 
                 <div class="control-field-group">
-                  <label class="control-field-label">Yellow / Amber Time (s)</label>
-                  <input type="number" id="engAmberTime" class="control-field-select" value="3.0" min="0.5" max="10.0" step="0.5">
-                  <span class="input-val-check" id="valCheckAmber" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&gt; 0s)</span>
-                </div>
-
-                <div class="control-field-group">
-                  <label class="control-field-label">All-Red Time (s)</label>
-                  <input type="number" id="engAllRedTime" class="control-field-select" value="2.0" min="0.0" max="10.0" step="0.5">
-                  <span class="input-val-check" id="valCheckAllRed" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (≥ 0s)</span>
-                </div>
-
-                <div class="control-field-group">
                   <label class="control-field-label">Start-Up Lost Time L1 (s)</label>
                   <input type="number" id="engStartupLost" class="control-field-select" value="2.0" min="0.0" max="10.0" step="0.5">
                   <span class="input-val-check" id="valCheckStartupLost" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (≥ 0s)</span>
@@ -428,25 +403,8 @@
                   <span class="input-val-check" id="valCheckClearanceLost" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (≥ 0s)</span>
                 </div>
 
-                <div class="control-field-group" style="grid-column: span 2; background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                    <span style="font-size: 0.78rem; font-weight: 700; color: var(--accent-primary); text-transform: uppercase;">Signal Phase Structure</span>
-                    <span class="badge badge-low" style="background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); font-size: 0.7rem;">Fixed analytical phase structure</span>
-                  </div>
-                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; font-size: 0.82rem;">
-                    <div style="background: rgba(30,41,59,0.5); padding: 0.5rem 0.75rem; border-radius: 4px; border-left: 3px solid var(--accent-primary);">
-                      <strong style="color: var(--accent-primary);">Phase 1 — North / South</strong>
-                      <div style="color: var(--text-secondary); font-size: 0.78rem;">Road A + Road C</div>
-                    </div>
-                    <div style="background: rgba(30,41,59,0.5); padding: 0.5rem 0.75rem; border-radius: 4px; border-left: 3px solid #fcd34d;">
-                      <strong style="color: #fcd34d;">Phase 2 — East / West</strong>
-                      <div style="color: var(--text-secondary); font-size: 0.78rem;">Road B + Road D</div>
-                    </div>
-                  </div>
-                </div>
-
                 <div class="control-field-group" style="grid-column: span 2;">
-                  <label class="control-field-label">Cycle Length Mode</label>
+                  <label class="control-field-label">Cycle Optimization Mode</label>
                   <div style="display: flex; gap: 1rem; margin-top: 0.25rem;">
                     <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; cursor: pointer; color: var(--text-primary);">
                       <input type="radio" name="cycleConstraint" value="auto" checked> Auto Webster Optimization
@@ -456,10 +414,56 @@
                     </label>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <!-- 1B. BASELINE / EXISTING SIGNAL TIMING CARD -->
+            <div class="eng-panel-card">
+              <div class="eng-panel-header">
+                <div class="eng-panel-title-group">
+                  <div class="eng-panel-icon">🚥</div>
+                  <div>
+                    <div class="eng-panel-title">SECTION C — BASELINE / EXISTING SIGNAL TIMING</div>
+                    <div class="eng-panel-subtitle">Existing signal timing used for BEFORE vs AFTER performance comparison</div>
+                  </div>
+                </div>
+                <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3);">Baseline Input</span>
+              </div>
+
+              <div class="eng-fields-grid">
+                <div class="control-field-group" style="grid-column: span 2;">
+                  <label class="control-field-label">Baseline / Existing Cycle Length (s)</label>
+                  <input type="number" id="engExistingCycle" class="control-field-select" value="120" min="20" max="300" step="5">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Phase 1 — North / South Green (s)</label>
+                  <input type="number" id="engBaselineP1Green" class="control-field-select" placeholder="e.g. 60" min="1" max="200" step="1">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Phase 2 — East / West Green (s)</label>
+                  <input type="number" id="engBaselineP2Green" class="control-field-select" placeholder="e.g. 52" min="1" max="200" step="1">
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">Yellow / Amber Time (s)</label>
+                  <input type="number" id="engAmberTime" class="control-field-select" value="3.0" min="0.5" max="10.0" step="0.5">
+                  <span class="input-val-check" id="valCheckAmber" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&gt; 0s)</span>
+                </div>
+
+                <div class="control-field-group">
+                  <label class="control-field-label">All-Red Time (s)</label>
+                  <input type="number" id="engAllRedTime" class="control-field-select" value="2.0" min="0.0" max="10.0" step="0.5">
+                  <span class="input-val-check" id="valCheckAllRed" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (≥ 0s)</span>
+                </div>
 
                 <div class="control-field-group" style="grid-column: span 2;">
-                  <label class="control-field-label">Existing Cycle Length (s) <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;">— Shared Intersection-Wide Parameter</span></label>
-                  <input type="number" id="engExistingCycle" class="control-field-select" value="120" min="20" max="300" step="5" style="max-width: 250px;">
+                  <div id="baselineTimingValidationBox" style="padding: 0.75rem 1rem; background: rgba(15,23,42,0.6); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.82rem;">
+                    <div id="baselineTimingValMsg" style="font-weight: 700; color: #38bdf8;">
+                      ℹ Enter Phase 1 and Phase 2 existing green times to validate baseline timing.
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -778,6 +782,7 @@
               </div>
 
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
+                <!-- ROW 1 -->
                 <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Approaches</div>
                   <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryApproachesVal">4</div>
@@ -794,6 +799,8 @@
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Phase 2</div>
                   <div style="font-size: 0.95rem; font-weight: 700; color: #fcd34d; margin-top: 0.2rem;" id="summaryPhase2Val">Road B + Road D (E/W)</div>
                 </div>
+
+                <!-- ROW 2 -->
                 <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Base Saturation Flow</div>
                   <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryBaseSatVal">1800 PCU/h/lane</div>
@@ -801,14 +808,6 @@
                 <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Existing Cycle</div>
                   <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryExistingCycleVal">120 s</div>
-                </div>
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Amber Interval</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAmberVal">3 s</div>
-                </div>
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">All-Red Interval</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAllRedVal">2 s</div>
                 </div>
                 <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                   <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Minimum Green</div>
@@ -819,8 +818,38 @@
                   <div style="font-size: 0.95rem; font-weight: 700; color: var(--success); margin-top: 0.2rem;" id="summaryPcuFactorsVal">Standard</div>
                 </div>
                 <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Baseline Data</div>
-                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-secondary); margin-top: 0.2rem;" id="summaryBaselineVal">Not Available</div>
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Baseline Data Mode</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-secondary); margin-top: 0.2rem;" id="summaryBaselineVal">Not Available</div>
+                </div>
+
+                <!-- ROW 3 — BASELINE GREEN TIMINGS -->
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--accent-primary); text-transform: uppercase; font-weight: 700;">Baseline Phase 1 Green</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="summaryBaselineP1GreenVal">Not Provided</div>
+                </div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: #fcd34d; text-transform: uppercase; font-weight: 700;">Baseline Phase 2 Green</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: #fcd34d; margin-top: 0.2rem;" id="summaryBaselineP2GreenVal">Not Provided</div>
+                </div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Baseline Green Split</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryBaselineGreenSplitVal">Not Provided</div>
+                </div>
+
+                <!-- ROW 4 — CLEARANCE INTERVALS & BASELINE TIMING STATUS -->
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Amber Interval</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAmberVal">3 s</div>
+                </div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">All-Red Interval</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAllRedVal">2 s</div>
+                </div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Baseline Timing Status</div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: #38bdf8; margin-top: 0.2rem;" id="summaryBaselineTimingStatusVal">ℹ Awaiting Green Times</div>
+                </div>
+              </div>font-weight: 700; color: var(--text-secondary); margin-top: 0.2rem;" id="summaryBaselineVal">Not Available</div>
                 </div>
               </div>
 
@@ -1100,7 +1129,7 @@
             <span class="badge badge-low">Two-Phase Model</span>
           </div>
 
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
             <!-- Phase 1 Card -->
             <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
               <div style="font-size: 0.85rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">PHASE 1 — NORTH / SOUTH</div>
@@ -1139,19 +1168,6 @@
                 <span style="font-size: 0.8rem; color: var(--text-secondary);">Phase 2 Critical Ratio (y₂):</span>
                 <span style="font-size: 1.1rem; font-weight: 800; color: #fcd34d;" id="step5Phase2RatioY">—</span>
               </div>
-            </div>
-          </div>
-
-          <!-- PHASE SEQUENCE VISUAL -->
-          <div>
-            <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase; margin-bottom: 0.5rem;">Phase Sequence Visual &amp; Proportional Allocation</div>
-            <div id="step5PhaseSequenceTimeline" style="height: 36px; background: rgba(15,23,42,0.9); border-radius: 6px; border: 1px solid var(--border-color); display: flex; overflow: hidden; font-size: 0.75rem; font-weight: 700; text-align: center; line-height: 36px;">
-              <div style="flex: 1; background: rgba(56, 189, 248, 0.3); color: #38bdf8; border-right: 1px solid rgba(255,255,255,0.1);">Phase 1 Green</div>
-              <div style="width: 40px; background: rgba(245, 158, 11, 0.4); color: #fcd34d; border-right: 1px solid rgba(255,255,255,0.1);">Amb</div>
-              <div style="width: 30px; background: rgba(239, 68, 68, 0.4); color: #ef4444; border-right: 1px solid rgba(255,255,255,0.1);">Red</div>
-              <div style="flex: 1; background: rgba(252, 211, 77, 0.3); color: #fcd34d; border-right: 1px solid rgba(255,255,255,0.1);">Phase 2 Green</div>
-              <div style="width: 40px; background: rgba(245, 158, 11, 0.4); color: #fcd34d; border-right: 1px solid rgba(255,255,255,0.1);">Amb</div>
-              <div style="width: 30px; background: rgba(239, 68, 68, 0.4); color: #ef4444;">Red</div>
             </div>
           </div>
         </div>
@@ -1248,9 +1264,15 @@
 
           <!-- Dynamic Cycle Timeline Bar -->
           <div>
-            <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase; margin-bottom: 0.5rem;">Cycle Timeline Breakdown</div>
-            <div id="step5CycleTimelineBar" style="height: 40px; background: rgba(15,23,42,0.9); border-radius: 6px; border: 1px solid var(--border-color); display: flex; overflow: hidden; font-size: 0.75rem; font-weight: 700; text-align: center; line-height: 40px;">
-              <!-- Dynamically populated with exact pixel/percent widths by renderStep5AnalysisDashboard() -->
+            <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); text-transform: uppercase; margin-bottom: 0.6rem;">Cycle Timeline Breakdown</div>
+            <div id="step5CycleTimelineBar" style="display: flex; gap: 4px; padding: 4px; min-height: 52px; background: rgba(15,23,42,0.95); border-radius: 8px; border: 1px solid var(--border-color); overflow-x: auto;">
+              <!-- Dynamically populated with exact duration labels by renderStep5AnalysisDashboard() -->
+            </div>
+            <!-- Timeline Legend -->
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 0.6rem; font-size: 0.76rem; color: var(--text-secondary);">
+              <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 50%; background: #10b981; display: inline-block;"></span> 🟢 Green = Effective Green</span>
+              <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 50%; background: #f59e0b; display: inline-block;"></span> 🟡 Amber = Amber Interval</span>
+              <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 50%; background: #ef4444; display: inline-block;"></span> 🔴 Red = All-Red Interval</span>
             </div>
           </div>
         </div>
@@ -1304,26 +1326,66 @@
             <span class="badge badge-low">Engineering Recommendation</span>
           </div>
 
-          <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
-              <div>
-                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Primary Bottleneck</div>
-                <div style="font-size: 1.05rem; font-weight: 800; color: #ef4444; margin-top: 0.2rem;" id="step5RecBottleneck">—</div>
-              </div>
-              <div>
-                <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Recommended Phase Priority</div>
-                <div style="font-size: 1.05rem; font-weight: 800; color: var(--accent-primary); margin-top: 0.2rem;" id="step5RecPhase">—</div>
-              </div>
-            </div>
-
-            <div style="margin-bottom: 0.85rem;">
-              <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 0.2rem;">Reasoning &amp; Critical Demand Rationale</div>
-              <div style="font-size: 0.85rem; color: var(--text-primary); line-height: 1.5;" id="step5RecReason">Awaiting validated traffic dataset.</div>
-            </div>
-
+          <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <!-- 1. ENGINEERING RECOMMENDATION OVERVIEW -->
             <div>
-              <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 0.2rem;">Recommended Signal Action</div>
-              <div style="font-size: 0.85rem; color: var(--text-primary); line-height: 1.5;" id="step5RecAction">Awaiting analysis execution.</div>
+              <div style="font-size: 0.75rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.6rem;">1. ENGINEERING RECOMMENDATION OVERVIEW</div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem;">
+                <div style="background: rgba(15,23,42,0.7); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; padding: 1rem;">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Primary Bottleneck</div>
+                  <div style="font-size: 1.15rem; font-weight: 800; color: #ef4444; margin-top: 0.3rem;" id="step5RecBottleneck">—</div>
+                </div>
+                <div style="background: rgba(15,23,42,0.7); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 8px; padding: 1rem;">
+                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Recommended Phase Priority</div>
+                  <div style="font-size: 1.15rem; font-weight: 800; color: #38bdf8; margin-top: 0.3rem;" id="step5RecPhase">—</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. REASONING & CRITICAL DEMAND RATIONALE -->
+            <div style="background: rgba(15,23,42,0.6); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.25rem;">
+              <div style="font-size: 0.75rem; font-weight: 800; color: #fcd34d; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.75rem;">2. REASONING &amp; CRITICAL DEMAND RATIONALE</div>
+              
+              <!-- Key Value Metrics Grid -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 0.85rem; padding: 0.75rem; background: rgba(30, 41, 59, 0.5); border-radius: 6px; border: 1px solid var(--border-color);">
+                <div>
+                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Flow Ratio</div>
+                  <div style="font-size: 0.95rem; font-weight: 800; color: #38bdf8;" id="step5RecFlowRatioVal">—</div>
+                </div>
+                <div>
+                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Peak Interval</div>
+                  <div style="font-size: 0.95rem; font-weight: 800; color: var(--text-primary);" id="step5RecPeakIntervalVal">—</div>
+                </div>
+                <div>
+                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Approach</div>
+                  <div style="font-size: 0.95rem; font-weight: 800; color: #ef4444;" id="step5RecCritApproachVal">—</div>
+                </div>
+              </div>
+
+              <div style="font-size: 0.88rem; color: var(--text-primary); line-height: 1.6;" id="step5RecReason">Awaiting validated traffic dataset.</div>
+            </div>
+
+            <!-- 3. RECOMMENDED SIGNAL ACTION -->
+            <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 8px; padding: 1.25rem;">
+              <div style="font-size: 0.75rem; font-weight: 800; color: #10b981; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.75rem;">3. RECOMMENDED SIGNAL ACTION</div>
+
+              <!-- Recommendation Values Card -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin-bottom: 0.85rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.08); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25);">
+                <div>
+                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Shared Cycle</div>
+                  <div style="font-size: 1.1rem; font-weight: 800; color: #10b981;" id="step5RecCycleVal">—</div>
+                </div>
+                <div>
+                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Phase 1 Green</div>
+                  <div style="font-size: 1.1rem; font-weight: 800; color: #38bdf8;" id="step5RecP1Val">—</div>
+                </div>
+                <div>
+                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Phase 2 Green</div>
+                  <div style="font-size: 1.1rem; font-weight: 800; color: #fcd34d;" id="step5RecP2Val">—</div>
+                </div>
+              </div>
+
+              <div style="font-size: 0.88rem; color: var(--text-primary); line-height: 1.6;" id="step5RecAction">Awaiting analysis execution.</div>
             </div>
           </div>
         </div>
@@ -1454,9 +1516,6 @@
   </footer>
 
   <script charset="utf-8" src="../js/app.js"></script>
-  <script charset="utf-8" src="../js/congestion.js"></script>
-  <script charset="utf-8" src="../js/simulation.js"></script>
-  <script charset="utf-8" src="../js/analysis.js"></script>
 </body>
 
 </html>

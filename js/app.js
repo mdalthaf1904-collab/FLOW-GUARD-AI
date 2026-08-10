@@ -3910,7 +3910,8 @@ const FlowGuard = (function () {
     // List of input IDs to attach live input/change listeners
     const engInputIds = [
       'engMinGreen', 'engMaxGreen', 'engAmberTime', 'engAllRedTime',
-      'engExistingCycle', 'engBaseSatFlow', 'engWalkSpeed', 'engMinWalkTime',
+      'engExistingCycle', 'engBaselineP1Green', 'engBaselineP2Green',
+      'engBaseSatFlow', 'engWalkSpeed', 'engMinWalkTime',
       'engPedClearanceCalc', 'engIncidentEvent',
       'baseline_delay_road_a', 'baseline_queue_road_a', 'baseline_dos_road_a',
       'baseline_delay_road_b', 'baseline_queue_road_b', 'baseline_dos_road_b',
@@ -4000,6 +4001,16 @@ const FlowGuard = (function () {
       if (eng.signal.cycleMode) {
         const rad = document.querySelector(`input[name="cycleConstraint"][value="${eng.signal.cycleMode}"]`);
         if (rad) rad.checked = true;
+      }
+    }
+
+    // Baseline Signal Timing State Loading
+    if (eng.baseline) {
+      if (eng.baseline.phase1Green !== undefined && eng.baseline.phase1Green !== null && document.getElementById('engBaselineP1Green')) {
+        document.getElementById('engBaselineP1Green').value = eng.baseline.phase1Green;
+      }
+      if (eng.baseline.phase2Green !== undefined && eng.baseline.phase2Green !== null && document.getElementById('engBaselineP2Green')) {
+        document.getElementById('engBaselineP2Green').value = eng.baseline.phase2Green;
       }
     }
 
@@ -4132,7 +4143,51 @@ const FlowGuard = (function () {
     const pedClearanceCalc = (document.getElementById('engPedClearanceCalc') || {}).value || 'ENABLED';
     const incidentEvent = (document.getElementById('engIncidentEvent') || {}).value || 'None';
 
-    // 5. Baseline / Observed Performance
+    // 5. Baseline Signal Timing Inputs & Validation
+    const p1GreenInput = document.getElementById('engBaselineP1Green');
+    const p2GreenInput = document.getElementById('engBaselineP2Green');
+    const p1GreenVal = p1GreenInput && p1GreenInput.value !== '' ? parseFloat(p1GreenInput.value) : null;
+    const p2GreenVal = p2GreenInput && p2GreenInput.value !== '' ? parseFloat(p2GreenInput.value) : null;
+
+    const hasP1 = p1GreenVal !== null && !isNaN(p1GreenVal) && p1GreenVal > 0;
+    const hasP2 = p2GreenVal !== null && !isNaN(p2GreenVal) && p2GreenVal > 0;
+
+    const valBox = document.getElementById('baselineTimingValidationBox');
+    const valMsg = document.getElementById('baselineTimingValMsg');
+
+    let isBaselineConsistent = false;
+
+    if (valMsg) {
+      if (!hasP1 && !hasP2) {
+        valMsg.textContent = 'ℹ Enter Phase 1 and Phase 2 existing green times to validate baseline timing.';
+        valMsg.style.color = '#38bdf8';
+        if (valBox) valBox.style.borderColor = 'var(--border-color)';
+      } else if (!hasP1 || !hasP2) {
+        valMsg.textContent = '⚠ Please enter both Phase 1 and Phase 2 existing green times.';
+        valMsg.style.color = '#fcd34d';
+        if (valBox) valBox.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+      } else {
+        const totalAllocated = p1GreenVal + p2GreenVal + (amberTime * 2) + (allRedTime * 2);
+        const diff = totalAllocated - existingCycle;
+
+        if (Math.abs(diff) < 0.1) {
+          isBaselineConsistent = true;
+          valMsg.textContent = `✓ Baseline timing is internally consistent. (Total: ${totalAllocated}s = ${p1GreenVal}s + ${p2GreenVal}s + 2×${amberTime}s + 2×${allRedTime}s)`;
+          valMsg.style.color = 'var(--success)';
+          if (valBox) valBox.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+        } else if (diff > 0) {
+          valMsg.textContent = `⚠ Baseline timing exceeds configured cycle length by ${parseFloat(diff.toFixed(1))} s. (Sum: ${totalAllocated}s, Cycle: ${existingCycle}s)`;
+          valMsg.style.color = '#ef4444';
+          if (valBox) valBox.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+        } else {
+          valMsg.textContent = `⚠ Baseline timing leaves ${parseFloat(Math.abs(diff).toFixed(1))} s unallocated. (Sum: ${totalAllocated}s, Cycle: ${existingCycle}s)`;
+          valMsg.style.color = '#fcd34d';
+          if (valBox) valBox.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+        }
+      }
+    }
+
+    // 6. Baseline / Observed Performance Mode
     const baselineModeRadio = document.querySelector('input[name="baselineMode"]:checked');
     const baselineMode = baselineModeRadio ? baselineModeRadio.value : 'not_available';
 
@@ -4148,6 +4203,12 @@ const FlowGuard = (function () {
 
     const baselineData = {
       mode: baselineMode,
+      cycleLength: existingCycle,
+      phase1Green: hasP1 ? p1GreenVal : null,
+      phase2Green: hasP2 ? p2GreenVal : null,
+      amber: amberTime,
+      allRed: allRedTime,
+      isValid: isBaselineConsistent,
       roads: {
         'Road A': { delay: parseBaselineVal('baseline_delay_road_a'), queue: parseBaselineVal('baseline_queue_road_a'), degreeOfSaturation: parseBaselineVal('baseline_dos_road_a') },
         'Road B': { delay: parseBaselineVal('baseline_delay_road_b'), queue: parseBaselineVal('baseline_queue_road_b'), degreeOfSaturation: parseBaselineVal('baseline_dos_road_b') },
@@ -4202,9 +4263,12 @@ const FlowGuard = (function () {
     }
 
     // Summary Card Live Update
-    const setSummaryTxt = (id, text) => {
+    const setSummaryTxt = (id, text, color = null) => {
       const el = document.getElementById(id);
-      if (el) el.textContent = text;
+      if (el) {
+        el.textContent = text;
+        if (color) el.style.color = color;
+      }
     };
 
     setSummaryTxt('summaryApproachesVal', 4);
@@ -4218,6 +4282,41 @@ const FlowGuard = (function () {
     setSummaryTxt('summaryMinGreenVal', `${minGreen} s`);
     setSummaryTxt('summaryPcuFactorsVal', manualOverride ? 'Custom Override' : 'Standard');
     setSummaryTxt('summaryBaselineVal', baselineMode === 'not_available' ? 'Not Available' : 'Road-wise');
+
+    // Baseline Signal Timing Summary Fields (Derived dynamically from Section C state)
+    const p1GreenStr = hasP1 ? `${p1GreenVal} s` : 'Not Provided';
+    const p2GreenStr = hasP2 ? `${p2GreenVal} s` : 'Not Provided';
+    const splitStr = (hasP1 && hasP2) ? `${p1GreenVal} s / ${p2GreenVal} s` : 'Not Provided';
+
+    setSummaryTxt('summaryBaselineP1GreenVal', p1GreenStr);
+    setSummaryTxt('summaryBaselineP2GreenVal', p2GreenStr);
+    setSummaryTxt('summaryBaselineGreenSplitVal', splitStr);
+
+    let statusText = 'ℹ Awaiting Inputs';
+    let statusColor = '#38bdf8';
+
+    if (!hasP1 && !hasP2) {
+      statusText = 'ℹ Awaiting Green Times';
+      statusColor = '#38bdf8';
+    } else if (!hasP1 || !hasP2) {
+      statusText = '⚠ Incomplete Phase Green';
+      statusColor = '#fcd34d';
+    } else {
+      const totalAllocated = p1GreenVal + p2GreenVal + (amberTime * 2) + (allRedTime * 2);
+      const diff = totalAllocated - existingCycle;
+      if (Math.abs(diff) < 0.1) {
+        statusText = '✓ Internally Consistent';
+        statusColor = 'var(--success)';
+      } else if (diff > 0) {
+        statusText = `⚠ Exceeds Cycle (+${parseFloat(diff.toFixed(1))} s)`;
+        statusColor = '#ef4444';
+      } else {
+        statusText = `⚠ Unallocated Time (${parseFloat(Math.abs(diff).toFixed(1))} s)`;
+        statusColor = '#fcd34d';
+      }
+    }
+
+    setSummaryTxt('summaryBaselineTimingStatusVal', statusText, statusColor);
 
     // Save State into project.engineeringParameters
     const currentState = getState();
@@ -4893,38 +4992,44 @@ const FlowGuard = (function () {
 
     // Cycle Timeline Bar Renderer (Sum of all 6 components MUST equal websterCycleC0 EXACTLY)
     const timelineBar = document.getElementById('step5CycleTimelineBar');
-    const phaseSeqTimeline = document.getElementById('step5PhaseSequenceTimeline');
 
     if (timelineBar) {
       if (isUploaded && isWebsterValid && websterCycleC0 && g1 !== null && g2 !== null) {
-        const p1Pct = ((g1 / websterCycleC0) * 100).toFixed(2);
-        const amb1Pct = ((amberPhase / websterCycleC0) * 100).toFixed(2);
-        const red1Pct = ((allRedPhase / websterCycleC0) * 100).toFixed(2);
-        const p2Pct = ((g2 / websterCycleC0) * 100).toFixed(2);
-        const amb2Pct = ((amberPhase / websterCycleC0) * 100).toFixed(2);
-        const red2Pct = (100 - (parseFloat(p1Pct) + parseFloat(amb1Pct) + parseFloat(red1Pct) + parseFloat(p2Pct) + parseFloat(amb2Pct))).toFixed(2);
-
-        const htmlTimeline = `
-          <div style="width: ${p1Pct}%; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center;" title="Phase 1 Green: ${g1}s">PHASE 1 GREEN (${g1}s)</div>
-          <div style="width: ${amb1Pct}%; background: rgba(245, 158, 11, 0.35); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); display: flex; align-items: center; justify-content: center;" title="Amber: ${amberPhase}s">AMBER (${amberPhase}s)</div>
-          <div style="width: ${red1Pct}%; background: rgba(239, 68, 68, 0.35); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); display: flex; align-items: center; justify-content: center;" title="All-Red: ${allRedPhase}s">ALL-RED (${allRedPhase}s)</div>
-          <div style="width: ${p2Pct}%; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center;" title="Phase 2 Green: ${g2}s">PHASE 2 GREEN (${g2}s)</div>
-          <div style="width: ${amb2Pct}%; background: rgba(245, 158, 11, 0.35); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); display: flex; align-items: center; justify-content: center;" title="Amber: ${amberPhase}s">AMBER (${amberPhase}s)</div>
-          <div style="width: ${red2Pct}%; background: rgba(239, 68, 68, 0.35); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); display: flex; align-items: center; justify-content: center;" title="All-Red: ${allRedPhase}s">ALL-RED (${allRedPhase}s)</div>
+        timelineBar.innerHTML = `
+          <div style="flex: ${g1}; min-width: 90px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Phase 1 Green: ${g1}s">
+            <span style="font-size: 0.74rem; font-weight: 800; letter-spacing: 0.02em;">PHASE 1 GREEN</span>
+            <span style="font-size: 0.85rem; font-weight: 800;">${g1} s</span>
+          </div>
+          <div style="flex: ${amberPhase}; min-width: 65px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Amber: ${amberPhase}s">
+            <span style="font-size: 0.7rem; font-weight: 800;">AMBER</span>
+            <span style="font-size: 0.82rem; font-weight: 800;">${amberPhase} s</span>
+          </div>
+          <div style="flex: ${allRedPhase}; min-width: 65px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="All-Red: ${allRedPhase}s">
+            <span style="font-size: 0.7rem; font-weight: 800;">ALL-RED</span>
+            <span style="font-size: 0.82rem; font-weight: 800;">${allRedPhase} s</span>
+          </div>
+          <div style="flex: ${g2}; min-width: 90px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Phase 2 Green: ${g2}s">
+            <span style="font-size: 0.74rem; font-weight: 800; letter-spacing: 0.02em;">PHASE 2 GREEN</span>
+            <span style="font-size: 0.85rem; font-weight: 800;">${g2} s</span>
+          </div>
+          <div style="flex: ${amberPhase}; min-width: 65px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Amber: ${amberPhase}s">
+            <span style="font-size: 0.7rem; font-weight: 800;">AMBER</span>
+            <span style="font-size: 0.82rem; font-weight: 800;">${amberPhase} s</span>
+          </div>
+          <div style="flex: ${allRedPhase}; min-width: 65px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="All-Red: ${allRedPhase}s">
+            <span style="font-size: 0.7rem; font-weight: 800;">ALL-RED</span>
+            <span style="font-size: 0.82rem; font-weight: 800;">${allRedPhase} s</span>
+          </div>
         `;
-        timelineBar.innerHTML = htmlTimeline;
-        if (phaseSeqTimeline) phaseSeqTimeline.innerHTML = htmlTimeline;
       } else {
-        const htmlDefault = `
-          <div style="flex: 1; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center;">Phase 1 Green</div>
-          <div style="width: 50px; background: rgba(245, 158, 11, 0.35); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); display: flex; align-items: center; justify-content: center;">Amb</div>
-          <div style="width: 40px; background: rgba(239, 68, 68, 0.35); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); display: flex; align-items: center; justify-content: center;">Red</div>
-          <div style="flex: 1; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center;">Phase 2 Green</div>
-          <div style="width: 50px; background: rgba(245, 158, 11, 0.35); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); display: flex; align-items: center; justify-content: center;">Amb</div>
-          <div style="width: 40px; background: rgba(239, 68, 68, 0.35); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); display: flex; align-items: center; justify-content: center;">Red</div>
+        timelineBar.innerHTML = `
+          <div style="flex: 1; min-width: 80px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; display: flex; align-items: center; justify-content: center;">PHASE 1 GREEN</div>
+          <div style="min-width: 60px; background: rgba(245, 158, 11, 0.35); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;">AMBER</div>
+          <div style="min-width: 60px; background: rgba(239, 68, 68, 0.35); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;">ALL-RED</div>
+          <div style="flex: 1; min-width: 80px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; display: flex; align-items: center; justify-content: center;">PHASE 2 GREEN</div>
+          <div style="min-width: 60px; background: rgba(245, 158, 11, 0.35); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;">AMBER</div>
+          <div style="min-width: 60px; background: rgba(239, 68, 68, 0.35); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;">ALL-RED</div>
         `;
-        timelineBar.innerHTML = htmlDefault;
-        if (phaseSeqTimeline) phaseSeqTimeline.innerHTML = htmlDefault;
       }
     }
 
@@ -4967,6 +5072,8 @@ const FlowGuard = (function () {
       }
     }
 
+    const baseGreenFallbackStr = 'Not Available in current baseline';
+
     if (simTableBody) {
       if (!isUploaded || !isWebsterValid || !websterCycleC0 || g1 === null || g2 === null) {
         simTableBody.innerHTML = `
@@ -4978,7 +5085,7 @@ const FlowGuard = (function () {
           </tr>
           <tr style="border-bottom: 1px solid var(--border-color);">
             <td style="padding: 0.75rem 1rem; font-weight: 700;">Effective Green Split (Phase 1 / Phase 2)</td>
-            <td style="padding: 0.75rem 1rem;">Not Available</td>
+            <td style="padding: 0.75rem 1rem;">${baseGreenFallbackStr}</td>
             <td style="padding: 0.75rem 1rem;">Not Available</td>
             <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
           </tr>
@@ -5055,9 +5162,11 @@ const FlowGuard = (function () {
           ? (eng.baseline.roads[critRoadDesignation] || {})
           : {};
 
-        const baseG1 = Math.round(Math.max(0, existingCycle - totalLostTimeL) / 2);
-        const baseG2 = Math.max(0, Math.max(0, existingCycle - totalLostTimeL) - baseG1);
-        const baseGreenStr = (existingCycle && !isNaN(existingCycle)) ? `${baseG1} s / ${baseG2} s` : 'Not Available';
+        const baseP1Green = (eng.baseline && eng.baseline.phase1Green !== undefined) ? eng.baseline.phase1Green : null;
+        const baseP2Green = (eng.baseline && eng.baseline.phase2Green !== undefined) ? eng.baseline.phase2Green : null;
+
+        const isBaseGreenAvailable = (baseP1Green !== null && baseP2Green !== null);
+        const baseGreenStr = isBaseGreenAvailable ? `${baseP1Green} s / ${baseP2Green} s` : 'Baseline phase green times not provided';
         const baseCycleStr = `${existingCycle} s`;
         const baseDelayStr = roadBaseline.delay !== null && roadBaseline.delay !== undefined ? `${roadBaseline.delay.toFixed(1)} s/veh` : 'Not Available';
         const baseQueueStr = roadBaseline.queue !== null && roadBaseline.queue !== undefined ? `${roadBaseline.queue} m` : 'Not Available';
@@ -5128,9 +5237,9 @@ const FlowGuard = (function () {
           </tr>
           <tr style="border-bottom: 1px solid var(--border-color);">
             <td style="padding: 0.75rem 1rem; font-weight: 700;">Effective Green Split (Phase 1 / Phase 2)</td>
-            <td style="padding: 0.75rem 1rem;">${baseGreenStr}</td>
-            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${g1}s / ${g2}s</td>
-            <td style="padding: 0.75rem 1rem; color: var(--accent-primary);">Proportional</td>
+            <td style="padding: 0.75rem 1rem; ${isBaseGreenAvailable ? 'color: var(--text-primary);' : 'color: var(--text-secondary); font-style: italic;'}">${baseGreenStr}</td>
+            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${g1} s / ${g2} s</td>
+            <td style="padding: 0.75rem 1rem; color: var(--accent-primary);">${isBaseGreenAvailable ? 'Proportional (Rebalanced)' : 'Proportional'}</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border-color);">
             <td style="padding: 0.75rem 1rem; font-weight: 700;">Critical Approach Avg. Delay (s/veh)</td>
@@ -5164,18 +5273,36 @@ const FlowGuard = (function () {
     if (!isUploaded) {
       setText('step5RecBottleneck', '—');
       setText('step5RecPhase', '—');
+      setText('step5RecFlowRatioVal', '—');
+      setText('step5RecPeakIntervalVal', '—');
+      setText('step5RecCritApproachVal', '—');
       setText('step5RecReason', 'Awaiting validated traffic dataset.');
+      setText('step5RecCycleVal', '—');
+      setText('step5RecP1Val', '—');
+      setText('step5RecP2Val', '—');
       setText('step5RecAction', 'Awaiting analysis execution.');
     } else if (!isWebsterValid) {
       setText('step5RecBottleneck', `${winnerTitle} (${winnerMetric.critMoveStr})`);
       setText('step5RecPhase', yPhase1 >= yPhase2 ? 'Phase 1 (N/S)' : 'Phase 2 (E/W)');
+      setText('step5RecFlowRatioVal', `y = ${winnerMetric.flowRatioYStr}`);
+      setText('step5RecPeakIntervalVal', `${winnerMetric.peakIntervalStr}`);
+      setText('step5RecCritApproachVal', `${winnerTitle} — ${winnerMetric.critMoveStr}`);
       setText('step5RecReason', warningMsg);
+      setText('step5RecCycleVal', '—');
+      setText('step5RecP1Val', '—');
+      setText('step5RecP2Val', '—');
       setText('step5RecAction', 'Critical flow ratio exceeds intersection capacity limit. Geometric or physical capacity expansion recommended prior to signal timing optimization.');
     } else {
       setText('step5RecBottleneck', `${winnerTitle} (${winnerMetric.critMoveStr})`);
       const winningPhaseStr = yPhase1 >= yPhase2 ? 'Phase 1 (North / South)' : 'Phase 2 (East / West)';
       setText('step5RecPhase', winningPhaseStr);
+      setText('step5RecFlowRatioVal', `y = ${winnerMetric.flowRatioYStr}`);
+      setText('step5RecPeakIntervalVal', `${winnerMetric.peakIntervalStr}`);
+      setText('step5RecCritApproachVal', `${winnerTitle} — ${winnerMetric.critMoveStr}`);
       setText('step5RecReason', `Approach ${winnerTitle} exhibits the highest critical flow ratio y = ${winnerMetric.flowRatioYStr} on the ${winnerMetric.critMoveStr} movement under peak interval ${winnerMetric.peakIntervalStr}. Primary critical demand is concentrated on ${winningPhaseStr}.`);
+      setText('step5RecCycleVal', `${websterCycleC0} s`);
+      setText('step5RecP1Val', `${g1} s`);
+      setText('step5RecP2Val', `${g2} s`);
       setText('step5RecAction', `Implement proposed Webster offline signal timing plan: Shared Cycle C₀ = ${websterCycleC0}s, Phase 1 Green = ${g1}s, Phase 2 Green = ${g2}s. This rebalances phase green splits to match actual critical PCU demand.`);
     }
 
@@ -6302,11 +6429,55 @@ const FlowGuard = (function () {
     validateApproachLanes,
     validateApproachGeometry,
     CENTRAL_VEHICLE_TYPE_MAP,
-    resolveVehicleCategoryAndPCU
+    resolveVehicleCategoryAndPCU,
+    switchMainView,
+    handleHashRouting,
+    initMainViewRouting
   };
 })();
+
+function switchMainView(viewName) {
+  if (typeof document === 'undefined') return;
+  const landingView = document.getElementById('flowguard-landing-view');
+  const analyzerView = document.getElementById('traffic-analyzer-view');
+  const navLanding = document.getElementById('navLinkLanding');
+  const navAnalyzer = document.getElementById('navLinkAnalyzer');
+
+  if (viewName === 'analyzer') {
+    if (landingView) landingView.style.display = 'none';
+    if (analyzerView) analyzerView.style.display = 'flex';
+    if (navLanding) navLanding.classList.remove('active');
+    if (navAnalyzer) navAnalyzer.classList.add('active');
+  } else {
+    if (landingView) landingView.style.display = 'block';
+    if (analyzerView) analyzerView.style.display = 'none';
+    if (navLanding) navLanding.classList.add('active');
+    if (navAnalyzer) navAnalyzer.classList.remove('active');
+  }
+}
+
+function handleHashRouting() {
+  if (typeof window === 'undefined') return;
+  const hash = window.location.hash ? window.location.hash.toLowerCase() : '';
+  if (hash === '#analyzer' || hash === '#analysis' || hash === '#traffic-analysis') {
+    switchMainView('analyzer');
+  } else {
+    switchMainView('landing');
+  }
+}
+
+function initMainViewRouting() {
+  if (typeof window === 'undefined') return;
+  window.addEventListener('hashchange', handleHashRouting);
+  handleHashRouting();
+}
+
 if (typeof window !== 'undefined') {
   window.FlowGuard = FlowGuard;
+  window.FlowGuard.switchMainView = switchMainView;
+  window.FlowGuard.handleHashRouting = handleHashRouting;
+  window.FlowGuard.initMainViewRouting = initMainViewRouting;
+  window.switchMainView = switchMainView;
   window.getProject = FlowGuard.getProject;
   window.saveProject = FlowGuard.saveProject;
   window.exportProjectJSON = FlowGuard.exportProjectJSON;
@@ -6343,6 +6514,7 @@ if (typeof window !== 'undefined') {
   window.resolveVehicleCategoryAndPCU = FlowGuard.resolveVehicleCategoryAndPCU;
   FlowGuard.initAppEvents();
   FlowGuard.initProjectInspector();
+  initMainViewRouting();
 }
 if (typeof module !== 'undefined' && module.exports) { module.exports = FlowGuard; }
 
