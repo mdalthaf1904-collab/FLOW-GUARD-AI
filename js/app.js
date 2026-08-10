@@ -3155,7 +3155,7 @@ const FlowGuard = (function () {
     if (numericId > 4 && currentState.wizardStep === 4) {
       const proj = loadProject();
       const ds = (proj && proj.dataset) ? proj.dataset : {};
-      const isUploaded = !!(ds.uploaded || (ds.records && ds.records.length > 0));
+      const isUploaded = !!(ds.uploaded || (ds.records && ds.records.length > 0) || (proj.trafficInput && proj.trafficInput.datasetUploaded) || currentState.dataUploaded);
 
       if (!isUploaded) {
         if (typeof showNotification === 'function') {
@@ -3281,8 +3281,11 @@ const FlowGuard = (function () {
     }
 
     // Smooth scroll to top of content area
-    const contentArea = typeof document !== 'undefined' ? document.querySelector('.main-content-scroll') : null;
-    if (contentArea) contentArea.scrollTop = 0;
+    if (typeof document !== 'undefined') {
+      const contentArea = document.querySelector('.main-viewport') || document.querySelector('.main-content-scroll');
+      if (contentArea && contentArea.scrollTop !== undefined) contentArea.scrollTop = 0;
+      if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
 
   /**
@@ -3298,16 +3301,18 @@ const FlowGuard = (function () {
       console.log('[FlowGuard AI] DOM Fully Loaded — Binding Event Listeners Safely');
 
       // ── 1. Sidebar Stepper Navigation Click Bindings ──────────────────────
-      const stepperItems = document.querySelectorAll('.wizard-step-item, .wizard-sub-item, .step');
-      stepperItems.forEach((item, index) => {
+      const stepperItems = document.querySelectorAll('.wizard-step-item');
+      stepperItems.forEach((item) => {
         item.addEventListener('click', (e) => {
           const stepAttr = item.getAttribute('data-step-id');
-          const stepId = stepAttr ? parseInt(stepAttr, 10) : index + 1;
-          console.log(`Button clicked: Sidebar Step [Step ${stepId}]`);
-          try {
-            setWizardStep(stepId);
-          } catch (err) {
-            console.error('Error during sidebar step navigation:', err);
+          if (stepAttr) {
+            const stepId = parseInt(stepAttr, 10);
+            console.log(`Button clicked: Sidebar Step [Step ${stepId}]`);
+            try {
+              setWizardStep(stepId);
+            } catch (err) {
+              console.error('Error during sidebar step navigation:', err);
+            }
           }
         });
       });
