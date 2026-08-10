@@ -6454,6 +6454,10 @@ function switchMainView(viewName) {
     if (analyzerView) analyzerView.style.display = 'flex';
     if (navLanding) navLanding.classList.remove('active');
     if (navAnalyzer) navAnalyzer.classList.add('active');
+
+    // Sync active wizard step from SSoT project state
+    const currentStep = (typeof getState === 'function' && getState().wizardStep) ? getState().wizardStep : 1;
+    setWizardStep(currentStep);
   } else {
     if (landingView) landingView.style.display = 'block';
     if (analyzerView) analyzerView.style.display = 'none';

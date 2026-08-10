@@ -1509,16 +1509,20 @@
     </div>
 
     <div class="action-bar-buttons">
+      <button class="btn-ghost-reset" id="btnWizardPrev" style="display: none;">
+        &larr; Previous Step
+      </button>
+
       <button class="btn-ghost-reset" id="btnResetAnalysis" onclick="FlowGuard.resetToDefaults()">
         ↺ Reset All
       </button>
 
       <button class="btn-secondary-save" id="btnSaveContinue">
-        💾 Save &amp; Continue Later
+        💾 Save Progress
       </button>
 
-      <button class="btn-primary-cyan" id="btnApplyTrafficInput" onclick="FlowGuard.setWizardStep(3)">
-        Apply to Engineering Analysis &rarr;
+      <button class="btn-primary-cyan" id="btnWizardNext">
+        Next Step &rarr;
       </button>
     </div>
   </footer>
