@@ -2863,10 +2863,14 @@ const FlowGuard = (function () {
       container = document.getElementById('dashboard-results');
     }
     if (!container) {
-      container = document.createElement('div');
-      container.id = containerId;
-      document.body.appendChild(container);
+      const targetSec = document.getElementById('wizard-section-6');
+      if (targetSec) {
+        container = document.createElement('div');
+        container.id = containerId;
+        targetSec.appendChild(container);
+      }
     }
+    if (!container) return;
 
     container.innerHTML = '';
 
@@ -3176,6 +3180,10 @@ const FlowGuard = (function () {
       sections.forEach(sec => {
         sec.style.display = 'none';
       });
+
+      // Remove any stray orphaned containers appended directly to body
+      const strayContainers = document.querySelectorAll('body > #engineeringDashboardContainer, body > #dashboard-results');
+      strayContainers.forEach(el => el.remove());
 
       // Always invalidate stale cache & recompute project data before step rendering
       const currentProj = getProject();

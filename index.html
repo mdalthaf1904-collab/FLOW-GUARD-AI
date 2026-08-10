@@ -400,6 +400,14 @@
               <span class="wizard-step-subtitle">Signal timing &amp; optimization</span>
             </div>
           </li>
+
+          <li class="wizard-step-item" data-step-id="6" onclick="FlowGuard.setWizardStep(6)">
+            <span class="wizard-step-num">6</span>
+            <div class="wizard-step-content">
+              <span class="wizard-step-title">Results &amp; Reports</span>
+              <span class="wizard-step-subtitle">View engineering results &amp; reports</span>
+            </div>
+          </li>
         </ul>
       </div>
 
@@ -2060,9 +2068,23 @@
             <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;" id="step5BottomActionGroup">
               <button class="btn-secondary-save" id="btnDownloadReportStep5" onclick="FlowGuard.generateEngineeringReport()">🖨 Download Report</button>
               <button class="btn-primary-cyan" id="btnRunAgainStep5" onclick="FlowGuard.runStep5Analysis()">▶ Run Analysis Again</button>
+              <button class="btn-primary-cyan" id="btnViewResultsStep5" onclick="FlowGuard.setWizardStep(6)">View Results &amp; Reports →</button>
             </div>
           </div>
         </div>
+      </section>
+
+      <!-- STEP 6 SECTION: RESULTS & REPORTS -->
+      <section id="wizard-section-6" class="wizard-section-panel" style="display: none;">
+        <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 class="section-header-title" style="font-size: 1.05rem;">6. RESULTS &amp; ENGINEERING REPORTS</h2>
+            <p style="font-size: 0.82rem; color: var(--text-secondary);">Comprehensive engineering report with optimized signal timings, capacity &amp; v/c analysis, LOS assessment, and printable PDF report generator.</p>
+          </div>
+          <button class="btn-primary-cyan" onclick="FlowGuard.generateEngineeringReport()">🖨 Print PDF Engineering Report</button>
+        </div>
+
+        <div id="engineeringDashboardContainer"></div>
       </section>
 
     </main>
