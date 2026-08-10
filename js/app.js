@@ -6298,11 +6298,9 @@ const FlowGuard = (function () {
       setProgress('Generating Preview Table...', 100);
 
       if (typeof window !== 'undefined') {
-        setTimeout(() => {
-          if (progressContainer) progressContainer.style.display = 'none';
-          renderDatasetPreviewTable(result);
-          console.log('[Dataset Pipeline Complete] Dataset processed cleanly.');
-        }, 100);
+        if (progressContainer) progressContainer.style.display = 'none';
+        renderDatasetPreviewTable(result);
+        console.log('[Dataset Pipeline Complete] Dataset processed cleanly.');
       }
 
       return result;
@@ -6907,6 +6905,9 @@ function initMainViewRouting() {
 
 if (typeof window !== 'undefined') {
   window.FlowGuard = FlowGuard;
+  if (typeof window.FlowGuard2D !== 'undefined') {
+    window.FlowGuard.simulation2D = window.FlowGuard2D;
+  }
   window.FlowGuard.switchMainView = switchMainView;
   window.FlowGuard.handleHashRouting = handleHashRouting;
   window.FlowGuard.initMainViewRouting = initMainViewRouting;

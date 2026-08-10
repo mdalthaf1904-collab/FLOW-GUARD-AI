@@ -283,10 +283,53 @@
       ⚠️ <strong>TRAFFIC ANALYSIS REQUIRED</strong> — Please complete FlowGuard traffic input and analysis before starting the data-driven simulation. Navigate to <a href="analysis.html" style="color: #fde68a;">Analysis →</a>
     </div>
 
+    <!-- Section 0: 2D TOP-DOWN MICROSCOPIC CANVAS TRAFFIC SIMULATION (CSV-DATA-DRIVEN) -->
+    <div class="card" id="sim-2d-canvas-card" style="margin-bottom: 1.5rem; border: 1px solid var(--accent-primary);">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+          <h3 class="card-title" style="display: flex; align-items: center; gap: 0.5rem;">
+            📹 2D Top-Down Microscopic Canvas Simulation
+            <span class="badge badge-low" style="font-size: 0.65rem; background: rgba(56,189,248,0.15); color: #38bdf8; border-color: rgba(56,189,248,0.4);">CSV DATA DRIVEN</span>
+          </h3>
+          <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.25rem;">Real-time microscopic vehicle car-following animation, stop line queues, and traffic signal countdown badges driven by uploaded CSV datasets.</p>
+        </div>
+
+        <!-- Time Interval Selector from CSV -->
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted);">Uploaded CSV Interval:</label>
+          <select id="simCsvIntervalSelect" onchange="if (typeof FlowGuard2D !== 'undefined') FlowGuard2D.setInterval(this.value);" style="padding: 6px 12px; border-radius: 6px; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); font-family: var(--font-mono); font-size: 0.8rem; cursor: pointer;">
+            <option value="08:30 - 08:45">⏱️ 08:30 - 08:45 (Peak Interval)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Controls Toolbar -->
+      <div style="display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: rgba(15,23,42,0.6); border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button class="btn-primary-cyan" onclick="if (typeof FlowGuard2D !== 'undefined') FlowGuard2D.start();" style="padding: 6px 14px; font-size: 0.82rem;">▶ Start Simulation</button>
+          <button class="btn-toolbar" onclick="if (typeof FlowGuard2D !== 'undefined') FlowGuard2D.pause();" style="padding: 6px 14px; font-size: 0.82rem;">⏸ Pause</button>
+          <button class="btn-ghost-reset" onclick="if (typeof FlowGuard2D !== 'undefined') FlowGuard2D.reset();" style="padding: 6px 14px; font-size: 0.82rem;">↺ Reset</button>
+          <button class="btn-toolbar" onclick="if (typeof FlowGuard2D !== 'undefined') FlowGuard2D.triggerEVP('north');" style="padding: 6px 14px; font-size: 0.82rem; background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #fca5a5;">⚡ Emergency Vehicle Priority (North)</button>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Sim Speed:</span>
+          <button class="sim-timing-btn active" onclick="if (typeof FlowGuard2D !== 'undefined') { FlowGuard2D.setSpeed(1.0); document.querySelectorAll('.sim-speed-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); }" class="sim-speed-btn">1x</button>
+          <button class="sim-timing-btn" onclick="if (typeof FlowGuard2D !== 'undefined') { FlowGuard2D.setSpeed(2.0); document.querySelectorAll('.sim-speed-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); }" class="sim-speed-btn">2x</button>
+          <button class="sim-timing-btn" onclick="if (typeof FlowGuard2D !== 'undefined') { FlowGuard2D.setSpeed(4.0); document.querySelectorAll('.sim-speed-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); }" class="sim-speed-btn">4x</button>
+        </div>
+      </div>
+
+      <!-- Canvas Viewport -->
+      <div style="padding: 1rem; background: #0b0f19; text-align: center;">
+        <canvas id="trafficSimCanvas" width="900" height="650" style="width: 100%; max-width: 900px; height: auto; border-radius: 10px; border: 1px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: block; margin: 0 auto;"></canvas>
+      </div>
+    </div>
+
     <!-- Section 1: Prototype Signal Simulation -->
     <div class="card" id="sim-live-card" style="margin-bottom: 1.25rem;">
       <div class="card-header">
-        <h3 class="card-title">1. Signal Operation Simulation (Prototype)</h3>
+        <h3 class="card-title">1. Signal Operation Simulation (D/D/1 Queuing Dashboard)</h3>
         <div style="display: flex; gap: 0.5rem; align-items: center;">
           <span id="sim-phase-badge" class="sim-phase-badge spb-idle">IDLE</span>
           <span class="section-proto-label">PROTOTYPE SIMULATION</span>
@@ -1560,5 +1603,13 @@
       </div>
     </div>
   </div>
+  <script charset="utf-8" src="../js/simulation2d.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (typeof FlowGuard2D !== 'undefined') {
+        FlowGuard2D.init('trafficSimCanvas');
+      }
+    });
+  </script>
 </body>
 </html>
