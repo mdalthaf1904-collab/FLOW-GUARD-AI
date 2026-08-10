@@ -316,8 +316,91 @@ const FlowGuard = (function () {
   const PROJECT_STORAGE_KEY = 'FLOWGUARD_PROJECT_V8';
   const SESSION_STORAGE_KEY = 'FLOWGUARD_SESSION_STATE_V6';
   const CSV_RECORDS_KEY = 'FLOWGUARD_CSV_RECORDS_V6';
+  const CURRENT_RESULT_STORAGE_KEY = 'FLOWGUARD_CURRENT_ANALYSIS_RESULT_V1';
+  const REPORT_HISTORY_STORAGE_KEY = 'FLOWGUARD_REPORT_HISTORY_V1';
 
   let _projectStore = null;
+  let _currentAnalysisResult = null;
+
+  function saveCurrentAnalysisResult(resultObj) {
+    if (!resultObj) return;
+    _currentAnalysisResult = resultObj;
+
+    try {
+      const proj = loadProject();
+      if (proj) {
+        proj.lastAnalysisResult = resultObj;
+        proj.report = {
+          generatedAt: resultObj.timestamp,
+          runId: resultObj.runId,
+          summary: resultObj
+        };
+      }
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(CURRENT_RESULT_STORAGE_KEY, JSON.stringify(resultObj));
+
+        let history = [];
+        try {
+          const histStr = localStorage.getItem(REPORT_HISTORY_STORAGE_KEY);
+          if (histStr) history = JSON.parse(histStr) || [];
+        } catch (e) { history = []; }
+
+        history = history.filter(h => h && h.runId !== resultObj.runId);
+        history.unshift(resultObj);
+        if (history.length > 50) history = history.slice(0, 50);
+
+        localStorage.setItem(REPORT_HISTORY_STORAGE_KEY, JSON.stringify(history));
+      }
+    } catch (err) {
+      console.warn('[FlowGuard AI] Error saving current analysis result:', err);
+    }
+  }
+
+  function getCurrentAnalysisResult() {
+    if (_currentAnalysisResult && _currentAnalysisResult.websterTiming) {
+      return _currentAnalysisResult;
+    }
+
+    try {
+      const proj = loadProject();
+      if (proj && proj.lastAnalysisResult && proj.lastAnalysisResult.websterTiming) {
+        _currentAnalysisResult = proj.lastAnalysisResult;
+        return _currentAnalysisResult;
+      }
+    } catch (e) {}
+
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem(CURRENT_RESULT_STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.websterTiming) {
+            _currentAnalysisResult = parsed;
+            return _currentAnalysisResult;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[FlowGuard AI] Error reading current analysis result:', err);
+    }
+
+    return null;
+  }
+
+  function clearCurrentAnalysisResult() {
+    _currentAnalysisResult = null;
+    try {
+      const proj = loadProject();
+      if (proj) {
+        proj.lastAnalysisResult = null;
+        proj.report = { generatedAt: null, summary: null };
+      }
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(CURRENT_RESULT_STORAGE_KEY);
+      }
+    } catch (err) {}
+  }
 
   function createInitialProject() {
     return {
@@ -1327,6 +1410,7 @@ const FlowGuard = (function () {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
         sessionStorage.removeItem(CSV_RECORDS_KEY);
       }
+      clearCurrentAnalysisResult();
     } catch (err) {
       console.warn('[FlowGuard AI] Error writing reset project to storage:', err);
     }
@@ -1339,6 +1423,7 @@ const FlowGuard = (function () {
    * Wipes dataset, processedTraffic, analysisResults, and report.
    */
   function clearDataset() {
+    clearCurrentAnalysisResult();
     const proj = loadProject();
     const initial = createInitialProject();
 
@@ -2573,14 +2658,17 @@ const FlowGuard = (function () {
   }
 
   /**
-   * TASK 8: Upgraded Engineering Report Generator (15 Required Sections)
+   * Upgraded Engineering Report Generator (PDF Printable Report from Canonical Current Result)
    */
   function generateEngineeringReport(stateData) {
-    const state = stateData || getState();
-    const activeKeys = getActiveApproachKeys(state.configType || '4CROSS');
-    const approaches = state.approaches || DEFAULT_STATE.approaches;
+    const currentResult = getCurrentAnalysisResult();
 
     if (typeof window === 'undefined') return;
+
+    if (!currentResult || !currentResult.websterTiming) {
+      alert('No completed analysis result available. Please execute Step 5 (Run Analysis) before downloading or printing the report.');
+      return;
+    }
 
     const reportWindow = window.open('', '_blank');
     if (!reportWindow) {
@@ -2588,108 +2676,117 @@ const FlowGuard = (function () {
       return;
     }
 
+    const { runId, formattedDate, geometry, demandSummary, criticalAnalysis, websterTiming, baselineTiming, beforeAfterPerformance, recommendations, assumptionsLimitations } = currentResult;
+    const roadMetrics = (demandSummary && demandSummary.roadMetrics) || {};
+
     const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>FlowGuard AI — Professional Traffic Engineering Report</title>
+  <title>FlowGuard AI — Engineering Decision Support Report (${runId})</title>
   <style>
-    body { font-family: 'Inter', Arial, sans-serif; margin: 2rem; color: #1e293b; line-height: 1.5; }
-    h1 { color: #0f172a; border-bottom: 2px solid #0284c7; padding-bottom: 0.5rem; font-size: 1.6rem; }
-    h2 { color: #0369a1; margin-top: 1.25rem; font-size: 1.1rem; border-left: 4px solid #0284c7; padding-left: 0.5rem; }
+    body { font-family: 'Inter', Arial, sans-serif; margin: 2rem; color: #1e293b; line-height: 1.5; background: #fff; }
+    h1 { color: #0f172a; border-bottom: 2px solid #0284c7; padding-bottom: 0.5rem; font-size: 1.5rem; }
+    h2 { color: #0369a1; margin-top: 1.25rem; font-size: 1.05rem; border-left: 4px solid #0284c7; padding-left: 0.5rem; }
     table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; margin-bottom: 1rem; font-size: 0.85rem; }
     th, td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; }
-    th { background: #f1f5f9; color: #334155; }
+    th { background: #f1f5f9; color: #334155; font-weight: 700; }
     .summary-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.85rem 1rem; border-radius: 6px; margin-bottom: 1rem; }
+    .badge-success { color: #15803d; font-weight: 700; }
+    @media print {
+      body { margin: 0.5cm; font-size: 11pt; }
+      .no-print { display: none; }
+    }
   </style>
 </head>
 <body>
+  <div class="no-print" style="margin-bottom: 1rem; text-align: right;">
+    <button onclick="window.print()" style="background: #0284c7; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; font-weight: 700; cursor: pointer;">🖨 Print / Save as PDF</button>
+  </div>
+
   <h1>FLOWGUARD AI — TRAFFIC ENGINEERING DECISION SUPPORT REPORT</h1>
   <div style="font-size:0.82rem; color:#64748b; margin-bottom:1.25rem;">
-    Generated: ${new Date().toLocaleString()} | Standards: IRC:93, IRC:106, HCM | Mode: Offline Engineering Decision Support
+    Run ID: <strong>${runId}</strong> | Generated: ${formattedDate} | Standards: IRC:93, IRC:106, HCM | Mode: Offline Decision Support
   </div>
 
   <div class="summary-box">
-    <h2>1. Executive Summary</h2>
-    <p>This report documents the traffic engineering analysis, PCU calculation, capacity evaluation, Webster signal timing optimization, and IRC:93 guidelines validation for the selected junction.</p>
+    <h2 style="margin-top:0;">1. Executive Summary</h2>
+    <p>This report presents the canonical traffic engineering analysis, PCU demand conversion, Webster signal timing optimization, and IRC:93 safety validation for <strong>${geometry.configLabel}</strong> under peak survey window <strong>${demandSummary.peakInterval}</strong>.</p>
   </div>
 
-  <h2>2. Traffic Inputs & Geometry</h2>
-  <p>Intersection Configuration: <strong>${getConfigLabel(state.configType || '4CROSS')}</strong></p>
+  <h2>2. Intersection Geometry & Parameters</h2>
+  <p>Configuration: <strong>${geometry.configLabel}</strong> | Base Saturation Flow: <strong>${geometry.baseSaturationFlow} PCU/h/lane</strong> | Survey Duration: <strong>${geometry.surveyDuration} min</strong></p>
 
-  <h2>3. PCU Calculation (IRC:106 Standard)</h2>
+  <h2>3. Traffic Demand & PCU Conversion (IRC:106 Standard)</h2>
   <table>
-    <thead><tr><th>Approach</th><th>Traffic Volume (PCU/h)</th><th>Lanes</th><th>Turning Share (L / T / R)</th></tr></thead>
+    <thead>
+      <tr>
+        <th>Approach</th>
+        <th>Lanes</th>
+        <th>Physical Vehicles</th>
+        <th>Converted Demand (PCU/h)</th>
+        <th>Sat Flow (PCU/h)</th>
+        <th>Critical Flow Ratio (y)</th>
+      </tr>
+    </thead>
     <tbody>
-      ${activeKeys.map(k => {
-      const a = approaches[k] || {};
-      return `<tr><td>${a.name || k.toUpperCase()}</td><td>${a.flow || 0}</td><td>${a.lanes || 2}</td><td>${a.left || 0} / ${a.through || 0} / ${a.right || 0}</td></tr>`;
-    }).join('')}
+      ${['north', 'east', 'south', 'west'].map(k => {
+        const m = roadMetrics[k] || {};
+        const titleMap = { north: 'Road A - Northbound', east: 'Road B - Eastbound', south: 'Road C - Southbound', west: 'Road D - Westbound' };
+        return `
+          <tr>
+            <td>${titleMap[k]}</td>
+            <td>${m.lanesVal || 2}</td>
+            <td>${m.totalDemandVal ? Math.round(m.totalDemandVal) : 0} veh</td>
+            <td><strong>${m.totalDemandVal ? m.totalDemandVal.toFixed(1) : '0.0'} PCU/h</strong></td>
+            <td>${m.satFlow || ( (m.lanesVal || 2) * geometry.baseSaturationFlow )} PCU/h</td>
+            <td><strong>${m.flowRatioY !== undefined ? m.flowRatioY.toFixed(4) : '—'}</strong> (${m.critMoveStr || 'Through'})</td>
+          </tr>
+        `;
+      }).join('')}
     </tbody>
   </table>
 
-  <h2>4. Capacity Analysis</h2>
-  <p>Approach capacity computed using IRC saturation flow $S = 525 \times W$ (where $W$ is carriageway width in meters).</p>
-
-  <h2>5. Level of Service (LOS)</h2>
-  <p>Control delay and Level of Service evaluated per HCM/IRC thresholds (A through F).</p>
-
-  <h2>6. Queue Analysis (D/D/1 Queuing Model)</h2>
-  <p>Maximum queue build-up and average queue dissipation evaluated across simulation horizon.</p>
-
-  <h2>7. Delay Analysis</h2>
-  <p>Total system delay (veh-sec) and average wait time per vehicle computed for baseline and candidate plans.</p>
-
-  <h2>8. Traffic Pressure Index (TPI)</h2>
-  <table>
-    <thead><tr><th>Approach</th><th>Traffic Volume</th><th>Queue Length</th><th>Average Delay</th><th>V/C Ratio</th><th>Pressure Rank</th></tr></thead>
-    <tbody>
-      ${activeKeys.map(k => {
-      const a = approaches[k] || {};
-      const flow = a.flow || 400;
-      const q = Math.round((flow / 3600) * 40);
-      const d = 35;
-      const vc = (flow / 1000).toFixed(2);
-      const rank = calculateTrafficPressureIndex(flow, q, d, vc);
-      return `<tr><td>${a.name || k.toUpperCase()}</td><td>${flow} PCU/h</td><td>${q} veh</td><td>${d} s</td><td>${vc}</td><td><strong>${rank}</strong></td></tr>`;
-    }).join('')}
-    </tbody>
-  </table>
-
-  <h2>9. Webster Signal Timing Calculation</h2>
-  <p>Optimum cycle length $C = (1.5L + 5) / (1 - Y)$, green splits allocated proportionally to flow ratios $y_i$.</p>
-
-  <h2>10. IRC:93 Validation & Compliance</h2>
+  <h2>4. Webster Signal Timing Plan (IRC:93 Standard)</h2>
   <div class="summary-box">
-    <p>✓ Minimum Green Bound satisfied ($\ge 7$s)</p>
-    <p>✓ Maximum Green Bound satisfied ($\le 90$s)</p>
-    <p>✓ Yellow Interval satisfied ($\ge 3$s)</p>
-    <p>✓ All Red Clearance satisfied ($\ge 2$s)</p>
-    <p>✓ Pedestrian Crossing Time satisfied (Crosswalk width $14$m $\Rightarrow 18.7$s minimum)</p>
-    <p>✓ Conflict-Free Phasing verified</p>
-    <p><strong>OVERALL STATUS: ENGINEERING VALIDATED</strong></p>
+    <p>• Webster Optimum Cycle Length C₀ = <strong>${websterTiming.websterCycleC0} s</strong> (Lost Time L = ${websterTiming.totalLostTimeL}s)</p>
+    <p>• Phase 1 Green Split (N / S) = <strong class="badge-success">${websterTiming.g1} s</strong> (Amber: ${websterTiming.amber}s, All-Red: ${websterTiming.allRed}s)</p>
+    <p>• Phase 2 Green Split (E / W) = <strong class="badge-success">${websterTiming.g2} s</strong> (Amber: ${websterTiming.amber}s, All-Red: ${websterTiming.allRed}s)</p>
+    <p>• Critical Flow Ratio Y = <strong>${criticalAnalysis.totalY}</strong> (Capacity Limit Status: ${criticalAnalysis.isWebsterValid ? 'FEASIBLE' : 'OVERSATURATED'})</p>
   </div>
 
-  <h2>11. Simulation Results</h2>
-  <p>Deterministic queuing simulation executed over 10 cycles showing queue stability and reduced residual queues.</p>
-
-  <h2>12. Controller Validation</h2>
-  <p>Signal controller phase sequence verified with zero simultaneous conflicting green phase interlocks.</p>
-
-  <h2>13. Before vs After Comparison Metrics</h2>
+  <h2>5. Before vs After Performance Comparison</h2>
   <table>
-    <thead><tr><th>Metric</th><th>Baseline</th><th>Webster Candidate</th><th>Improvement</th></tr></thead>
+    <thead>
+      <tr>
+        <th>Performance Metric</th>
+        <th>Current / Baseline</th>
+        <th>Webster Candidate</th>
+        <th>Estimated Impact</th>
+      </tr>
+    </thead>
     <tbody>
-      <tr><td>Overall Avg Wait Time</td><td>48.5 s/veh</td><td>32.1 s/veh</td><td><strong style="color:#15803d;">-33.8%</strong></td></tr>
-      <tr><td>Max Queue Length</td><td>58 veh</td><td>34 veh</td><td><strong style="color:#15803d;">-41.4%</strong></td></tr>
+      <tr><td>Shared Cycle Length</td><td>${baselineTiming.hasBaseline ? baselineTiming.existingCycle + ' s' : '—'}</td><td><strong>${websterTiming.websterCycleC0} s</strong></td><td>Optimized C₀</td></tr>
+      <tr><td>Phase 1 Green (N/S)</td><td>${baselineTiming.hasBaseline ? baselineTiming.baselineP1Green + ' s' : '—'}</td><td><strong>${websterTiming.g1} s</strong></td><td>Rebalanced Split</td></tr>
+      <tr><td>Phase 2 Green (E/W)</td><td>${baselineTiming.hasBaseline ? baselineTiming.baselineP2Green + ' s' : '—'}</td><td><strong>${websterTiming.g2} s</strong></td><td>Rebalanced Split</td></tr>
+      <tr><td>Control Delay (s/veh)</td><td>${beforeAfterPerformance.baselineDelay}</td><td><strong>${beforeAfterPerformance.proposedDelay}</strong></td><td class="badge-success">${beforeAfterPerformance.delayChange}</td></tr>
+      <tr><td>Queue Length (m)</td><td>${beforeAfterPerformance.baselineQueue}</td><td><strong>${beforeAfterPerformance.proposedQueue}</strong></td><td class="badge-success">${beforeAfterPerformance.queueChange}</td></tr>
+      <tr><td>Degree of Saturation (v/c)</td><td>${beforeAfterPerformance.baselineDOS}</td><td><strong>${beforeAfterPerformance.proposedDOS}</strong></td><td class="badge-success">${beforeAfterPerformance.dosChange}</td></tr>
+      <tr><td>Level of Service (LOS)</td><td>${beforeAfterPerformance.baselineLOS}</td><td><strong>${beforeAfterPerformance.proposedLOS}</strong></td><td class="badge-success">${beforeAfterPerformance.losChange}</td></tr>
     </tbody>
   </table>
 
-  <h2>14. Engineering Recommendation</h2>
-  <p>Implementation of the validated Webster candidate signal plan is recommended. Priority allocated to heavy approach legs while maintaining minimum pedestrian crossing safety intervals on minor legs.</p>
+  <h2>6. Engineering Bottleneck & Recommendation</h2>
+  <div class="summary-box">
+    <p>Primary Bottleneck: <strong>${recommendations.bottleneck}</strong></p>
+    <p>Reason: ${recommendations.reason}</p>
+    <p><strong>Action Plan:</strong> ${recommendations.action}</p>
+  </div>
 
-  <h2>15. Future Scope & System Enhancements</h2>
-  <p>Future extensions include multi-intersection corridor coordination, dynamic lane reassignment advisories, and transit signal priority integration.</p>
+  <h2>7. Engineering Standards & Assumptions</h2>
+  <ul>
+    ${assumptionsLimitations.map(item => `<li>${item}</li>`).join('')}
+  </ul>
 
   <script>
     window.onload = function() { window.print(); };
@@ -2754,423 +2851,237 @@ const FlowGuard = (function () {
   }
 
   /**
-   * Master Function: renderEngineeringDashboard(parsedData)
-   * Dynamically builds and injects the 7 massive engineering dashboard sections
-   * into a container div named #dashboard-results immediately after CSV processing.
+   * Master Function: renderEngineeringDashboard(parsedData, containerId)
+   * Dynamically builds and renders the canonical Results & Reports dashboard
+   * from the latest completed analysis run. Enforces empty state when no analysis is available.
    */
-  /**
-   * Master Function: renderEngineeringDashboard(parsedData)
-   * Dynamically builds and injects the 7 massive engineering dashboard sections
-   * into a container div named #dashboard-results immediately after CSV processing.
-   * Strictly enforces data isolation per approach to prevent single-direction data bleed.
-   */
-  function renderEngineeringDashboard(parsedData, containerId = 'dashboard-results') {
+  function renderEngineeringDashboard(parsedData, containerId = 'engineeringDashboardContainer') {
     if (typeof document === 'undefined') return;
 
     let container = document.getElementById(containerId);
+    if (!container) {
+      container = document.getElementById('dashboard-results');
+    }
     if (!container) {
       container = document.createElement('div');
       container.id = containerId;
       document.body.appendChild(container);
     }
 
-    container.innerHTML = ''; // Clear previous contents
+    container.innerHTML = '';
 
-    const state = getState();
-    const approaches = state.approaches || DEFAULT_STATE.approaches;
-    const storedRecords = getCSVRecords();
-    const isExplicitlyProcessed = (parsedData && (Array.isArray(parsedData) ? parsedData.length > 0 : Object.keys(parsedData).length > 0));
-    const hasUploadedRoads = Object.values(approaches).some(app => app.uploaded === true || app.fromCSV === true);
+    const currentResult = getCurrentAnalysisResult();
 
-    const hasData = isExplicitlyProcessed || (storedRecords && storedRecords.length > 0) || hasUploadedRoads;
-
-    // ── DATA CHECK GATEKEEPER — EMPTY STATE UI (Fixes "Ghost Data" Bug) ──
-    if (!hasData) {
+    // ── DATA CHECK GATEKEEPER — EMPTY STATE UI ──
+    if (!currentResult || !currentResult.websterTiming) {
       container.innerHTML = `
-        <div class="card" style="padding: 2.5rem; text-align: center; border: 1px dashed rgba(56,189,248,0.4); background: rgba(15,23,42,0.6); margin-top: 1.5rem;">
-          <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">📊</div>
+        <div class="card" style="padding: 3rem 2rem; text-align: center; border: 1px dashed rgba(56,189,248,0.4); background: rgba(15,23,42,0.6); margin-top: 1.5rem;">
+          <div style="font-size: 3rem; margin-bottom: 0.75rem;">📊</div>
           <div style="font-size: 0.85rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #94a3b8; margin-bottom: 0.5rem;">
-            STATUS: AWAITING DATA INPUT
+            STATUS: NO COMPLETED ANALYSIS AVAILABLE
           </div>
           <h3 style="margin: 0 0 0.75rem 0; color: #38bdf8; font-size: 1.25rem;">
-            No Traffic Data Uploaded Yet
+            No Completed Analysis Available
           </h3>
-          <p style="color: var(--text-muted); max-width: 600px; margin: 0 auto 1.5rem auto; font-size: 0.88rem; line-height: 1.6;">
-            The D/D/1 queuing calculations and saturation flow metrics are halted to prevent phantom baseline rendering. Upload a historical traffic CSV file or load demo mock data to calculate volume-to-capacity ratios, queuing metrics, and signal timing plans.
+          <p style="color: var(--text-secondary); max-width: 600px; margin: 0 auto 1.5rem auto; font-size: 0.88rem; line-height: 1.6;">
+            Run the Traffic Analysis before viewing results and reports. Completing Step 5 optimizes signal timings and generates comprehensive engineering reports.
           </p>
           <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
-            <button id="btnEmptyStateLoadDemo" class="btn btn-primary" style="padding: 0.6rem 1.25rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
-              ⚡ Load Demo Mock Data
-            </button>
-            <button id="btnEmptyStateTriggerUpload" class="btn btn-secondary" style="padding: 0.6rem 1.25rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
-              📂 Upload Traffic CSV
+            <button class="btn-primary-cyan" onclick="FlowGuard.setWizardStep(5)">
+              ▶ Go to Step 5: Run Analysis
             </button>
           </div>
         </div>
       `;
-
-      const demoBtn = document.getElementById('btnEmptyStateLoadDemo');
-      if (demoBtn) {
-        demoBtn.addEventListener('click', () => {
-          const demoApproaches = {
-            north: { id: 'north', road: 'A', name: 'Road A - North', flow: 3300, currentGreen: 30, left: 495, through: 2310, right: 495, lanes: 2, uploaded: true, fromCSV: true },
-            east: { id: 'east', road: 'B', name: 'Road B - East', flow: 720, currentGreen: 30, left: 100, through: 520, right: 100, lanes: 2, uploaded: true, fromCSV: true },
-            south: { id: 'south', road: 'C', name: 'Road C - South', flow: 280, currentGreen: 30, left: 40, through: 200, right: 40, lanes: 2, uploaded: true, fromCSV: true },
-            west: { id: 'west', road: 'D', name: 'Road D - West', flow: 350, currentGreen: 30, left: 50, through: 250, right: 50, lanes: 2, uploaded: true, fromCSV: true }
-          };
-          const newState = { ...state, approaches: demoApproaches };
-          saveState(newState);
-          saveCSVRecords([
-            { time_of_day: '08:00 AM', vehicles_per_minute: 55, lanes: 2, incident_event: 'none' },
-            { time_of_day: '08:15 AM', vehicles_per_minute: 40, lanes: 2, incident_event: 'none' },
-            { time_of_day: '08:30 AM', vehicles_per_minute: 25, lanes: 2, incident_event: 'roadwork' }
-          ]);
-          renderEngineeringDashboard(demoApproaches, containerId);
-        });
-      }
-
-      const uploadBtn = document.getElementById('btnEmptyStateTriggerUpload');
-      if (uploadBtn) {
-        uploadBtn.addEventListener('click', () => {
-          const fileInput = document.getElementById('csvFileInput');
-          if (fileInput) {
-            fileInput.click();
-          } else {
-            window.location.href = 'analysis.html#csvUploadSection';
-          }
-        });
-      }
-
       return;
     }
 
-    const roadKeys = ['north', 'east', 'south', 'west'];
-    const roadNamesMap = { north: 'Road A - North', east: 'Road B - East', south: 'Road C - South', west: 'Road D - West' };
+    // Render current result dashboard strictly from canonical `currentResult` SSoT
+    const { runId, formattedDate, geometry, demandSummary, criticalAnalysis, websterTiming, baselineTiming, beforeAfterPerformance, recommendations, assumptionsLimitations } = currentResult;
+    const roadMetrics = (demandSummary && demandSummary.roadMetrics) || {};
 
-    // Perform Webster Signal Timing Engine & IRC:93 Engineering Validation
-    const websterRes = calculateWebsterEngine(approaches);
-    const valRes = validateIRC93(websterRes, approaches);
+    const roadKeys = [
+      { key: 'north', title: 'Road A — Northbound', icon: '⬆' },
+      { key: 'east', title: 'Road B — Eastbound', icon: '➔' },
+      { key: 'south', title: 'Road C — Southbound', icon: '⬇' },
+      { key: 'west', title: 'Road D — Westbound', icon: '⬅' }
+    ];
 
-    let totalDemandPCU = 0;
-    const roadData = {};
-
-    roadKeys.forEach(k => {
-      const app = approaches[k] || {};
-      const flow = parseFloat(app.flow || app.pcuTotal) || 0;
-      const left = parseFloat(app.left) || 0;
-      const through = parseFloat(app.through) || 0;
-      const right = parseFloat(app.right) || 0;
-      const lanes = parseInt(app.lanes, 10) || 2;
-      const valInfo = (valRes.validations || []).find(v => v.key === k) || {};
-      const recGreen = valInfo.validatedGreen || (websterRes.approaches[k] ? websterRes.approaches[k].greenSplit : 30);
-      const currGreen = parseFloat(app.currentGreen) || 30;
-      const uploaded = app.uploaded === true || (flow > 0 && app.fromCSV === true);
-
-      // Compute Saturation Flow S = 525 * (lanes * 3.5m)
-      const satFlow = Math.round(525 * (lanes * 3.5));
-      const capacity = Math.round(satFlow * (recGreen / valRes.finalCycleTime)) || 900;
-      const vc = capacity > 0 ? parseFloat((flow / capacity).toFixed(2)) : 0;
-
-      roadData[k] = {
-        name: roadNamesMap[k],
-        flow: flow,
-        left: left,
-        through: through,
-        right: right,
-        lanes: lanes,
-        green: currGreen,
-        recGreen: recGreen,
-        capacity: capacity,
-        satFlow: satFlow,
-        vc: vc,
-        uploaded: uploaded,
-        isOversaturated: vc > 1.0,
-        appObj: app
-      };
-
-      totalDemandPCU += flow;
-    });
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'engineering-dashboard-master';
-    wrapper.style.display = 'flex';
-    wrapper.style.flexDirection = 'column';
-    wrapper.style.gap = '1.5rem';
-    wrapper.style.marginTop = '1.5rem';
-
-    // Helper functions for building table rows dynamically per road:
-    const renderCardGrid = () => roadKeys.map(k => {
-      const r = roadData[k];
-      return `
-        <div style="background: rgba(15,23,42,0.6); padding: 1rem; border-radius: 6px; border: 1px solid ${r.uploaded ? 'rgba(56,189,248,0.4)' : 'var(--border-color)'};">
-          <h4 style="margin: 0 0 0.5rem 0; color: ${r.uploaded ? 'var(--primary)' : 'var(--text-muted)'};">${r.name}</h4>
-          <div style="font-size: 0.83rem; display: flex; flex-direction: column; gap: 0.25rem;">
-            <div>Incoming Lanes: <strong>${r.lanes} IN Lanes</strong></div>
-            <div>Speed Limit: <strong>${r.appObj.speedLimit || 50} km/h</strong></div>
-            <div>Total Demand: <strong style="color: ${r.uploaded ? 'var(--primary)' : 'var(--text-dim)'};">${r.flow > 0 ? `${r.flow} PCU/h` : '0 PCU/h (No Upload)'}</strong></div>
-            <div>Current / Rec. Green: <strong>${r.green}s / <span style="color:#10b981;">${r.recGreen}s</span></strong></div>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    const renderTurningRows = () => roadKeys.map(k => {
-      const r = roadData[k];
-      const leftPct = r.flow > 0 ? Math.round((r.left / r.flow) * 100) : 0;
-      const thruPct = r.flow > 0 ? Math.round((r.through / r.flow) * 100) : 0;
-      const rightPct = r.flow > 0 ? Math.round((r.right / r.flow) * 100) : 0;
-
-      return `
-        <tr>
-          <td><strong>${r.name}</strong></td>
-          <td><span class="badge badge-low">${r.lanes} IN Lanes</span></td>
-          <td>${r.flow > 0 ? r.left : 0}</td>
-          <td>${r.flow > 0 ? r.through : 0}</td>
-          <td>${r.flow > 0 ? r.right : 0}</td>
-          <td><strong style="color:${r.flow > 0 ? 'var(--primary)' : 'var(--text-dim)'};">${r.flow} PCU/h</strong></td>
-          <td>${r.flow > 0 ? `Left: ${leftPct}% | Thru: ${thruPct}% | Right: ${rightPct}%` : '<span style="color:var(--text-dim);">No Data / Awaiting Upload</span>'}</td>
-        </tr>
-      `;
-    }).join('');
-
-    const renderCapacityRows = () => roadKeys.map(k => {
-      const r = roadData[k];
-      const isOver = r.vc > 1.0;
-      return `
-        <tr style="${isOver ? 'background: rgba(239,68,68,0.08);' : ''}">
-          <td><strong>${r.name}</strong></td>
-          <td>${r.flow} PCU/h</td>
-          <td>${r.capacity} PCU/h</td>
-          <td>${r.recGreen}s (Rec) / ${r.green}s (Curr)</td>
-          <td>${totalDemandPCU > 0 ? ((r.flow / totalDemandPCU) * 100).toFixed(1) : '0.0'}%</td>
-          <td style="font-weight: 700; color: ${isOver ? '#ef4444' : '#10b981'};">${r.vc.toFixed(2)}</td>
-          <td><span class="badge ${isOver ? 'badge-oversaturated' : 'badge-low'}" style="font-weight: 700;">${isOver ? 'OVERSATURATED' : (r.flow === 0 ? 'NO DATA' : 'OPTIMAL')}</span></td>
-        </tr>
-      `;
-    }).join('');
-
-    const renderSchematicDirections = () => roadKeys.map(k => {
-      const r = roadData[k];
-      return `
-        <div style="background: rgba(30,41,59,0.6); padding: 0.75rem; border-radius: 4px; border: 1px solid ${r.uploaded ? 'rgba(56,189,248,0.4)' : 'var(--border-color)'};">
-          <div style="font-weight: 700; color: #38bdf8;">${r.name.toUpperCase()}</div>
-          <div style="font-size: 0.8rem; margin-top: 0.2rem;">INBOUND: <strong>${r.flow} PCU/h</strong></div>
-          <div style="font-size: 0.8rem; color: ${r.vc > 1.0 ? '#ef4444' : '#10b981'}; font-weight: 700;">v/c Ratio: ${r.vc.toFixed(2)}</div>
-        </div>
-      `;
-    }).join('');
-
-    wrapper.innerHTML = `
-      <!-- SECTION 1: Active Approach Traffic & Lane Configuration -->
-      <div class="card" style="padding: 1.5rem; border: 1px solid rgba(56,189,248,0.35);">
-        <h3 style="margin-top: 0; color: #38bdf8; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
-          1. Active Approach Traffic & Lane Configuration (Interactive Panel)
-        </h3>
-
-        <div style="display: grid; grid-template-columns: 3fr 1fr; gap: 1.25rem;">
-          <div class="grid-2" style="gap: 1rem;">
-            ${renderCardGrid()}
-          </div>
-
-          <div style="background: rgba(30,41,59,0.5); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.8rem;">
-            <div style="font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem;">IRC:106-1990 PCU Factors</div>
-            <div style="display: flex; flex-direction: column; gap: 0.2rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-              <div>Car / Jeep: <strong>1.0 PCU</strong></div>
-              <div>2-Wheeler: <strong>0.5 PCU</strong></div>
-              <div>Auto-Rickshaw: <strong>0.8 PCU</strong></div>
-              <div>City Bus: <strong>3.0 PCU</strong></div>
-              <div>Truck / LCV: <strong>3.0 PCU</strong></div>
-              <div>Bicycle: <strong>0.4 PCU</strong></div>
+    container.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 1.5rem; margin-top: 1rem;">
+        
+        <!-- SECTION 1: RUN HEADER & METADATA -->
+        <div class="card" style="padding: 1.25rem 1.5rem; background: var(--bg-panel); border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <div style="font-size: 0.75rem; color: var(--accent-primary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.2rem;">
+              COMPLETED ANALYSIS RUN • ${runId}
             </div>
-
-            <div style="font-weight: 700; color: var(--text-main); margin-bottom: 0.3rem;">Webster & IRC:93 Parameters</div>
-            <div style="display: flex; flex-direction: column; gap: 0.2rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-              <div>Cycle Length (C): <strong>${valRes.finalCycleTime}s</strong></div>
-              <div>Amber (Y): <strong>${websterRes.amberTime}s</strong></div>
-              <div>All-Red (AR): <strong>${websterRes.allRedTime}s</strong></div>
-              <div>Base Saturation: <strong>525 × Width PCU/h</strong></div>
-            </div>
-
-            <div style="background: rgba(56,189,248,0.1); padding: 0.5rem; border-radius: 4px; border-left: 3px solid #38bdf8;">
-              <strong>Pedestrian Safety Module:</strong><br>
-              T_ped = 7.0s + (W / 1.2m/s) (IRC:93 Compliant)
+            <h3 style="margin: 0; color: var(--text-primary); font-size: 1.15rem; font-weight: 700;">
+              ${geometry.configLabel || '4-Arm Cross Intersection'} Signal Timing & Capacity Evaluation
+            </h3>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">
+              Execution Timestamp: <strong>${formattedDate}</strong> | Survey Peak Window: <strong>${demandSummary.peakInterval}</strong> | Base Saturation: <strong>${geometry.baseSaturationFlow} PCU/h/lane</strong>
             </div>
           </div>
-        </div>
-      </div>
-
-      <!-- SECTION 2: Turning Movement Summary Table -->
-      <div class="card" style="padding: 1.5rem;">
-        <h3 style="margin-top: 0; color: var(--primary); font-size: 1.1rem;">
-          2. Turning Movement Summary Table & Percentage Distribution
-        </h3>
-
-        <div class="table-responsive">
-          <table class="data-table" style="width: 100%; font-size: 0.85rem;">
-            <thead>
-              <tr>
-                <th>Active Origin Road</th>
-                <th>Incoming Lanes</th>
-                <th>Left Turn</th>
-                <th>Through</th>
-                <th>Right Turn</th>
-                <th>Total Demand</th>
-                <th>Turning Distribution (%)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${renderTurningRows()}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- SECTION 3: Approach Capacity & Volume-to-Capacity (v/c) Ratios -->
-      <div class="card" style="padding: 1.5rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-          <h3 style="margin: 0; color: var(--primary); font-size: 1.1rem;">
-            3. Approach Capacity & Volume-to-Capacity (v/c) Ratios
-          </h3>
-          <span style="font-size: 0.95rem; font-weight: 700; color: #38bdf8; background: rgba(56,189,248,0.15); padding: 0.3rem 0.75rem; border-radius: 4px; border: 1px solid rgba(56,189,248,0.3);">
-            Total Demand: ${totalDemandPCU.toLocaleString()} PCU/h
-          </span>
+          <button class="btn-primary-cyan" onclick="FlowGuard.generateEngineeringReport()">
+            🖨 Download / Print PDF Report
+          </button>
         </div>
 
-        <div class="table-responsive">
-          <table class="data-table" style="width: 100%; font-size: 0.85rem;">
-            <thead>
-              <tr>
-                <th>Active Approach</th>
-                <th>Total Demand (PCU/h)</th>
-                <th>Capacity (PCU/h)</th>
-                <th>Signal Timing (Green)</th>
-                <th>Demand Share</th>
-                <th>v/c Ratio</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${renderCapacityRows()}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- SECTION 4: Intersection Demand Schematic (Indian LHT) -->
-      <div class="card" style="padding: 1.5rem;">
-        <h3 style="margin-top: 0; color: var(--primary); font-size: 1.1rem; margin-bottom: 0.75rem;">
-          4. Intersection Demand Schematic (Indian LHT)
-        </h3>
-
-        <div style="background: rgba(15,23,42,0.8); padding: 1.25rem; border-radius: 6px; border: 1px solid var(--border-color);">
-          <div style="display: flex; gap: 1.5rem; align-items: center; margin-bottom: 1rem; font-size: 0.83rem;">
-            <strong>SCHEMATIC LEGEND:</strong>
-            <span style="color: #3b82f6;">■ Blue = Left Turn (↰)</span>
-            <span style="color: #10b981;">■ Green = Through (↑)</span>
-            <span style="color: #f97316;">■ Orange = Right Turn (↱)</span>
+        <!-- SECTION 2: TOP METRIC CARDS (4 STAT CARDS) -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+          <div class="card" style="padding: 1.1rem; text-align: center; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">WEBSTER OPTIMUM CYCLE (C₀)</div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: var(--accent-primary); margin-top: 0.2rem;">${websterTiming.websterCycleC0} s</div>
+            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.25rem;">Total Lost Time L = ${websterTiming.totalLostTimeL}s</div>
           </div>
 
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; text-align: center;">
-            ${renderSchematicDirections()}
+          <div class="card" style="padding: 1.1rem; text-align: center; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">PHASE 1 GREEN (N / S)</div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: var(--success); margin-top: 0.2rem;">${websterTiming.g1} s</div>
+            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.25rem;">Amber: ${websterTiming.amber}s | All-Red: ${websterTiming.allRed}s</div>
+          </div>
+
+          <div class="card" style="padding: 1.1rem; text-align: center; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">PHASE 2 GREEN (E / W)</div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: #fcd34d; margin-top: 0.2rem;">${websterTiming.g2} s</div>
+            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.25rem;">Amber: ${websterTiming.amber}s | All-Red: ${websterTiming.allRed}s</div>
+          </div>
+
+          <div class="card" style="padding: 1.1rem; text-align: center; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">CRITICAL FLOW RATIO (Y)</div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: ${criticalAnalysis.totalY >= 0.9 ? '#ef4444' : 'var(--accent-primary)'}; margin-top: 0.2rem;">${criticalAnalysis.totalY}</div>
+            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.25rem;">Capacity Status: ${criticalAnalysis.isWebsterValid ? '✓ Within Limits' : '⚠️ Over Capacity'}</div>
           </div>
         </div>
-      </div>
 
-      <!-- SECTION 5: Webster Optimum Signal Timing & IRC:93 Validation Plan -->
-      <div class="card" style="padding: 1.5rem;">
-        <h3 style="margin-top: 0; color: #10b981; font-size: 1.1rem; margin-bottom: 0.5rem;">
-          5. Webster Signal Timing & IRC:93 Validation Recommendation
-        </h3>
-        <div style="font-weight: 700; color: #10b981; background: rgba(16,185,129,0.12); padding: 0.6rem 1rem; border-radius: 4px; border-left: 4px solid #10b981; margin-bottom: 1rem;">
-          RECOMMENDED PLAN — Webster Optimum Cycle C = ${valRes.finalCycleTime}s | Effective Green Split Allocated
-        </div>
-
-        <div class="table-responsive">
-          <table class="data-table" style="width: 100%; font-size: 0.85rem;">
-            <thead>
-              <tr>
-                <th>Active Approach Road</th>
-                <th>Baseline Green</th>
-                <th>Webster Allocated Green</th>
-                <th>IRC:93 Validated Green</th>
-                <th>Capacity (PCU/h)</th>
-                <th>v/c Ratio</th>
-                <th>IRC:93 Validation Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${roadKeys.map(k => {
-      const r = roadData[k];
-      const valInfo = (valRes.validations || []).find(v => v.key === k) || {};
-      return `
-                  <tr>
-                    <td><strong>${r.name}</strong></td>
-                    <td>${r.green}s</td>
-                    <td>${(websterRes.approaches[k] || {}).greenSplit || 30}s</td>
-                    <td><strong style="color:#10b981;">${r.recGreen}s</strong></td>
-                    <td>${r.capacity}</td>
-                    <td style="color:${r.vc > 1.0 ? '#ef4444' : '#10b981'}; font-weight:700;">${r.vc.toFixed(2)}</td>
-                    <td><span class="badge ${valInfo.status === 'PASSED' ? 'badge-low' : 'badge-medium'}">${valInfo.status || 'PASSED'}</span></td>
-                  </tr>
-                `;
-    }).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- SECTION 6: Professional Step-by-Step Engineering Calculation Panels (Task 11) -->
-      <div class="card" style="padding: 1.5rem;">
-        <h3 style="margin-top: 0; color: #38bdf8; font-size: 1.1rem; margin-bottom: 0.75rem;">
-          6. Professional Step-by-Step Engineering Calculation Panel (Interactive)
-        </h3>
-
-        <div style="background: rgba(30,41,59,0.5); padding: 0.75rem 1rem; border-radius: 4px; font-size: 0.8rem; margin-bottom: 1rem;">
-          <strong>Complete 9-Step Engineering Pipeline per Approach:</strong><br>
-          1. Vehicle Counts &rarr; 2. IRC:106 PCU &rarr; 3. Turning Distribution &rarr; 4. Saturation Flow S &rarr; 5. Flow Ratio y &rarr; 6. Webster Cycle C &rarr; 7. Green Split g &rarr; 8. IRC:93 Validation &rarr; 9. Approach Capacity & Performance
-        </div>
-
-        ${roadKeys.map(k => buildCalculationPanelHTML(k, roadData[k].appObj, websterRes, valRes)).join('')}
-      </div>
-
-      <!-- SECTION 7: Congestion & Level-of-Service (LOS) Assessment -->
-      <div class="card" style="padding: 1.5rem; border: 1px solid ${totalDemandPCU > 3600 ? 'rgba(239,68,68,0.4)' : 'rgba(16,185,129,0.4)'};">
-        <h3 style="margin-top: 0; color: ${totalDemandPCU > 3600 ? '#ef4444' : '#10b981'}; font-size: 1.1rem; margin-bottom: 0.75rem;">
-          7. Congestion & Level-of-Service (LOS) Assessment
-        </h3>
-
-        <div style="background: ${totalDemandPCU > 3600 ? 'rgba(239,68,68,0.18)' : 'rgba(16,185,129,0.18)'}; border: 2px solid ${totalDemandPCU > 3600 ? '#ef4444' : '#10b981'}; padding: 1rem; border-radius: 6px; color: ${totalDemandPCU > 3600 ? '#ef4444' : '#10b981'}; font-weight: 700; font-size: 1.2rem; text-align: center; margin-bottom: 1.25rem;">
-          INTERSECTION PERFORMANCE: ${totalDemandPCU > 3600 ? 'LOS F — OVERSATURATED' : (totalDemandPCU > 2400 ? 'LOS D — CONGESTED' : 'LOS B / C — ACCEPTABLE')}
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
-          <div style="background: rgba(30,41,59,0.6); padding: 1rem; border-radius: 6px; text-align: center;">
-            <div style="font-size: 0.75rem; color: var(--text-muted);">Total Network Demand</div>
-            <div style="font-size: 1.4rem; font-weight: 700; color: #38bdf8;">${totalDemandPCU.toLocaleString()} PCU/h</div>
-          </div>
-          <div style="background: rgba(30,41,59,0.6); padding: 1rem; border-radius: 6px; text-align: center;">
-            <div style="font-size: 0.75rem; color: var(--text-muted);">Webster Cycle</div>
-            <div style="font-size: 1.4rem; font-weight: 700; color: #6366f1;">${valRes.finalCycleTime}s</div>
-          </div>
-          <div style="background: rgba(30,41,59,0.6); padding: 1rem; border-radius: 6px; text-align: center;">
-            <div style="font-size: 0.75rem; color: var(--text-muted);">Critical Approach</div>
-            <div style="font-size: 1rem; font-weight: 700; color: #38bdf8;">${(() => { let maxK = roadKeys[0]; roadKeys.forEach(k => { if ((roadData[k].vc || 0) > (roadData[maxK].vc || 0)) maxK = k; }); return roadData[maxK].name; })()}</div>
-          </div>
-          <div style="background: rgba(30,41,59,0.6); padding: 1rem; border-radius: 6px; text-align: center;">
-            <div style="font-size: 0.75rem; color: var(--text-muted);">Worst v/c Ratio</div>
-            <div style="font-size: 1.4rem; font-weight: 700; color: ${Math.max(...roadKeys.map(k => roadData[k].vc || 0)) > 1.0 ? '#ef4444' : '#10b981'};">${Math.max(...roadKeys.map(k => roadData[k].vc || 0)).toFixed(2)}</div>
+        <!-- SECTION 3: TRAFFIC DEMAND & PCU BREAKDOWN TABLE -->
+        <div class="card" style="padding: 1.25rem;">
+          <h4 style="margin: 0 0 1rem 0; color: var(--text-primary); font-size: 0.95rem; font-weight: 700;">
+            📊 Approach Traffic Demand & PCU Conversion Breakdown
+          </h4>
+          <div style="overflow-x: auto;">
+            <table class="table-eng" style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+              <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); background: rgba(15,23,42,0.6); text-align: left;">
+                  <th style="padding: 0.65rem 0.85rem;">Approach</th>
+                  <th style="padding: 0.65rem 0.85rem;">Incoming Lanes</th>
+                  <th style="padding: 0.65rem 0.85rem;">Physical Demand</th>
+                  <th style="padding: 0.65rem 0.85rem;">Converted PCU/h</th>
+                  <th style="padding: 0.65rem 0.85rem;">Sat Flow (PCU/h)</th>
+                  <th style="padding: 0.65rem 0.85rem;">Critical Flow Ratio (y)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${roadKeys.map(r => {
+                  const m = roadMetrics[r.key] || {};
+                  return `
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                      <td style="padding: 0.65rem 0.85rem; font-weight: 700; color: var(--text-primary);">${r.icon} ${r.title}</td>
+                      <td style="padding: 0.65rem 0.85rem;">${m.lanesVal || 2} lanes</td>
+                      <td style="padding: 0.65rem 0.85rem;">${m.totalDemandVal ? Math.round(m.totalDemandVal) : 0} veh</td>
+                      <td style="padding: 0.65rem 0.85rem; font-weight: 700; color: var(--accent-primary);">${m.totalDemandVal ? m.totalDemandVal.toFixed(1) : '0.0'} PCU/h</td>
+                      <td style="padding: 0.65rem 0.85rem; color: var(--success);">${m.satFlow || ( (m.lanesVal || 2) * geometry.baseSaturationFlow )} PCU/h</td>
+                      <td style="padding: 0.65rem 0.85rem; font-weight: 700; color: #f59e0b;">${m.flowRatioY !== undefined ? m.flowRatioY.toFixed(4) : '—'} (${m.critMoveStr || 'Through'})</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
           </div>
         </div>
+
+        <!-- SECTION 4: BEFORE VS AFTER PERFORMANCE TABLE -->
+        <div class="card" style="padding: 1.25rem;">
+          <h4 style="margin: 0 0 1rem 0; color: var(--text-primary); font-size: 0.95rem; font-weight: 700;">
+            📈 Before vs After Signal Optimization Performance Estimate
+          </h4>
+          <div style="overflow-x: auto;">
+            <table class="table-eng" style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+              <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); background: rgba(15,23,42,0.6); text-align: left;">
+                  <th style="padding: 0.65rem 0.85rem;">Performance Indicator</th>
+                  <th style="padding: 0.65rem 0.85rem;">Current / Baseline</th>
+                  <th style="padding: 0.65rem 0.85rem;">Proposed Webster Plan</th>
+                  <th style="padding: 0.65rem 0.85rem;">Estimated Impact</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                  <td style="padding: 0.65rem 0.85rem; font-weight: 700;">Shared Cycle Length (C)</td>
+                  <td style="padding: 0.65rem 0.85rem;">${baselineTiming.hasBaseline ? baselineTiming.existingCycle + ' s' : '—'}</td>
+                  <td style="padding: 0.65rem 0.85rem; font-weight: 700; color: var(--accent-primary);">${websterTiming.websterCycleC0} s</td>
+                  <td style="padding: 0.65rem 0.85rem; color: var(--success); font-weight: 700;">Optimized C₀</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                  <td style="padding: 0.65rem 0.85rem; font-weight: 700;">Phase 1 Green Split (N / S)</td>
+                  <td style="padding: 0.65rem 0.85rem;">${baselineTiming.hasBaseline ? baselineTiming.baselineP1Green + ' s' : '—'}</td>
+                  <td style="padding: 0.65rem 0.85rem; font-weight: 700; color: var(--success);">${websterTiming.g1} s</td>
+                  <td style="padding: 0.65rem 0.85rem;">Rebalanced Split</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                  <td style="padding: 0.65rem 0.85rem; font-weight: 700;">Phase 2 Green Split (E / W)</td>
+                  <td style="padding: 0.65rem 0.85rem;">${baselineTiming.hasBaseline ? baselineTiming.baselineP2Green + ' s' : '—'}</td>
+                  <td style="padding: 0.65rem 0.85rem; font-weight: 700; color: #fcd34d;">${websterTiming.g2} s</td>
+                  <td style="padding: 0.65rem 0.85rem;">Rebalanced Split</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                  <td style="padding: 0.65rem 0.85rem; font-weight: 700;">Critical Control Delay (s/veh)</td>
+                  <td style="padding: 0.65rem 0.85rem;">${beforeAfterPerformance.baselineDelay}</td>
+                  <td style="padding: 0.65rem 0.85rem; font-weight: 700; color: var(--success);">${beforeAfterPerformance.proposedDelay}</td>
+                  <td style="padding: 0.65rem 0.85rem; color: var(--success); font-weight: 700;">${beforeAfterPerformance.delayChange}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                  <td style="padding: 0.65rem 0.85rem; font-weight: 700;">Critical Queue Length (m)</td>
+                  <td style="padding: 0.65rem 0.85rem;">${beforeAfterPerformance.baselineQueue}</td>
+                  <td style="padding: 0.65rem 0.85rem; font-weight: 700; color: var(--success);">${beforeAfterPerformance.proposedQueue}</td>
+                  <td style="padding: 0.65rem 0.85rem; color: var(--success); font-weight: 700;">${beforeAfterPerformance.queueChange}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                  <td style="padding: 0.65rem 0.85rem; font-weight: 700;">Degree of Saturation (v/c)</td>
+                  <td style="padding: 0.65rem 0.85rem;">${beforeAfterPerformance.baselineDOS}</td>
+                  <td style="padding: 0.65rem 0.85rem; font-weight: 700; color: var(--success);">${beforeAfterPerformance.proposedDOS}</td>
+                  <td style="padding: 0.65rem 0.85rem; color: var(--success); font-weight: 700;">${beforeAfterPerformance.dosChange}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 0.65rem 0.85rem; font-weight: 700;">Level of Service (LOS)</td>
+                  <td style="padding: 0.65rem 0.85rem;">${beforeAfterPerformance.baselineLOS}</td>
+                  <td style="padding: 0.65rem 0.85rem; font-weight: 700; color: var(--success);">${beforeAfterPerformance.proposedLOS}</td>
+                  <td style="padding: 0.65rem 0.85rem; color: var(--success); font-weight: 700;">${beforeAfterPerformance.losChange}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SECTION 5: BOTTLENECK RECOMMENDATION & ACTION PLAN -->
+        <div class="card" style="padding: 1.25rem; border-left: 4px solid var(--accent-primary);">
+          <h4 style="margin: 0 0 0.5rem 0; color: var(--text-primary); font-size: 0.95rem; font-weight: 700;">
+            💡 Engineering Bottleneck Recommendation & Action Plan
+          </h4>
+          <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 0.75rem;">
+            Primary Bottleneck: <strong style="color: var(--accent-primary);">${recommendations.bottleneck}</strong> | Critical Phase: <strong style="color: var(--text-primary);">${recommendations.winningPhase}</strong>
+          </div>
+          <div style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; font-size: 0.82rem; color: var(--text-primary); line-height: 1.5; border: 1px solid var(--border-color); margin-bottom: 0.75rem;">
+            ${recommendations.reason}
+          </div>
+          <div style="background: rgba(16,185,129,0.1); padding: 0.85rem 1rem; border-radius: 6px; font-size: 0.82rem; color: var(--success); font-weight: 700; border: 1px solid rgba(16,185,129,0.3);">
+            ✓ Action Recommendation: ${recommendations.action}
+          </div>
+        </div>
+
+        <!-- SECTION 6: ASSUMPTIONS & LIMITATIONS -->
+        <div class="card" style="padding: 1.25rem;">
+          <h4 style="margin: 0 0 0.75rem 0; color: var(--text-primary); font-size: 0.95rem; font-weight: 700;">
+            📜 Engineering Standards, Assumptions & Limitations
+          </h4>
+          <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.6;">
+            ${assumptionsLimitations.map(item => `<li>${item}</li>`).join('')}
+          </ul>
+        </div>
+
       </div>
     `;
-
-    container.appendChild(wrapper);
-
-    // Smooth scroll to the results
-    if (typeof wrapper.scrollIntoView === 'function') {
-      wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-    return wrapper;
   }
 
   /**
@@ -5343,6 +5254,99 @@ const FlowGuard = (function () {
     setText('step5SumCycle', hasRun ? `${websterCycleC0} s` : '—');
     setText('step5SumP1Green', hasRun ? `${g1} s` : '—');
     setText('step5SumP2Green', hasRun ? `${g2} s` : '—');
+
+    // ── CANONICAL ANALYSIS RESULT SYNCHRONIZATION ──
+    if (hasRun) {
+      const winningPhaseStr = yPhase1 >= yPhase2 ? 'Phase 1 (North / South)' : 'Phase 2 (East / West)';
+      const currentResultObj = {
+        runId: `RUN-${new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14)}-${Math.floor(100 + Math.random() * 900)}`,
+        timestamp: new Date().toISOString(),
+        formattedDate: new Date().toLocaleString(),
+        projectInfo: {
+          title: (project.projectInfo && project.projectInfo.title) || 'Signalized Intersection Optimization Project',
+          location: (project.projectInfo && project.projectInfo.location) || 'Main Junction',
+          analyst: (project.projectInfo && project.projectInfo.analyst) || 'Traffic Engineer',
+          jurisdiction: (project.projectInfo && project.projectInfo.jurisdiction) || 'Municipal Traffic Authority'
+        },
+        geometry: {
+          configType: geom.configType || '4CROSS',
+          configLabel: getConfigLabel(geom.configType || '4CROSS'),
+          surveyDuration: geom.surveyDuration || '15',
+          baseSaturationFlow: baseSat
+        },
+        demandSummary: {
+          totalPhysicalVehicles: totalPhysicalVehiclesSum || 0,
+          totalPCU: totalDemandPCUSum || 0,
+          peakInterval: (winnerMetric && winnerMetric.peakIntervalStr) ? winnerMetric.peakIntervalStr : '08:45–09:00',
+          roadMetrics: {
+            north: getRoadMetrics('north'),
+            east: getRoadMetrics('east'),
+            south: getRoadMetrics('south'),
+            west: getRoadMetrics('west')
+          }
+        },
+        criticalAnalysis: {
+          criticalApproach: `${winnerTitle} (${winnerMetric.critMoveStr})`,
+          criticalMovement: winnerMetric.critMoveStr,
+          criticalFlowRatio: winnerMetric.flowRatioYStr,
+          phase1CritFlow: phase1CritFlowVal,
+          phase2CritFlow: phase2CritFlowVal,
+          yPhase1: parseFloat(yPhase1.toFixed(4)),
+          yPhase2: parseFloat(yPhase2.toFixed(4)),
+          totalY: parseFloat(totalY.toFixed(4)),
+          isWebsterValid: true
+        },
+        websterTiming: {
+          websterCycleC0: websterCycleC0,
+          g1: g1,
+          g2: g2,
+          amber: amberPhase,
+          allRed: allRedPhase,
+          totalLostTimeL: totalLostTimeL,
+          gEff: gEff,
+          numPhases: numPhases
+        },
+        baselineTiming: {
+          hasBaseline: hasBaselineConfig,
+          existingCycle: existingCycle,
+          baselineP1Green: baselineP1Green,
+          baselineP2Green: baselineP2Green,
+          amber: amberPhase,
+          allRed: allRedPhase
+        },
+        beforeAfterPerformance: {
+          baselineDelay: baseDelayStr,
+          proposedDelay: propDelayStr,
+          delayChange: delayDiffStr,
+          baselineQueue: baseQueueStr,
+          proposedQueue: propQueueStr,
+          queueChange: queueDiffStr,
+          baselineDOS: baseDOSStr,
+          proposedDOS: propDOSStr,
+          dosChange: dosDiffStr,
+          baselineLOS: baseLOSStr,
+          proposedLOS: propLOSStr,
+          losChange: losDiffStr
+        },
+        recommendations: {
+          bottleneck: `${winnerTitle} (${winnerMetric.critMoveStr})`,
+          winningPhase: winningPhaseStr,
+          reason: `Approach ${winnerTitle} exhibits the highest critical flow ratio y = ${winnerMetric.flowRatioYStr} on the ${winnerMetric.critMoveStr} movement under peak interval ${winnerMetric.peakIntervalStr}. Primary critical demand is concentrated on ${winningPhaseStr}.`,
+          action: `Implement proposed Webster offline signal timing plan: Shared Cycle C₀ = ${websterCycleC0}s, Phase 1 Green = ${g1}s, Phase 2 Green = ${g2}s. This rebalances phase green splits to match actual critical PCU demand.`
+        },
+        assumptionsLimitations: [
+          'Analysis conducted in accordance with IRC:93 (Signal Timing) and IRC:106 (PCU Equivalency) standards.',
+          `Base saturation flow rate S₀ = ${baseSat} PCU/h/lane assuming standard carriageway dimensions.`,
+          'Minimum vehicular green constraint set to 7 seconds per phase.',
+          'Pedestrian clearance time evaluated per crosswalk width requirements.',
+          'Offline fixed-time signal plan optimization based on peak surge factor.'
+        ]
+      };
+
+      saveCurrentAnalysisResult(currentResultObj);
+    } else {
+      clearCurrentAnalysisResult();
+    }
   }
 
   /**
@@ -6430,6 +6434,9 @@ const FlowGuard = (function () {
     validateApproachGeometry,
     CENTRAL_VEHICLE_TYPE_MAP,
     resolveVehicleCategoryAndPCU,
+    getCurrentAnalysisResult,
+    saveCurrentAnalysisResult,
+    clearCurrentAnalysisResult,
     switchMainView,
     handleHashRouting,
     initMainViewRouting
@@ -6482,6 +6489,9 @@ if (typeof window !== 'undefined') {
   window.saveProject = FlowGuard.saveProject;
   window.exportProjectJSON = FlowGuard.exportProjectJSON;
   window.importProjectJSON = FlowGuard.importProjectJSON;
+  window.getCurrentAnalysisResult = FlowGuard.getCurrentAnalysisResult;
+  window.saveCurrentAnalysisResult = FlowGuard.saveCurrentAnalysisResult;
+  window.clearCurrentAnalysisResult = FlowGuard.clearCurrentAnalysisResult;
   window.renderEngineeringDashboard = FlowGuard.renderEngineeringDashboard;
   window.calculateTrafficPressureIndex = FlowGuard.calculateTrafficPressureIndex;
   window.setWizardStep = FlowGuard.setWizardStep;
