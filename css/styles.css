@@ -31,11 +31,25 @@
   --border-color: #1E293B;
   /* Subtle Navy Border — Card borders, dividers */
 
-  /* Radii & Spacing */
-  --border-radius-lg: 8px;
+  /* Radii & Spacing Design Tokens */
+  --border-radius-lg: 12px;
   /* For main cards & panels */
-  --border-radius-sm: 4px;
+  --border-radius-sm: 6px;
   /* For inputs, badges, and buttons */
+
+  /* Global UI Card & Typography Tokens */
+  --fg-card-padding: 1.35rem 1.4rem;
+  --fg-card-radius: 12px;
+  --fg-card-gap: 1.15rem;
+
+  --fg-font-title-page: 1.5rem;      /* 24px */
+  --fg-font-title-section: 1.35rem;  /* 21.6px */
+  --fg-font-title-card: 1.08rem;     /* 17.3px */
+  --fg-font-value-primary: 1.5rem;   /* 24px */
+  --fg-font-body: 0.88rem;           /* 14px */
+  --fg-font-label: 0.8rem;           /* 12.8px */
+  --fg-font-input: 0.92rem;          /* 14.7px */
+  --fg-font-helper: 0.78rem;         /* 12.5px */
 
   /* Backward Compatibility Aliases */
   --bg-main: var(--bg-app);
@@ -438,17 +452,18 @@ header.navbar {
 }
 
 .section-header-title {
-  font-size: 1.25rem;
-  font-weight: 800;
+  font-size: 1.4rem;
+  font-weight: 700;
   color: var(--accent-primary);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   margin-bottom: 4px;
 }
 
 .section-header-subtitle {
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   color: var(--text-secondary);
+  line-height: 1.45;
   margin-bottom: 20px;
 }
 
@@ -460,7 +475,7 @@ header.navbar {
   background-color: var(--bg-panel);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-lg);
-  padding: 16px 20px;
+  padding: 18px 22px;
   margin-bottom: 24px;
 }
 
@@ -480,15 +495,24 @@ header.navbar {
 .control-field-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .control-field-label {
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   color: var(--text-secondary);
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.3;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .control-field-select,
@@ -499,11 +523,16 @@ input[type="number"] {
   border: 1px solid var(--border-color);
   color: var(--text-primary);
   border-radius: var(--border-radius-sm);
-  padding: 8px 12px;
-  font-size: 0.85rem;
+  padding: 7px 9px;
+  font-size: 0.86rem;
   font-weight: 500;
   outline: none;
   transition: border-color 0.15s ease;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  text-overflow: ellipsis;
 }
 
 .control-field-select:focus,
@@ -791,12 +820,17 @@ button {
   background: var(--bg-panel);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-lg);
-  padding: 1.25rem;
+  padding: 1.35rem 1.4rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.15rem;
   position: relative;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  container-type: inline-size;
+  container-name: engCard;
 }
 
 .eng-panel-card.full-width {
@@ -808,7 +842,7 @@ button {
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  padding-bottom: 0.75rem;
+  padding-bottom: 0.85rem;
 }
 
 .eng-panel-title-group {
@@ -818,62 +852,89 @@ button {
 }
 
 .eng-panel-icon {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 6px;
   background: rgba(56, 189, 248, 0.12);
   color: var(--accent-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
 }
 
 .eng-panel-title {
-  font-size: 0.95rem;
+  font-size: 1.08rem;
   font-weight: 700;
   color: var(--text-primary);
+  letter-spacing: 0.01em;
 }
 
 .eng-panel-subtitle {
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   color: var(--text-secondary);
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 .eng-fields-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+@container engCard (max-width: 310px) {
+  .eng-fields-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+#geomApproachGrid,
+.approach-configurator-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  #geomApproachGrid,
+  .approach-configurator-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .eng-calc-box {
   background: rgba(15, 23, 42, 0.7);
   border: 1px solid rgba(56, 189, 248, 0.25);
   border-radius: var(--border-radius-sm);
-  padding: 0.85rem 1rem;
+  padding: 0.95rem 1.15rem;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
 }
 
 .eng-calc-title {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   color: var(--accent-primary);
 }
 
 .eng-calc-formula {
   font-family: var(--font-mono);
-  font-size: 0.73rem;
+  font-size: 0.78rem;
   color: var(--text-secondary);
 }
 
 .eng-calc-value {
   font-family: var(--font-mono);
-  font-size: 1.25rem;
+  font-size: 1.55rem;
   font-weight: 700;
   color: #38bdf8;
 }
@@ -1056,11 +1117,11 @@ button {
   background: var(--bg-panel);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-lg);
-  padding: 1.25rem;
+  padding: 1.35rem 1.4rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  gap: 1.15rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
   position: relative;
 }
 
@@ -1073,7 +1134,7 @@ button {
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  padding-bottom: 0.75rem;
+  padding-bottom: 0.85rem;
 }
 
 .summary-dash-title-group {
@@ -1083,53 +1144,55 @@ button {
 }
 
 .summary-dash-icon {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 6px;
   background: rgba(56, 189, 248, 0.12);
   color: var(--accent-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
 }
 
 .summary-dash-title {
-  font-size: 0.95rem;
+  font-size: 1.08rem;
   font-weight: 700;
   color: var(--text-primary);
+  letter-spacing: 0.01em;
 }
 
 .summary-dash-subtitle {
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   color: var(--text-secondary);
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 .summary-metrics-list {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 0.75rem;
 }
 
 .summary-metric-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 0.75rem;
+  padding: 0.65rem 0.85rem;
   background: rgba(15, 23, 42, 0.6);
   border-radius: var(--border-radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .summary-metric-label {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: var(--text-secondary);
+  font-weight: 600;
 }
 
 .summary-metric-value {
   font-family: var(--font-mono);
-  font-size: 0.9rem;
+  font-size: 0.98rem;
   font-weight: 700;
   color: var(--text-primary);
 }

@@ -485,7 +485,7 @@
             Approach Configurator
           </div>
 
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;" id="geomApproachGrid">
+          <div class="approach-configurator-grid" id="geomApproachGrid">
 
             <!-- CARD A: APPROACH 1 — NORTHBOUND -->
             <div class="eng-panel-card" style="margin-bottom: 0;">
@@ -500,7 +500,7 @@
                 <span class="badge" style="background: rgba(56,189,248,0.15); color: var(--accent-primary); border: 1px solid rgba(56,189,248,0.3);">ACTIVE / CYAN</span>
               </div>
 
-              <div class="eng-fields-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.85rem;">
+              <div class="eng-fields-grid">
                 <div class="control-field-group">
                   <label class="control-field-label">Road Designation</label>
                   <input type="text" class="control-field-select" id="geomRoadA_Name" value="Road A">
@@ -555,8 +555,8 @@
               </div>
 
               <!-- B. Physical Width Validation Box -->
-              <div id="geomWidthValidationBox_A" style="margin-top:0.6rem; padding:0.5rem 0.65rem; background:rgba(15,23,42,0.6); border:1px solid rgba(16,185,129,0.3); border-radius:6px; font-size:0.75rem;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem; color:var(--text-secondary);">
+              <div id="geomWidthValidationBox_A" style="margin-top:0.6rem; padding:0.5rem 0.65rem; background:rgba(15,23,42,0.6); border:1px solid rgba(16,185,129,0.3); border-radius:6px; font-size:0.75rem; width:100%; box-sizing:border-box; min-width:0; word-break:break-word;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem; color:var(--text-secondary); flex-wrap:wrap; gap:0.2rem;">
                   <span>Minimum Required Width: <strong id="geomMinWidthVal_A" style="color:var(--text-primary);">14 m</strong></span>
                   <span style="font-size:0.7rem; color:var(--text-secondary);">Calculated: <span id="geomWidthCalc_A">3.5 m × 4 lanes</span></span>
                 </div>
@@ -566,9 +566,9 @@
               </div>
 
               <!-- A. Lane Configuration Validation Box -->
-              <div id="geomValidationMsg_A" style="display:none; margin-top:0.4rem; padding:0.4rem 0.65rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:6px; font-size:0.75rem; color:#f59e0b; font-weight:700;">⚠️ Lane configuration total does not match incoming lanes.</div>
+              <div id="geomValidationMsg_A" style="display:none; margin-top:0.4rem; padding:0.4rem 0.65rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:6px; font-size:0.75rem; color:#f59e0b; font-weight:700; width:100%; box-sizing:border-box; min-width:0; word-break:break-word;">⚠️ Lane configuration total does not match incoming lanes.</div>
 
-              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem;">
+              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem; width:100%; box-sizing:border-box; min-width:0;">
                 <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
                   <span>Includes Pedestrian Crosswalk</span>
                   <input type="checkbox" id="geomRoadA_Crosswalk" checked style="accent-color: var(--accent-primary);">
@@ -597,7 +597,7 @@
                 <span class="badge" style="background: rgba(56,189,248,0.15); color: var(--accent-primary); border: 1px solid rgba(56,189,248,0.3);">ACTIVE / CYAN</span>
               </div>
 
-              <div class="eng-fields-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.85rem;">
+              <div class="eng-fields-grid">
                 <div class="control-field-group">
                   <label class="control-field-label">Road Designation</label>
                   <input type="text" class="control-field-select" id="geomRoadB_Name" value="Road B">
@@ -652,8 +652,8 @@
               </div>
 
               <!-- B. Physical Width Validation Box -->
-              <div id="geomWidthValidationBox_B" style="margin-top:0.6rem; padding:0.5rem 0.65rem; background:rgba(15,23,42,0.6); border:1px solid rgba(16,185,129,0.3); border-radius:6px; font-size:0.75rem;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem; color:var(--text-secondary);">
+              <div id="geomWidthValidationBox_B" style="margin-top:0.6rem; padding:0.5rem 0.65rem; background:rgba(15,23,42,0.6); border:1px solid rgba(16,185,129,0.3); border-radius:6px; font-size:0.75rem; width:100%; box-sizing:border-box; min-width:0; word-break:break-word;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem; color:var(--text-secondary); flex-wrap:wrap; gap:0.2rem;">
                   <span>Minimum Required Width: <strong id="geomMinWidthVal_B" style="color:var(--text-primary);">14 m</strong></span>
                   <span style="font-size:0.7rem; color:var(--text-secondary);">Calculated: <span id="geomWidthCalc_B">3.5 m × 4 lanes</span></span>
                 </div>
@@ -663,9 +663,9 @@
               </div>
 
               <!-- A. Lane Configuration Validation Box -->
-              <div id="geomValidationMsg_B" style="display:none; margin-top:0.4rem; padding:0.4rem 0.65rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:6px; font-size:0.75rem; color:#f59e0b; font-weight:700;">⚠️ Lane configuration total does not match incoming lanes.</div>
+              <div id="geomValidationMsg_B" style="display:none; margin-top:0.4rem; padding:0.4rem 0.65rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:6px; font-size:0.75rem; color:#f59e0b; font-weight:700; width:100%; box-sizing:border-box; min-width:0; word-break:break-word;">⚠️ Lane configuration total does not match incoming lanes.</div>
 
-              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem;">
+              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem; width:100%; box-sizing:border-box; min-width:0;">
                 <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
                   <span>Includes Pedestrian Crosswalk</span>
                   <input type="checkbox" id="geomRoadB_Crosswalk" checked style="accent-color: var(--accent-primary);">
@@ -694,7 +694,7 @@
                 <span class="badge" style="background: rgba(56,189,248,0.15); color: var(--accent-primary); border: 1px solid rgba(56,189,248,0.3);">ACTIVE / CYAN</span>
               </div>
 
-              <div class="eng-fields-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.85rem;">
+              <div class="eng-fields-grid">
                 <div class="control-field-group">
                   <label class="control-field-label">Road Designation</label>
                   <input type="text" class="control-field-select" id="geomRoadC_Name" value="Road C">
@@ -749,8 +749,8 @@
               </div>
 
               <!-- B. Physical Width Validation Box -->
-              <div id="geomWidthValidationBox_C" style="margin-top:0.6rem; padding:0.5rem 0.65rem; background:rgba(15,23,42,0.6); border:1px solid rgba(16,185,129,0.3); border-radius:6px; font-size:0.75rem;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem; color:var(--text-secondary);">
+              <div id="geomWidthValidationBox_C" style="margin-top:0.6rem; padding:0.5rem 0.65rem; background:rgba(15,23,42,0.6); border:1px solid rgba(16,185,129,0.3); border-radius:6px; font-size:0.75rem; width:100%; box-sizing:border-box; min-width:0; word-break:break-word;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem; color:var(--text-secondary); flex-wrap:wrap; gap:0.2rem;">
                   <span>Minimum Required Width: <strong id="geomMinWidthVal_C" style="color:var(--text-primary);">14 m</strong></span>
                   <span style="font-size:0.7rem; color:var(--text-secondary);">Calculated: <span id="geomWidthCalc_C">3.5 m × 4 lanes</span></span>
                 </div>
@@ -760,9 +760,9 @@
               </div>
 
               <!-- A. Lane Configuration Validation Box -->
-              <div id="geomValidationMsg_C" style="display:none; margin-top:0.4rem; padding:0.4rem 0.65rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:6px; font-size:0.75rem; color:#f59e0b; font-weight:700;">⚠️ Lane configuration total does not match incoming lanes.</div>
+              <div id="geomValidationMsg_C" style="display:none; margin-top:0.4rem; padding:0.4rem 0.65rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:6px; font-size:0.75rem; color:#f59e0b; font-weight:700; width:100%; box-sizing:border-box; min-width:0; word-break:break-word;">⚠️ Lane configuration total does not match incoming lanes.</div>
 
-              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem;">
+              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem; width:100%; box-sizing:border-box; min-width:0;">
                 <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
                   <span>Includes Pedestrian Crosswalk</span>
                   <input type="checkbox" id="geomRoadC_Crosswalk" checked style="accent-color: var(--accent-primary);">
@@ -791,7 +791,7 @@
                 <span class="badge" style="background: rgba(56,189,248,0.15); color: var(--accent-primary); border: 1px solid rgba(56,189,248,0.3);">ACTIVE / CYAN</span>
               </div>
 
-              <div class="eng-fields-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.85rem;">
+              <div class="eng-fields-grid">
                 <div class="control-field-group">
                   <label class="control-field-label">Road Designation</label>
                   <input type="text" class="control-field-select" id="geomRoadD_Name" value="Road D">
@@ -846,8 +846,8 @@
               </div>
 
               <!-- B. Physical Width Validation Box -->
-              <div id="geomWidthValidationBox_D" style="margin-top:0.6rem; padding:0.5rem 0.65rem; background:rgba(15,23,42,0.6); border:1px solid rgba(16,185,129,0.3); border-radius:6px; font-size:0.75rem;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem; color:var(--text-secondary);">
+              <div id="geomWidthValidationBox_D" style="margin-top:0.6rem; padding:0.5rem 0.65rem; background:rgba(15,23,42,0.6); border:1px solid rgba(16,185,129,0.3); border-radius:6px; font-size:0.75rem; width:100%; box-sizing:border-box; min-width:0; word-break:break-word;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem; color:var(--text-secondary); flex-wrap:wrap; gap:0.2rem;">
                   <span>Minimum Required Width: <strong id="geomMinWidthVal_D" style="color:var(--text-primary);">14 m</strong></span>
                   <span style="font-size:0.7rem; color:var(--text-secondary);">Calculated: <span id="geomWidthCalc_D">3.5 m × 4 lanes</span></span>
                 </div>
@@ -857,9 +857,9 @@
               </div>
 
               <!-- A. Lane Configuration Validation Box -->
-              <div id="geomValidationMsg_D" style="display:none; margin-top:0.4rem; padding:0.4rem 0.65rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:6px; font-size:0.75rem; color:#f59e0b; font-weight:700;">⚠️ Lane configuration total does not match incoming lanes.</div>
+              <div id="geomValidationMsg_D" style="display:none; margin-top:0.4rem; padding:0.4rem 0.65rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:6px; font-size:0.75rem; color:#f59e0b; font-weight:700; width:100%; box-sizing:border-box; min-width:0; word-break:break-word;">⚠️ Lane configuration total does not match incoming lanes.</div>
 
-              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem;">
+              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem; width:100%; box-sizing:border-box; min-width:0;">
                 <label style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-primary); cursor: pointer;">
                   <span>Includes Pedestrian Crosswalk</span>
                   <input type="checkbox" id="geomRoadD_Crosswalk" checked style="accent-color: var(--accent-primary);">
@@ -1376,71 +1376,71 @@
 
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
                 <!-- ROW 1 -->
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Approaches</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryApproachesVal">4</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Approaches</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryApproachesVal">4</div>
                 </div>
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Signal Phases</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryPhasesVal">2</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Signal Phases</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryPhasesVal">2</div>
                 </div>
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Phase 1</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="summaryPhase1Val">Road A + Road C (N/S)</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Phase 1</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="summaryPhase1Val">Road A + Road C (N/S)</div>
                 </div>
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Phase 2</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: #fcd34d; margin-top: 0.2rem;" id="summaryPhase2Val">Road B + Road D (E/W)</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Phase 2</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: #fcd34d; margin-top: 0.2rem;" id="summaryPhase2Val">Road B + Road D (E/W)</div>
                 </div>
 
                 <!-- ROW 2 -->
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Base Saturation Flow</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryBaseSatVal">1800 PCU/h/lane</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Base Saturation Flow</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryBaseSatVal">1800 PCU/h/lane</div>
                 </div>
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Existing Cycle</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryExistingCycleVal">120 s</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Existing Cycle</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryExistingCycleVal">120 s</div>
                 </div>
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Minimum Green</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryMinGreenVal">7 s</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Minimum Green</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryMinGreenVal">7 s</div>
                 </div>
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">PCU Factors</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--success); margin-top: 0.2rem;" id="summaryPcuFactorsVal">Standard</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">PCU Factors</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: var(--success); margin-top: 0.2rem;" id="summaryPcuFactorsVal">Standard</div>
                 </div>
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Baseline Data Mode</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-secondary); margin-top: 0.2rem;" id="summaryBaselineVal">Not Available</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Baseline Data Mode</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-secondary); margin-top: 0.2rem;" id="summaryBaselineVal">Not Available</div>
                 </div>
 
                 <!-- ROW 3 — BASELINE GREEN TIMINGS -->
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--accent-primary); text-transform: uppercase; font-weight: 700;">Baseline Phase 1 Green</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="summaryBaselineP1GreenVal">Not Provided</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.78rem; color: var(--accent-primary); text-transform: uppercase; font-weight: 700;">Baseline Phase 1 Green</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;" id="summaryBaselineP1GreenVal">Not Provided</div>
                 </div>
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: #fcd34d; text-transform: uppercase; font-weight: 700;">Baseline Phase 2 Green</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: #fcd34d; margin-top: 0.2rem;" id="summaryBaselineP2GreenVal">Not Provided</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.78rem; color: #fcd34d; text-transform: uppercase; font-weight: 700;">Baseline Phase 2 Green</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: #fcd34d; margin-top: 0.2rem;" id="summaryBaselineP2GreenVal">Not Provided</div>
                 </div>
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Baseline Green Split</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryBaselineGreenSplitVal">Not Provided</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Baseline Green Split</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryBaselineGreenSplitVal">Not Provided</div>
                 </div>
 
                 <!-- ROW 4 — CLEARANCE INTERVALS & BASELINE TIMING STATUS -->
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Amber Interval</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAmberVal">3 s</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Amber Interval</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAmberVal">3 s</div>
                 </div>
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">All-Red Interval</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAllRedVal">2 s</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">All-Red Interval</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-top: 0.2rem;" id="summaryAllRedVal">2 s</div>
                 </div>
-                <div style="background: rgba(30,41,59,0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Baseline Timing Status</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: #38bdf8; margin-top: 0.2rem;" id="summaryBaselineTimingStatusVal">ℹ Awaiting Green Times</div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Baseline Timing Status</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: #38bdf8; margin-top: 0.2rem;" id="summaryBaselineTimingStatusVal">ℹ Awaiting Green Times</div>
                 </div>
               </div>
 
