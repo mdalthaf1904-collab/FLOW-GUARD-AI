@@ -3180,37 +3180,6 @@ const FlowGuard = (function () {
         targetSection.style.display = 'block';
       }
 
-      // If Step 1, initialize geometry setup UI
-      if (numericId === 1) {
-        initGeometryUI();
-      }
-
-      // If Step 2, update active submode view
-      if (numericId === 2) {
-        setTrafficInputSubmode('upload');
-      }
-
-      // If Step 3, initialize engineering parameters panel UI and calculations
-      if (numericId === 3) {
-        initEngineeringParametersUI();
-      }
-
-      // If Step 4, render traffic summary engineering dashboard
-      if (numericId === 4) {
-        renderTrafficSummaryDashboard();
-      }
-
-      // If Step 5, initialize Analysis Execution Interface UI
-      if (numericId === 5) {
-        initAnalysisExecutionUI();
-        renderStep5AnalysisDashboard();
-      }
-
-      // If Step 6, render master engineering results report dashboard
-      if (numericId === 6) {
-        renderEngineeringDashboard(currentState.approaches, 'engineeringDashboardContainer');
-      }
-
       // Update Sidebar Stepper Items (6 Top-level steps)
       const stepperItems = document.querySelectorAll('.wizard-step-item');
       stepperItems.forEach(item => {
@@ -3263,6 +3232,22 @@ const FlowGuard = (function () {
           nextBtn.innerText = numericId === 5 ? 'View Results & Reports →' : 'Next Step →';
           nextBtn.onclick = () => setWizardStep(numericId + 1);
         }
+      }
+
+      // Step-specific UI Rendering
+      if (numericId === 1) {
+        initGeometryUI();
+      } else if (numericId === 2) {
+        setTrafficInputSubmode('upload');
+      } else if (numericId === 3) {
+        initEngineeringParametersUI();
+      } else if (numericId === 4) {
+        renderTrafficSummaryDashboard();
+      } else if (numericId === 5) {
+        initAnalysisExecutionUI();
+        renderStep5AnalysisDashboard();
+      } else if (numericId === 6) {
+        renderEngineeringDashboard(currentState.approaches, 'engineeringDashboardContainer');
       }
     }
 
@@ -4600,6 +4585,10 @@ const FlowGuard = (function () {
     const geom = project.geometry || {};
     const eng = project.engineeringParameters || {};
     const pt = project.processedTraffic || {};
+    const ds = project.dataset || {};
+
+    const totalPhysicalVehiclesSum = parseFloat(pt.totalVehicles || ds.totalVehicles || (project.trafficInput && project.trafficInput.totalVehicles) || 0);
+    const totalDemandPCUSum = parseFloat(pt.totalPCUDemand || pt.totalPCU || ds.totalPCU || (project.trafficInput && project.trafficInput.totalConvertedPCU) || 0);
 
     const setText = (id, txt) => {
       const el = document.getElementById(id);
@@ -6450,14 +6439,17 @@ function switchMainView(viewName) {
   const navAnalyzer = document.getElementById('navLinkAnalyzer');
 
   if (viewName === 'analyzer') {
+    const isAlreadyAnalyzer = analyzerView && analyzerView.style.display === 'flex';
     if (landingView) landingView.style.display = 'none';
     if (analyzerView) analyzerView.style.display = 'flex';
     if (navLanding) navLanding.classList.remove('active');
     if (navAnalyzer) navAnalyzer.classList.add('active');
 
-    // Sync active wizard step from SSoT project state
-    const currentStep = (typeof getState === 'function' && getState().wizardStep) ? getState().wizardStep : 1;
-    setWizardStep(currentStep);
+    // Only sync initial wizard step if entering analyzer view for the first time
+    if (!isAlreadyAnalyzer) {
+      const currentStep = (typeof getState === 'function' && getState().wizardStep) ? getState().wizardStep : 1;
+      setWizardStep(currentStep);
+    }
   } else {
     if (landingView) landingView.style.display = 'block';
     if (analyzerView) analyzerView.style.display = 'none';
