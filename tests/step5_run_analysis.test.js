@@ -213,6 +213,52 @@ describe('Step 5: Run Analysis Engine', () => {
     expect(C0).toBe(52);
     expect(`${g1}s / ${g2}s`).toBe('25s / 19s');
   });
+
+  test('11. Step 5 -> Step 6 Data Flow & Persistence: saves lastAnalysisResult and retrieves it in getCurrentAnalysisResult', () => {
+    const mockResult = {
+      runId: 'RUN-TEST-001',
+      timestamp: new Date().toISOString(),
+      status: 'completed',
+      websterTiming: {
+        websterCycleC0: 54,
+        g1: 24,
+        g2: 22,
+        amber: 3,
+        allRed: 1,
+        totalLostTimeL: 8,
+        totalY: 0.6828,
+        y1: 0.3629,
+        y2: 0.3199,
+        gEff: 46
+      },
+      criticalAnalysis: {
+        winnerTitle: 'Road C',
+        winnerMetric: { critMoveStr: 'THROUGH', flowRatioYStr: '0.3629' }
+      }
+    };
+
+    // Save result via saveCurrentAnalysisResult
+    FlowGuard.saveCurrentAnalysisResult(mockResult);
+
+    // Verify getState returns lastAnalysisResult
+    const state = FlowGuard.getState();
+    expect(state.lastAnalysisResult).toBeDefined();
+    expect(state.lastAnalysisResult.runId).toBe('RUN-TEST-001');
+
+    // Save state (simulating step navigation setWizardStep(6))
+    FlowGuard.saveState(state);
+
+    // Verify getCurrentAnalysisResult retrieves stored result
+    const currentRes = FlowGuard.getCurrentAnalysisResult();
+    expect(currentRes).not.toBeNull();
+    expect(currentRes.runId).toBe('RUN-TEST-001');
+    expect(currentRes.websterTiming.websterCycleC0).toBe(54);
+
+    // Verify project object persisted lastAnalysisResult
+    const proj = FlowGuard.getProject();
+    expect(proj.lastAnalysisResult).toBeDefined();
+    expect(proj.lastAnalysisResult.runId).toBe('RUN-TEST-001');
+  });
 });
 
 
