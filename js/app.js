@@ -1673,6 +1673,53 @@ const FlowGuard = (function () {
     });
   }
 
+  /**
+   * UI Presentation Helper: Animates metric count-up presentation without modifying actual data
+   */
+  function animateMetricCountUp(elementOrId, endValue, suffix = '', decimals = 0, durationMs = 380) {
+    if (typeof document === 'undefined') return;
+    const el = typeof elementOrId === 'string' ? document.getElementById(elementOrId) : elementOrId;
+    if (!el) return;
+
+    const numVal = parseFloat(endValue);
+    if (isNaN(numVal) || numVal === 0) {
+      el.textContent = (endValue !== undefined && endValue !== null ? endValue : '-') + (suffix ? ' ' + suffix : '');
+      return;
+    }
+
+    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      el.textContent = (decimals > 0 ? numVal.toFixed(decimals) : Math.round(numVal).toLocaleString('en-US')) + (suffix ? ' ' + suffix : '');
+      return;
+    }
+
+    const startTime = performance.now();
+    const startVal = 0;
+
+    function step(currentTime) {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / durationMs, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const currentVal = startVal + (numVal - startVal) * eased;
+
+      const formatted = decimals > 0
+        ? currentVal.toFixed(decimals)
+        : Math.round(currentVal).toLocaleString('en-US');
+
+      el.textContent = formatted + (suffix ? ' ' + suffix : '');
+
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        const finalFormatted = decimals > 0
+          ? numVal.toFixed(decimals)
+          : Math.round(numVal).toLocaleString('en-US');
+        el.textContent = finalFormatted + (suffix ? ' ' + suffix : '');
+      }
+    }
+
+    requestAnimationFrame(step);
+  }
+
   function validateInput(num, min = 0, max = 100000) {
     const parsed = parseFloat(num);
     if (isNaN(parsed)) return { valid: false, message: 'Must be a valid number' };
@@ -2046,6 +2093,46 @@ const FlowGuard = (function () {
   }
 
   /**
+   * Helper to parse a time string "HH:MM" or "HH:MM:SS" into total minutes from midnight (0 to 1440).
+   * Handles "24:00" as 1440 minutes.
+   */
+  function parseTimeToMinutes(tStr) {
+    if (tStr === undefined || tStr === null) return null;
+    const str = String(tStr).trim();
+    if (!str) return null;
+    const parts = str.split(':').map(s => parseInt(s.trim(), 10));
+    if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      return parts[0] * 60 + parts[1];
+    }
+    return null;
+  }
+
+  /**
+   * Helper to parse an interval window string like "00:00-00:15", "00:00–00:15", "08:00 - 08:30"
+   * Returns duration in minutes (e.g. 15, 30, 60), or null if not a range or invalid.
+   */
+  function parseIntervalWindowDuration(timeStr) {
+    if (!timeStr) return null;
+    const str = String(timeStr).trim();
+    const sep = str.includes('–') ? '–' : (str.includes('-') ? '-' : null);
+    if (sep) {
+      const parts = str.split(sep).map(s => s.trim());
+      if (parts.length === 2) {
+        const startMins = parseTimeToMinutes(parts[0]);
+        let endMins = parseTimeToMinutes(parts[1]);
+        if (startMins !== null && endMins !== null) {
+          if (endMins < startMins) {
+            endMins += 1440; // Midnight rollover e.g. 23:45-00:00
+          }
+          const diff = endMins - startMins;
+          if (diff > 0 && diff <= 1440) return diff;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
    * Universal helper to normalize and format time interval keys safely without hardcoded fallbacks
    */
   function normalizeTimeIntervalKey(timeStr, intervalMinutes = 15) {
@@ -2277,20 +2364,46 @@ const FlowGuard = (function () {
       }
     });
 
-    // STEP 2: Detect Survey Interval (15 Min, 30 Min, 1 Hour, or Custom)
-    const timeStrings = Array.from(new Set(records.map(r => r.time))).sort();
+    // STEP 2: Detect Survey Interval & Calculate Duration from Unique (Date, Time Interval) records
+    const uniqueDates = new Set(records.map(r => String(r.date || '2026-08-06').trim()));
+    const timeStrings = Array.from(new Set(records.map(r => String(r.time || '').trim()))).filter(Boolean);
+    const uniqueIntervalKeys = new Set(records.map(r => `${String(r.date || '').trim()}_${String(r.time || '').trim()}`));
+
     let surveyIntervalMinutes = 15;
     let surveyIntervalLabel = '15 Minutes';
 
-    if (timeStrings.length > 1) {
-      const minuteValues = timeStrings.map(t => {
-        const parts = String(t).split(':').map(Number);
-        return (parts[0] || 0) * 60 + (parts[1] || 0);
-      }).sort((a, b) => a - b);
+    // Collect interval window durations if available from range strings (e.g. "00:00-00:15")
+    const rangeDurations = [];
+    timeStrings.forEach(tStr => {
+      const dur = parseIntervalWindowDuration(tStr);
+      if (dur !== null && dur > 0) {
+        rangeDurations.push(dur);
+      }
+    });
+
+    if (rangeDurations.length > 0) {
+      const freq = {};
+      rangeDurations.forEach(d => freq[d] = (freq[d] || 0) + 1);
+      let modeDur = 15;
+      let maxCnt = 0;
+      Object.keys(freq).forEach(d => {
+        if (freq[d] > maxCnt) {
+          maxCnt = freq[d];
+          modeDur = parseInt(d, 10);
+        }
+      });
+      surveyIntervalMinutes = modeDur;
+    } else if (timeStrings.length > 1) {
+      // Fallback: Compute consecutive start time differences for single timestamps (e.g. "08:00", "08:15")
+      const startTimes = timeStrings.map(tStr => {
+        const sep = tStr.includes('–') ? '–' : (tStr.includes('-') ? '-' : null);
+        const firstPart = sep ? tStr.split(sep)[0].trim() : tStr;
+        return parseTimeToMinutes(firstPart);
+      }).filter(v => v !== null).sort((a, b) => a - b);
 
       const diffs = [];
-      for (let i = 1; i < minuteValues.length; i++) {
-        const diff = minuteValues[i] - minuteValues[i - 1];
+      for (let i = 1; i < startTimes.length; i++) {
+        const diff = startTimes[i] - startTimes[i - 1];
         if (diff > 0) diffs.push(diff);
       }
 
@@ -2305,14 +2418,42 @@ const FlowGuard = (function () {
             modeDiff = parseInt(d, 10);
           }
         });
-
         surveyIntervalMinutes = modeDiff;
-        if (modeDiff === 15) surveyIntervalLabel = '15 Minutes';
-        else if (modeDiff === 30) surveyIntervalLabel = '30 Minutes';
-        else if (modeDiff === 60) surveyIntervalLabel = '1 Hour';
-        else surveyIntervalLabel = `Custom (${modeDiff} Min)`;
       }
     }
+
+    if (surveyIntervalMinutes === 15) surveyIntervalLabel = '15 Minutes';
+    else if (surveyIntervalMinutes === 30) surveyIntervalLabel = '30 Minutes';
+    else if (surveyIntervalMinutes === 60) surveyIntervalLabel = '1 Hour';
+    else surveyIntervalLabel = `Custom (${surveyIntervalMinutes} Min)`;
+
+    // Calculate total survey duration across all unique (Date, Time Interval) windows
+    let totalSurveyDurationMinutes = 0;
+    uniqueIntervalKeys.forEach(key => {
+      const timePart = key.includes('_') ? key.split('_')[1] : key;
+      const windowDur = parseIntervalWindowDuration(timePart) || surveyIntervalMinutes;
+      totalSurveyDurationMinutes += windowDur;
+    });
+
+    if (totalSurveyDurationMinutes <= 0) {
+      totalSurveyDurationMinutes = (uniqueIntervalKeys.size || timeStrings.length || 1) * surveyIntervalMinutes;
+    }
+
+    const totalSurveyDurationHours = totalSurveyDurationMinutes / 60;
+
+    const surveyDurationFormatted = (totalSurveyDurationMinutes === 60)
+      ? '60 Minutes (1 Hour)'
+      : (totalSurveyDurationMinutes > 60
+          ? `${totalSurveyDurationMinutes} Minutes (${totalSurveyDurationHours.toFixed(1)} Hours)`
+          : `${totalSurveyDurationMinutes} Minutes`);
+
+    // LOGGING / DEBUG OUTPUT FOR DATASET VALIDATION
+    console.log(`Raw records: ${rawRows.length}`);
+    console.log(`Unique survey dates: ${uniqueDates.size}`);
+    console.log(`Unique time intervals: ${uniqueIntervalKeys.size}`);
+    console.log(`Detected interval: ${surveyIntervalMinutes} minutes`);
+    console.log(`Survey duration: ${totalSurveyDurationMinutes} minutes`);
+    console.log(`Survey duration: ${totalSurveyDurationHours} hours`);
 
     // STEP 3: Group Rows by (Date, Time, Road) into Intervals
     const hourlyMultiplier = 60 / surveyIntervalMinutes;
@@ -2385,14 +2526,6 @@ const FlowGuard = (function () {
       }
     });
 
-    // Determine min(t_start) and max(t_end) for T_duration = max(t_end) - min(t_start)
-    const totalSurveyDurationMinutes = (timeStrings.length || 1) * surveyIntervalMinutes;
-    const surveyDurationFormatted = (totalSurveyDurationMinutes === 60)
-      ? '60 Minutes (1 Hour)'
-      : (totalSurveyDurationMinutes > 60
-          ? `${totalSurveyDurationMinutes} Minutes (${(totalSurveyDurationMinutes / 60).toFixed(1)} Hours)`
-          : `${totalSurveyDurationMinutes} Minutes`);
-
     // Extract Survey Date from record corresponding to min(t_start)
     const earliestTime = timeStrings[0];
     const earliestRecord = records.find(r => r.time === earliestTime) || records[0];
@@ -2442,6 +2575,8 @@ const FlowGuard = (function () {
       surveyDurationFormatted: surveyDurationFormatted,
       surveyDateFormatted: surveyDateFormatted,
       numberOfRoads: uniqueRoads.length || 4,
+      numDates: uniqueDates.size,
+      numIntervals: uniqueIntervalKeys.size,
       startTime: timeStrings[0] || '00:00',
       endTime: timeStrings[timeStrings.length - 1] || '23:45',
       peakIntervalWindow: peakInterval ? peakInterval.timeWindow : '08:30–08:45',
@@ -2940,9 +3075,53 @@ const FlowGuard = (function () {
     const hasTurningData = Object.keys(roadMetrics).some(k => roadMetrics[k] && roadMetrics[k].hasTurningData);
     const overallStatusDisplay = isWebsterValid ? 'FEASIBLE — WEBSTER OPTIMIZATION' : 'OVERSATURATED';
 
-    const proposedGreenSplitStr = is4Phase
-      ? (isWebsterValid ? `${websterTiming.g1} s / ${websterTiming.g2} s / ${websterTiming.g3} s / ${websterTiming.g4} s` : 'N/A')
-      : (isWebsterValid ? `${websterTiming.g1} s / ${websterTiming.g2} s` : 'N/A');
+    // ── PRE-GENERATION DATA CONSISTENCY CHECK ──────────────────────────────────
+    // Validates that the VEHICLES column (observedVehicles) and PCU DEMAND column
+    // (totalDemandVal / peakHourPCU) are each sourced from the correct field.
+    // A mismatch indicates a field-mapping regression that would produce an incorrect report.
+    (() => {
+      const liveProject = loadProject();
+      const livePT = liveProject ? (liveProject.processedTraffic || {}) : {};
+      const liveNorm = liveProject ? (liveProject.normalizedTrafficData || {}) : {};
+      const liveNormRoads = liveNorm.roads || {};
+      let hasConsistencyError = false;
+
+      roadKeys.forEach(r => {
+        const m = roadMetrics[r.key] || {};
+        const liveRoad = livePT[r.key] || {};
+        const liveNormRoad = liveNormRoads[r.key] || null;
+
+        // Check 1: report.vehicleCount must equal trafficSummary.observedVehicleCount
+        const expectedVehicles = parseInt(liveRoad.totalVehicles || 0, 10);
+        const reportVehicles = m.observedVehicles;
+        if (reportVehicles !== undefined && reportVehicles !== expectedVehicles) {
+          console.error(
+            `[FlowGuard AI] REPORT CONSISTENCY ERROR — ${r.title}: ` +
+            `report.vehicleCount (${reportVehicles}) !== trafficSummary.observedVehicleCount (${expectedVehicles}). ` +
+            `Report may be displaying stale or incorrect vehicle counts.`
+          );
+          hasConsistencyError = true;
+        }
+
+        // Check 2: report.peakHourPCU must equal trafficSummary.peakHourPCU
+        const expectedPeakPCU = liveNormRoad ? liveNormRoad.peakHourPCU : null;
+        const reportPeakPCU = m.totalDemandVal;
+        if (expectedPeakPCU !== null && reportPeakPCU !== undefined &&
+            Math.abs(reportPeakPCU - expectedPeakPCU) > 0.15) {
+          console.error(
+            `[FlowGuard AI] REPORT CONSISTENCY ERROR — ${r.title}: ` +
+            `report.peakHourPCU (${reportPeakPCU}) !== trafficSummary.peakHourPCU (${expectedPeakPCU}). ` +
+            `Report PCU demand may be sourced from an incorrect field.`
+          );
+          hasConsistencyError = true;
+        }
+      });
+
+      if (!hasConsistencyError) {
+        console.info('[FlowGuard AI] PDF Pre-generation check PASSED — vehicleCount and peakHourPCU are consistent with traffic summary.');
+      }
+    })();
+    // ───────────────────────────────────────────────────────────────────────────
 
     const html = `<!DOCTYPE html>
 <html>
@@ -3172,11 +3351,15 @@ const FlowGuard = (function () {
         ${roadKeys.map(r => {
           const m = roadMetrics[r.key] || {};
           const isWinning = (r.key === winningKey);
+          // VEHICLES column: must show observed physical vehicle count, NOT rounded PCU demand
+          const vehDisplay = (m.observedVehicles !== undefined && m.observedVehicles !== null)
+            ? m.observedVehicles
+            : '—';
           return `
             <tr class="${isWinning ? 'bg-highlight' : ''}">
               <td><strong>${r.title}</strong> ${isWinning ? '<span style="color:#b91c1c; font-weight:800;">(BOTTLENECK)</span>' : ''}</td>
               <td>${m.lanesVal || 2}</td>
-              <td>${m.totalDemandVal ? Math.round(m.totalDemandVal) : 0} veh</td>
+              <td>${vehDisplay} veh</td>
               <td><strong>${m.totalDemandVal ? m.totalDemandVal.toFixed(1) : '0.0'} PCU/h</strong></td>
               <td>${m.critMoveStr || 'Through'}</td>
               <td><strong>${m.flowRatioY !== undefined ? m.flowRatioY.toFixed(4) : '—'}</strong></td>
@@ -3185,7 +3368,7 @@ const FlowGuard = (function () {
         }).join('')}
       </tbody>
     </table>
-    <div style="font-size: 7.5pt; color: #64748b; margin-top: -4px; margin-bottom: 6px; font-style: italic;">* Peak-hour PCU values are normalized from the observed survey interval used in Step 4.</div>
+    <div style="font-size: 7.5pt; color: #64748b; margin-top: -4px; margin-bottom: 6px; font-style: italic;">* Peak-hour PCU values are normalized from the observed survey interval used in Step 4. Vehicles = observed physical vehicle count from dataset.</div>
 
     ${hasTurningData ? `
       <div style="font-size: 8pt; font-weight: 700; color: #0369a1; margin-top: 6px; margin-bottom: 2px;">Turning Movement Breakdown (Peak-Hour PCU/h Rates):</div>
@@ -4676,6 +4859,9 @@ const FlowGuard = (function () {
       const targetSection = document.getElementById(`wizard-section-${numericId}`);
       if (targetSection) {
         targetSection.style.display = 'block';
+        targetSection.classList.remove('page-enter');
+        void targetSection.offsetWidth;
+        targetSection.classList.add('page-enter');
       }
 
       // Update Sidebar Stepper Items (6 Top-level steps)
@@ -5989,15 +6175,26 @@ const FlowGuard = (function () {
     const isUploaded = !!(ds.uploaded || (ds.records && ds.records.length > 0));
     const normData = proj ? proj.normalizedTrafficData : null;
 
-    const rawDuration = ds.surveyDuration || '15';
+    const rawDuration = ds.surveyDuration || (proj.trafficInput ? proj.trafficInput.surveyDuration : null) || (proj.geometry ? proj.geometry.surveyDuration : '15');
     let formattedDuration = '15 Minutes';
     if (rawDuration && rawDuration !== '—') {
       const durStr = String(rawDuration).trim();
-      if (durStr === '15' || durStr === '15 Minutes') formattedDuration = '15 Minutes';
-      else if (durStr === '30' || durStr === '30 Minutes') formattedDuration = '30 Minutes';
-      else if (durStr === '60' || durStr === '60 Minutes' || durStr === '60 Minutes (1 Hour)' || durStr === '1 Hour') formattedDuration = '60 Minutes (1 Hour)';
-      else if (/^\d+$/.test(durStr)) formattedDuration = `${durStr} Minutes`;
-      else formattedDuration = durStr;
+      const numMinutes = parseFloat(durStr);
+      if (durStr === '15' || durStr === '15 Minutes') {
+        formattedDuration = '15 Minutes';
+      } else if (durStr === '30' || durStr === '30 Minutes') {
+        formattedDuration = '30 Minutes';
+      } else if (durStr === '60' || durStr === '60 Minutes' || durStr === '60 Minutes (1 Hour)' || durStr === '1 Hour') {
+        formattedDuration = '60 Minutes (1 Hour)';
+      } else if (!isNaN(numMinutes) && /^\d+(\.\d+)?$/.test(durStr)) {
+        formattedDuration = (numMinutes === 60)
+          ? '60 Minutes (1 Hour)'
+          : (numMinutes > 60
+              ? `${numMinutes} Minutes (${(numMinutes / 60).toFixed(1)} Hours)`
+              : `${numMinutes} Minutes`);
+      } else {
+        formattedDuration = durStr;
+      }
     }
 
     // Base Saturation Flow S0 from Step 3
@@ -6423,6 +6620,10 @@ const FlowGuard = (function () {
       const lanesVal = appGeom.incomingLanes !== undefined ? parseInt(appGeom.incomingLanes, 10) : (parseInt(geom.laneCounts ? geom.laneCounts[key] : 2, 10) || 2);
       const satFlow = normRoad ? normRoad.saturationFlowS : (baseSat * lanesVal);
 
+      // Observed physical vehicle count for the selected survey interval (NOT PCU, NOT peak-hour PCU)
+      // Source of truth: processedTraffic[key].totalVehicles set in recomputeProjectData()
+      const observedVehicles = parseInt(roadData.totalVehicles || 0, 10);
+
       const totalDemandVal = normRoad ? normRoad.peakHourPCU : parseFloat(mvPcu.totalHourlyPCU || roadData.hourlyDemand || mvPcu.totalPCU || roadData.totalPCU || 0);
       const leftPCU = normRoad ? normRoad.normalizedMovementPCU.left : parseFloat(mvPcu.leftHourlyPCU || mvPcu.leftPCU || 0);
       const throughPCU = normRoad ? normRoad.normalizedMovementPCU.through : parseFloat(mvPcu.throughHourlyPCU || mvPcu.throughPCU || 0);
@@ -6435,6 +6636,8 @@ const FlowGuard = (function () {
 
       return {
         key,
+        lanesVal,
+        observedVehicles,
         totalDemandVal,
         totalDemandStr: isUploaded ? `${formatNum(totalDemandVal, 1)} PCU/h` : '—',
         leftPCU,
@@ -8800,8 +9003,10 @@ const FlowGuard = (function () {
 
       timingData = { g1, g2, g3, g4, amber, allRed, cycleLength };
 
-      // Build the 12 phase transition steps for a full 4-phase cycle:
+      // Build the phase transition steps for a full 4-phase cycle:
+      // Step 0 starts with INITIAL STARTUP ALL-RED interstage so ALL 4 approaches begin on RED!
       phaseSteps = [
+        { phaseNum: 1, phaseName: 'INITIAL STARTUP — ALL-RED', roadKey: 'all', lightState: 'ALL-RED', duration: allRed, nextName: 'PHASE 1 — ROAD A / NORTH' },
         { phaseNum: 1, phaseName: 'PHASE 1 — ROAD A / NORTH', roadKey: 'north', lightState: 'GREEN', duration: g1, nextName: 'PHASE 1 AMBER' },
         { phaseNum: 1, phaseName: 'PHASE 1 — ROAD A / NORTH', roadKey: 'north', lightState: 'AMBER', duration: amber, nextName: 'ALL-RED CLEARANCE' },
         { phaseNum: 1, phaseName: 'PHASE 1 — ALL-RED INTERSTAGE', roadKey: 'all', lightState: 'ALL-RED', duration: allRed, nextName: 'PHASE 2 — ROAD B / EAST' },
@@ -9057,6 +9262,8 @@ const FlowGuard = (function () {
     determineApproachKey,
     normalizeMovementKey,
     normalizeTimeIntervalKey,
+    parseTimeToMinutes,
+    parseIntervalWindowDuration,
     getConfigLabel,
     getActiveApproachKeys,
     getMovementDestination,
@@ -9104,6 +9311,7 @@ const FlowGuard = (function () {
     clearCurrentAnalysisResult,
     getNormalizedTrafficData,
     exportTrafficDataCSV,
+    animateMetricCountUp,
     switchMainView,
     handleHashRouting,
     initMainViewRouting,

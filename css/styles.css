@@ -2702,5 +2702,233 @@ button {
   animation: pulseShimmer 0.6s ease-in-out infinite;
 }
 
+/* ==========================================================================
+   2026 AI + CIVIL/TRAFFIC ENGINEERING UI/UX ANIMATION DESIGN SYSTEM
+   ========================================================================== */
+
+/* 1. Global Animation Timing & Easing Design Tokens */
+:root {
+  --ease-out-cubic: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --glow-cyan: rgba(56, 189, 248, 0.35);
+  --glow-green: rgba(16, 185, 129, 0.35);
+  --glow-amber: rgba(245, 158, 11, 0.35);
+  --glow-red: rgba(239, 68, 68, 0.4);
+  --glow-purple: rgba(167, 139, 250, 0.35);
+}
+
+/* 2. Global Page Entrance & Staggered Reveal Animations */
+@keyframes fgFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fgScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fgPulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 12px var(--glow-cyan);
+  }
+  50% {
+    box-shadow: 0 0 22px var(--glow-cyan);
+  }
+}
+
+.page-enter,
+.wizard-section-panel[style*="display: block"] {
+  animation: fgFadeUp 0.35s var(--ease-out-cubic) forwards;
+}
+
+.stagger-1 { animation: fgFadeUp 0.35s var(--ease-out-cubic) 0.05s forwards; }
+.stagger-2 { animation: fgFadeUp 0.35s var(--ease-out-cubic) 0.10s forwards; }
+.stagger-3 { animation: fgFadeUp 0.35s var(--ease-out-cubic) 0.15s forwards; }
+.stagger-4 { animation: fgFadeUp 0.35s var(--ease-out-cubic) 0.20s forwards; }
+.stagger-5 { animation: fgFadeUp 0.35s var(--ease-out-cubic) 0.25s forwards; }
+
+/* 3. Sidebar Wizard Stepper Animations */
+.wizard-step-item {
+  position: relative;
+  transition: all 0.25s var(--ease-out-cubic);
+  border-left: 3px solid transparent;
+}
+
+.wizard-step-item.active {
+  background: rgba(56, 189, 248, 0.12) !important;
+  border-left-color: var(--accent-primary) !important;
+  box-shadow: inset 0 0 14px rgba(56, 189, 248, 0.12);
+}
+
+.wizard-step-item.active .step-number-badge {
+  background: var(--accent-primary) !important;
+  color: #0B1121 !important;
+  box-shadow: 0 0 12px var(--glow-cyan);
+  animation: fgStepBadgePulse 0.4s var(--ease-out-cubic);
+}
+
+@keyframes fgStepBadgePulse {
+  0% { transform: scale(0.85); }
+  50% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+.wizard-step-item.completed {
+  border-left-color: var(--success) !important;
+}
+
+.wizard-step-item.completed .step-number-badge {
+  background: rgba(16, 185, 129, 0.2) !important;
+  color: var(--success) !important;
+  border: 1px solid rgba(16, 185, 129, 0.5) !important;
+}
+
+/* 4. Upgrade Buttons & Micro-Interactions */
+button,
+.btn-primary,
+.btn-primary-cyan,
+.btn-secondary,
+.btn-secondary-save,
+.btn-gemini-ai {
+  transition: all 0.2s var(--ease-out-cubic) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+button:hover:not(:disabled),
+.btn-primary:hover:not(:disabled),
+.btn-primary-cyan:hover:not(:disabled) {
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 18px rgba(56, 189, 248, 0.35);
+  filter: brightness(1.08);
+}
+
+button:active:not(:disabled),
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0.5px) scale(0.98);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+button:disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* 5. Engineering Cards & Hover Elevations */
+.card,
+.summary-card,
+.phase-box,
+.header-box {
+  transition: transform 0.25s var(--ease-out-cubic), box-shadow 0.25s var(--ease-out-cubic), border-color 0.25s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 14px rgba(56, 189, 248, 0.12);
+}
+
+/* Status-Specific Visual Accents */
+.glow-success,
+.card-status-pass {
+  border-color: rgba(16, 185, 129, 0.5) !important;
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.22) !important;
+}
+
+.glow-warning,
+.card-status-warning {
+  border-color: rgba(245, 158, 11, 0.5) !important;
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.22) !important;
+}
+
+.glow-critical,
+.card-status-critical {
+  border-color: rgba(239, 68, 68, 0.6) !important;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.3) !important;
+}
+
+.glow-ai {
+  border-color: rgba(167, 139, 250, 0.5) !important;
+  box-shadow: 0 0 20px rgba(167, 139, 250, 0.25) !important;
+}
+
+/* 6. Traffic Turning Movement Color Styling */
+.movement-left { color: var(--success) !important; }
+.movement-through { color: var(--accent-primary) !important; }
+.movement-right { color: #f59e0b !important; }
+
+/* 7. Critical Bottleneck Approach Glow */
+.critical-approach-glow {
+  border: 2px solid var(--danger) !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.35) !important;
+  animation: fgCriticalPulse 2.2s var(--ease-in-out-smooth) infinite;
+}
+
+@keyframes fgCriticalPulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(239, 68, 68, 0.25); }
+  50% { box-shadow: 0 0 26px rgba(239, 68, 68, 0.5); }
+}
+
+/* 8. Level of Service (LOS) Visual Indicators */
+.los-a, .los-b { color: var(--success) !important; font-weight: 800; }
+.los-c { color: #f59e0b !important; font-weight: 800; }
+.los-d { color: #f97316 !important; font-weight: 800; }
+.los-e, .los-f { color: var(--danger) !important; font-weight: 800; }
+
+/* 9. Dataset Dropzone Drag & Drop Hover Animation */
+.upload-dropzone {
+  transition: all 0.25s var(--ease-out-cubic);
+}
+
+.upload-dropzone.dragover,
+.upload-dropzone:hover {
+  border-color: var(--accent-primary) !important;
+  background: rgba(56, 189, 248, 0.08) !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+}
+
+/* 10. Table Row Entrance & Hover Micro-Interactions */
+table tbody tr {
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+table tbody tr:hover {
+  background-color: rgba(56, 189, 248, 0.06) !important;
+}
+
+/* 11. Accessibility: Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .page-enter,
+  .btn-spin-icon,
+  .analysis-running-shimmer,
+  .critical-approach-glow {
+    animation: none !important;
+  }
+}
+
+
 
 

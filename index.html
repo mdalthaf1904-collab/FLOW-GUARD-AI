@@ -14,6 +14,7 @@
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
     rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 
 <body>
@@ -46,6 +47,7 @@
     </ul>
 
     <div class="top-navbar-right-info">
+      <button id="btnOpenGeminiAI" class="btn-gemini-ai" onclick="if(window.FlowGuardGemini) FlowGuardGemini.toggleChat();" title="Ask questions about uploaded CSV dataset using Gemini AI">✨ Gemini AI Assistant</button>
       <span>System: <strong>Offline Decision Support</strong></span>
       <span>Engine: <strong class="status-badge-progress" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">READY</strong></span>
     </div>
@@ -2237,15 +2239,15 @@
           <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; font-size: 0.82rem;">
             <div>
               <span style="color: #94a3b8; font-size: 0.72rem; display: block; text-transform: uppercase;">ACTIVE PHASE</span>
-              <strong id="simStatusPhase" style="color: #ffffff; font-size: 0.95rem;">PHASE 1 — ROAD A / NORTH</strong>
+              <strong id="simStatusPhase" style="color: #ffffff; font-size: 0.95rem;">INITIAL STARTUP — ALL-RED</strong>
             </div>
             <div>
               <span style="color: #94a3b8; font-size: 0.72rem; display: block; text-transform: uppercase;">SIGNAL STATE</span>
-              <span id="simStatusSignal" style="font-size: 0.85rem; font-weight: 800; padding: 0.15rem 0.55rem; border-radius: 4px; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); display: inline-block;">GREEN</span>
+              <span id="simStatusSignal" style="font-size: 0.85rem; font-weight: 800; padding: 0.15rem 0.55rem; border-radius: 4px; background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); display: inline-block;">ALL-RED</span>
             </div>
             <div>
               <span style="color: #94a3b8; font-size: 0.72rem; display: block; text-transform: uppercase;">REMAINING TIME</span>
-              <strong id="simStatusRemaining" style="color: #34d399; font-size: 1.1rem;">47 s</strong>
+              <strong id="simStatusRemaining" style="color: #34d399; font-size: 1.1rem;">0 s</strong>
             </div>
             <div>
               <span style="color: #94a3b8; font-size: 0.72rem; display: block; text-transform: uppercase;">CYCLE / ELAPSED</span>
@@ -2254,7 +2256,7 @@
           </div>
 
           <div style="margin-top: 0.65rem; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.76rem; color: #94a3b8;">
-            Next Phase: <strong id="simStatusNext" style="color: #cbd5e1;">PHASE 2 — ROAD B / EAST</strong>
+            Next Phase: <strong id="simStatusNext" style="color: #cbd5e1;">PHASE 1 — ROAD A / NORTH</strong>
           </div>
         </div>
 
@@ -2274,7 +2276,7 @@
             <div class="sim-road-label">ROAD A — NORTHBOUND</div>
             <div class="sim-signal-head" id="signalHeadNorth">
               <div class="sim-signal-title">ROAD A</div>
-              <div class="sim-light light-red" id="lightNorthRed">RED</div>
+              <div class="sim-light light-red active-red" id="lightNorthRed">RED</div>
               <div class="sim-light light-amber" id="lightNorthAmber">AMBER</div>
               <div class="sim-light light-green" id="lightNorthGreen">GREEN</div>
             </div>
@@ -2286,7 +2288,7 @@
             <div class="sim-road-label">ROAD D — WESTBOUND</div>
             <div class="sim-signal-head" id="signalHeadWest">
               <div class="sim-signal-title">ROAD D</div>
-              <div class="sim-light light-red" id="lightWestRed">RED</div>
+              <div class="sim-light light-red active-red" id="lightWestRed">RED</div>
               <div class="sim-light light-amber" id="lightWestAmber">AMBER</div>
               <div class="sim-light light-green" id="lightWestGreen">GREEN</div>
             </div>
@@ -2298,8 +2300,8 @@
             <div style="font-size: 0.7rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; text-align: center;">
               4-WAY<br>JUNCTION
             </div>
-            <div id="simActivePhaseIndicator" style="margin-top: 0.35rem; font-size: 0.65rem; font-weight: 800; padding: 0.2rem 0.4rem; border-radius: 4px; background: rgba(56,189,248,0.15); color: #38bdf8; text-align: center;">
-              PHASE 1
+            <div id="simActivePhaseIndicator" style="margin-top: 0.35rem; font-size: 0.65rem; font-weight: 800; padding: 0.2rem 0.4rem; border-radius: 4px; background: rgba(239, 68, 68, 0.2); color: #f87171; text-align: center;">
+              ALL-RED
             </div>
           </div>
 
@@ -2308,7 +2310,7 @@
             <div class="sim-road-arrow">&larr;</div>
             <div class="sim-signal-head" id="signalHeadEast">
               <div class="sim-signal-title">ROAD B</div>
-              <div class="sim-light light-red" id="lightEastRed">RED</div>
+              <div class="sim-light light-red active-red" id="lightEastRed">RED</div>
               <div class="sim-light light-amber" id="lightEastAmber">AMBER</div>
               <div class="sim-light light-green" id="lightEastGreen">GREEN</div>
             </div>
@@ -2319,7 +2321,7 @@
             <div class="sim-road-arrow">&uarr;</div>
             <div class="sim-signal-head" id="signalHeadSouth">
               <div class="sim-signal-title">ROAD C</div>
-              <div class="sim-light light-red" id="lightSouthRed">RED</div>
+              <div class="sim-light light-red active-red" id="lightSouthRed">RED</div>
               <div class="sim-light light-amber" id="lightSouthAmber">AMBER</div>
               <div class="sim-light light-green" id="lightSouthGreen">GREEN</div>
             </div>
@@ -2476,6 +2478,7 @@
 
   <script charset="utf-8" src="js/simulation2d.js"></script>
   <script charset="utf-8" src="js/app.js"></script>
+  <script charset="utf-8" src="js/gemini_assistant.js"></script>
 </body>
 
 </html>

@@ -38,8 +38,8 @@
 
   // Signal state per approach: 'RED', 'YELLOW', 'GREEN'
   let signalStates = {
-    north: 'GREEN',
-    south: 'GREEN',
+    north: 'RED',
+    south: 'RED',
     east:  'RED',
     west:  'RED'
   };
