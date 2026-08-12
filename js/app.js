@@ -324,6 +324,9 @@ const FlowGuard = (function () {
 
   function saveCurrentAnalysisResult(resultObj) {
     if (!resultObj) return;
+    if (resultObj.analysisCompleted === undefined) {
+      resultObj.analysisCompleted = true;
+    }
     _currentAnalysisResult = resultObj;
 
     try {
@@ -360,13 +363,13 @@ const FlowGuard = (function () {
   }
 
   function getCurrentAnalysisResult() {
-    if (_currentAnalysisResult && _currentAnalysisResult.websterTiming) {
+    if (_currentAnalysisResult && (_currentAnalysisResult.websterTiming || _currentAnalysisResult.analysisCompleted)) {
       return _currentAnalysisResult;
     }
 
     try {
       const proj = loadProject();
-      if (proj && proj.lastAnalysisResult && proj.lastAnalysisResult.websterTiming) {
+      if (proj && proj.lastAnalysisResult && (proj.lastAnalysisResult.websterTiming || proj.lastAnalysisResult.analysisCompleted)) {
         _currentAnalysisResult = proj.lastAnalysisResult;
         return _currentAnalysisResult;
       }
@@ -377,7 +380,7 @@ const FlowGuard = (function () {
         const stored = localStorage.getItem(CURRENT_RESULT_STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (parsed && parsed.websterTiming) {
+          if (parsed && (parsed.websterTiming || parsed.analysisCompleted)) {
             _currentAnalysisResult = parsed;
             return _currentAnalysisResult;
           }
@@ -711,7 +714,6 @@ const FlowGuard = (function () {
       const selectedInterval = project.trafficInput.selectedInterval || (project.trafficInput.datasetStats ? project.trafficInput.selectedInterval : null);
       const intervalRoad = selectedInterval && selectedInterval.roads ? selectedInterval.roads[k] : null;
 
-      // Extract turning counts: if allRecords exists, aggregate across ALL records for approach k
       let left = 0;
       let through = 0;
       let right = 0;
@@ -722,8 +724,38 @@ const FlowGuard = (function () {
 
       const vehCounts = { car: 0, motorcycle: 0, autorickshaw: 0, lcv: 0, bus: 0, truck: 0, bicycle: 0 };
 
+      let recordsToProcess = appRecords;
       if (appRecords.length > 0) {
-        appRecords.forEach(r => {
+        const distinctIntervals = new Set(appRecords.map(r => normalizeTimeIntervalKey(r.timeWindow || r.time, 15)).filter(Boolean));
+        if (distinctIntervals.size > 1) {
+          const invMap = {};
+          appRecords.forEach(r => {
+            const invLabel = normalizeTimeIntervalKey(r.timeWindow || r.time, 15);
+            if (!invLabel) return;
+            if (!invMap[invLabel]) invMap[invLabel] = { pcu: 0, records: [] };
+            const cnt = r.count !== undefined ? r.count : (r.totalVehicles || 0);
+            const rawVehType = r.vehicleType || r.vehicletype || r.catKey || 'Cars';
+            const resolved = resolveVehicleCategoryAndPCU(rawVehType, pcuFactors);
+            const pcuVal = r.rawPCU !== undefined ? r.rawPCU : (cnt * (resolved.factor || 1.0));
+            invMap[invLabel].pcu += pcuVal;
+            invMap[invLabel].records.push(r);
+          });
+          let maxInvKey = null;
+          let maxInvPcu = -1;
+          Object.keys(invMap).forEach(lbl => {
+            if (invMap[lbl].pcu > maxInvPcu) {
+              maxInvPcu = invMap[lbl].pcu;
+              maxInvKey = lbl;
+            }
+          });
+          if (maxInvKey && invMap[maxInvKey].records.length > 0) {
+            recordsToProcess = invMap[maxInvKey].records;
+          }
+        }
+      }
+
+      if (recordsToProcess.length > 0) {
+        recordsToProcess.forEach(r => {
           const rawVehType = r.vehicleType || r.vehicletype || r.catKey || 'Cars';
           const resolved = resolveVehicleCategoryAndPCU(rawVehType, pcuFactors);
 
@@ -987,10 +1019,8 @@ const FlowGuard = (function () {
 
       const lanes = parseInt(project.geometry.laneCounts ? project.geometry.laneCounts[k] : 2, 10) || 2;
       const appSatFlow = lanes * baseSat;
-      const peakHourlyFlowQ = (peakIntervalPCU > 0 && intervalList.length > 1)
-        ? Math.round(peakIntervalPCU * mult * 10) / 10
-        : roadHourlyDemand;
-      const flowRatioY = appSatFlow > 0 ? parseFloat((peakHourlyFlowQ / appSatFlow).toFixed(4)) : 0;
+      const critFlowQ = Math.max(leftHourlyPCU, throughHourlyPCU, rightHourlyPCU);
+      const flowRatioY = appSatFlow > 0 ? parseFloat((roadHourlyDemand / appSatFlow).toFixed(4)) : 0;
 
       const roadName = (project.geometry.roadNames && project.geometry.roadNames[k])
         ? (project.geometry.roadNames[k] + ' - ' + k.charAt(0).toUpperCase() + k.slice(1))
@@ -1177,6 +1207,157 @@ const FlowGuard = (function () {
     project.processedTraffic.pcuCategoryBreakdown = pcuCategoryBreakdown;
     project.processedTraffic.sumModalVeh = sumModalVeh;
     project.processedTraffic.sumModalPcu = sumModalPcu;
+
+    // ── SINGLE SOURCE-OF-TRUTH NORMALIZED TRAFFIC DATASET ──
+    const normDataRoads = {};
+    activeKeys.forEach(k => {
+      const road = project.processedTraffic[k];
+      const mvPcu = road ? road.movementPCU : {};
+      const peakAnalysis = road ? road.peakHourAnalysis : {};
+      const satFlow = road ? road.satFlow : (baseSat * 2);
+
+      const observedPCU = parseFloat((road ? road.totalPCU : 0).toFixed(1));
+      const peakHourPCU = parseFloat((road ? road.hourlyDemand : 0).toFixed(1));
+
+      const obsLeft = parseFloat((mvPcu.leftPCU || 0).toFixed(1));
+      const obsThrough = parseFloat((mvPcu.throughPCU || 0).toFixed(1));
+      const obsRight = parseFloat((mvPcu.rightPCU || 0).toFixed(1));
+
+      const normLeft = parseFloat((mvPcu.leftHourlyPCU !== undefined ? mvPcu.leftHourlyPCU : obsLeft * mult).toFixed(1));
+      const normThrough = parseFloat((mvPcu.throughHourlyPCU !== undefined ? mvPcu.throughHourlyPCU : obsThrough * mult).toFixed(1));
+      const normRight = parseFloat((mvPcu.rightHourlyPCU !== undefined ? mvPcu.rightHourlyPCU : obsRight * mult).toFixed(1));
+
+      let critMove = 'Through';
+      if (normLeft >= normThrough && normLeft >= normRight && normLeft > 0) critMove = 'Left Turn';
+      else if (normRight >= normThrough && normRight >= normLeft && normRight > 0) critMove = 'Right Turn';
+
+      const critFlowQ = Math.max(normLeft, normThrough, normRight);
+      const flowRatioY = satFlow > 0 ? parseFloat((critFlowQ / satFlow).toFixed(4)) : 0;
+
+      normDataRoads[k] = {
+        key: k,
+        name: road ? road.roadName : `Road ${k.toUpperCase()}`,
+        observedInterval: (peakAnalysis ? peakAnalysis.peakInterval : null) || '—',
+        intervalMinutes: surveyDur,
+        observedVehicleCounts: road ? road.vehicleCounts : {},
+        observedPCU: observedPCU,
+        normalizationFactor: mult,
+        peakHourPCU: peakHourPCU,
+        observedMovementPCU: { left: obsLeft, through: obsThrough, right: obsRight },
+        normalizedMovementPCU: { left: normLeft, through: normThrough, right: normRight },
+        criticalMovement: critMove,
+        criticalFlowQ: critFlowQ,
+        saturationFlowS: satFlow,
+        flowRatioY: flowRatioY
+      };
+
+      if (road) {
+        road.hourlyDemand = peakHourPCU;
+        road.satFlow = satFlow;
+        road.flowRatioY = flowRatioY;
+        if (road.websterInputs) {
+          road.websterInputs.criticalMovement = critMove;
+          road.websterInputs.criticalFlow = critFlowQ;
+          road.websterInputs.satFlow = satFlow;
+          road.websterInputs.flowRatioY = flowRatioY;
+        }
+      }
+    });
+
+    const engParams = project.engineeringParameters || {};
+    const phaseMode = (engParams.phaseMode === '4-phase' || (engParams.signal && engParams.signal.phaseCount === 4)) ? '4-phase' : '2-phase';
+    const is4Phase = (phaseMode === '4-phase');
+
+    const yA = normDataRoads.north ? normDataRoads.north.flowRatioY : 0;
+    const yB = normDataRoads.east ? normDataRoads.east.flowRatioY : 0;
+    const yC = normDataRoads.south ? normDataRoads.south.flowRatioY : 0;
+    const yD = normDataRoads.west ? normDataRoads.west.flowRatioY : 0;
+
+    let phaseAnalysisObj = {};
+
+    if (is4Phase) {
+      const p1Road = normDataRoads.north || {};
+      const p2Road = normDataRoads.east || {};
+      const p3Road = normDataRoads.south || {};
+      const p4Road = normDataRoads.west || {};
+
+      const yPhase1 = parseFloat(yA.toFixed(4));
+      const yPhase2 = parseFloat(yB.toFixed(4));
+      const yPhase3 = parseFloat(yC.toFixed(4));
+      const yPhase4 = parseFloat(yD.toFixed(4));
+      const totalY = parseFloat((yPhase1 + yPhase2 + yPhase3 + yPhase4).toFixed(4));
+
+      phaseAnalysisObj = {
+        phaseMode: '4-phase',
+        numPhases: 4,
+        phase1: {
+          criticalApproachKey: 'north',
+          criticalApproachName: p1Road.name ? `${p1Road.name} — ${p1Road.criticalMovement || 'Through'}` : 'Road A (North) — Through',
+          criticalFlowQ: p1Road.criticalFlowQ || 0,
+          saturationFlowS: p1Road.saturationFlowS || 0,
+          flowRatioY: yPhase1
+        },
+        phase2: {
+          criticalApproachKey: 'east',
+          criticalApproachName: p2Road.name ? `${p2Road.name} — ${p2Road.criticalMovement || 'Through'}` : 'Road B (East) — Through',
+          criticalFlowQ: p2Road.criticalFlowQ || 0,
+          saturationFlowS: p2Road.saturationFlowS || 0,
+          flowRatioY: yPhase2
+        },
+        phase3: {
+          criticalApproachKey: 'south',
+          criticalApproachName: p3Road.name ? `${p3Road.name} — ${p3Road.criticalMovement || 'Through'}` : 'Road C (South) — Through',
+          criticalFlowQ: p3Road.criticalFlowQ || 0,
+          saturationFlowS: p3Road.saturationFlowS || 0,
+          flowRatioY: yPhase3
+        },
+        phase4: {
+          criticalApproachKey: 'west',
+          criticalApproachName: p4Road.name ? `${p4Road.name} — ${p4Road.criticalMovement || 'Through'}` : 'Road D (West) — Through',
+          criticalFlowQ: p4Road.criticalFlowQ || 0,
+          saturationFlowS: p4Road.saturationFlowS || 0,
+          flowRatioY: yPhase4
+        },
+        totalY: totalY
+      };
+    } else {
+      const phase1CritKey = (yA >= yC) ? 'north' : 'south';
+      const phase2CritKey = (yB >= yD) ? 'east' : 'west';
+
+      const p1Road = normDataRoads[phase1CritKey] || {};
+      const p2Road = normDataRoads[phase2CritKey] || {};
+
+      const yPhase1 = parseFloat(Math.max(yA, yC).toFixed(4));
+      const yPhase2 = parseFloat(Math.max(yB, yD).toFixed(4));
+      const totalY = parseFloat((yPhase1 + yPhase2).toFixed(4));
+
+      phaseAnalysisObj = {
+        phaseMode: '2-phase',
+        numPhases: 2,
+        phase1: {
+          criticalApproachKey: phase1CritKey,
+          criticalApproachName: p1Road.name ? `${p1Road.name} — ${p1Road.criticalMovement || 'Through'}` : 'Road A (North) — Through',
+          criticalFlowQ: p1Road.criticalFlowQ || 0,
+          saturationFlowS: p1Road.saturationFlowS || 0,
+          flowRatioY: yPhase1
+        },
+        phase2: {
+          criticalApproachKey: phase2CritKey,
+          criticalApproachName: p2Road.name ? `${p2Road.name} — ${p2Road.criticalMovement || 'Through'}` : 'Road B (East) — Through',
+          criticalFlowQ: p2Road.criticalFlowQ || 0,
+          saturationFlowS: p2Road.saturationFlowS || 0,
+          flowRatioY: yPhase2
+        },
+        totalY: totalY
+      };
+    }
+
+    project.normalizedTrafficData = {
+      surveyDuration: surveyDur,
+      normalizationFactor: mult,
+      roads: normDataRoads,
+      phaseAnalysis: phaseAnalysisObj
+    };
 
     if (project.projectInfo) {
       project.projectInfo.updatedAt = new Date().toISOString();
@@ -2447,15 +2628,26 @@ const FlowGuard = (function () {
       };
     });
 
-    // Step 3 & 4: Compute Webster Optimum Cycle C = (1.5L + 5) / (1 - Y)
-    const Y_calc = Math.min(0.95, totalFlowRatioY);
-    let websterCycle = Math.round((1.5 * totalLostTimeL + 5) / (1 - Y_calc));
+    // Step 3 & 4: Compute Webster Theoretical Cycle C₀ = (1.5L + 5) / (1 - Y)
+    let websterCycleC0 = null;
+    const configuredMaxCycle = 180;
+    const minCycleRequired = Math.max(40, totalLostTimeL + (numPhases * 7));
+    let appliedCycle = configuredMaxCycle;
+    let isConstrained = false;
 
-    // IRC:93 Cycle Length Bounds: Minimum 40s, Maximum 180s
-    websterCycle = Math.max(40, Math.min(180, websterCycle));
+    if (totalFlowRatioY > 0 && totalFlowRatioY < 1.00) {
+      websterCycleC0 = Math.round((1.5 * totalLostTimeL + 5) / (1 - totalFlowRatioY));
+      if (websterCycleC0 <= configuredMaxCycle) {
+        appliedCycle = Math.max(minCycleRequired, websterCycleC0);
+        isConstrained = false;
+      } else {
+        appliedCycle = configuredMaxCycle;
+        isConstrained = true;
+      }
+    }
 
-    // Step 5: Effective Green Total G_total = C - L
-    const effectiveGreenTotal = Math.max(10, websterCycle - totalLostTimeL);
+    // Step 5: Effective Green Total G_total = C_applied - L
+    const effectiveGreenTotal = Math.max(10, appliedCycle - totalLostTimeL);
 
     // Step 6: Allocate Green Split proportionally g_i = (y_i / Y) * G_total
     let totalAllocatedGreen = 0;
@@ -2481,8 +2673,12 @@ const FlowGuard = (function () {
       activeKeys: activeKeys,
       totalLostTimeL: totalLostTimeL,
       totalFlowRatioY: parseFloat(totalFlowRatioY.toFixed(4)),
-      websterCycle: websterCycle,
-      cOpt: websterCycle,
+      websterCycle: appliedCycle,
+      cOpt: appliedCycle,
+      websterCycleC0: websterCycleC0,
+      configuredMaxCycle: configuredMaxCycle,
+      appliedCycle: appliedCycle,
+      isConstrained: isConstrained,
       effectiveGreenTotal: effectiveGreenTotal,
       amberTime: amberTime,
       allRedTime: allRedTime,
@@ -2672,19 +2868,20 @@ const FlowGuard = (function () {
         Total Cycle Length: ${baseline.cycleLength}s (Baseline) / ${candidate.cycleLength}s (Candidate)
       </div>
     `;
-
     container.appendChild(wrapper);
   }
 
   /**
    * Upgraded Engineering Report Generator (PDF Printable Report from Canonical Current Result)
+   * Enforces 3-Page A4 Portrait Layout and Unicode Mathematical Symbol Rendering
    */
   function generateEngineeringReport(stateData) {
     const currentResult = getCurrentAnalysisResult();
 
     if (typeof window === 'undefined') return;
 
-    if (!currentResult || !currentResult.websterTiming) {
+    const isAnalysisDone = currentResult && (currentResult.analysisCompleted === true || (currentResult.analysisCompleted !== false && currentResult.runId && currentResult.demandSummary));
+    if (!isAnalysisDone) {
       alert('No completed analysis result available. Please execute Step 5 (Run Analysis) before downloading or printing the report.');
       return;
     }
@@ -2698,114 +2895,585 @@ const FlowGuard = (function () {
     const { runId, formattedDate, geometry, demandSummary, criticalAnalysis, websterTiming, baselineTiming, beforeAfterPerformance, recommendations, assumptionsLimitations } = currentResult;
     const roadMetrics = (demandSummary && demandSummary.roadMetrics) || {};
 
+    const phaseMode = criticalAnalysis.phaseMode || websterTiming.phaseMode || '2-phase';
+    const is4Phase = (phaseMode === '4-phase');
+    const numPhases = is4Phase ? 4 : 2;
+
+    const isWebsterValid = Boolean(
+      criticalAnalysis && criticalAnalysis.isWebsterValid !== undefined ? criticalAnalysis.isWebsterValid :
+      (websterTiming && websterTiming.isWebsterValid !== undefined ? websterTiming.isWebsterValid :
+      (criticalAnalysis && criticalAnalysis.totalY < 1.00 && criticalAnalysis.totalY > 0 && websterTiming && websterTiming.websterCycleC0 !== null))
+    );
+
+    const formatNum = (num, decimals = 0) => {
+      if (num === null || num === undefined || isNaN(num)) return '—';
+      return Number(num).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    };
+
+    const projInfo = currentResult.projectInfo || {};
+    const projTitle = projInfo.title || 'Signalized Intersection Optimization Project';
+    const projLocation = projInfo.location || 'Main Junction';
+    const projAnalyst = projInfo.analyst || 'Traffic Engineer';
+    const projJurisdiction = projInfo.jurisdiction || 'Municipal Traffic Authority';
+
+    const roadKeys = [
+      { key: 'north', title: 'Road A (Northbound)', shortTitle: 'Road A', dir: 'Northbound' },
+      { key: 'east', title: 'Road B (Eastbound)', shortTitle: 'Road B', dir: 'Eastbound' },
+      { key: 'south', title: 'Road C (Southbound)', shortTitle: 'Road C', dir: 'Southbound' },
+      { key: 'west', title: 'Road D (Westbound)', shortTitle: 'Road D', dir: 'Westbound' }
+    ];
+
+    let winningKey = 'north';
+    let maxRatio = -1;
+    roadKeys.forEach(r => {
+      const m = roadMetrics[r.key] || {};
+      if ((m.flowRatioY !== undefined ? m.flowRatioY : 0) > maxRatio) {
+        maxRatio = m.flowRatioY || 0;
+        winningKey = r.key;
+      }
+    });
+
+    const bottleneckMetric = roadMetrics[winningKey] || {};
+    const bottleneckRoad = criticalAnalysis.criticalApproach || `${roadKeys.find(r => r.key === winningKey).title} (${bottleneckMetric.critMoveStr || 'Through'})`;
+    const bottleneckFlowStr = bottleneckMetric.critFlowStr || `${formatNum(criticalAnalysis.phase1CritFlow || 2612.7, 1)} PCU/h`;
+
+    const hasTurningData = Object.keys(roadMetrics).some(k => roadMetrics[k] && roadMetrics[k].hasTurningData);
+    const overallStatusDisplay = isWebsterValid ? 'FEASIBLE — WEBSTER OPTIMIZATION' : 'OVERSATURATED';
+
+    const proposedGreenSplitStr = is4Phase
+      ? (isWebsterValid ? `${websterTiming.g1} s / ${websterTiming.g2} s / ${websterTiming.g3} s / ${websterTiming.g4} s` : 'N/A')
+      : (isWebsterValid ? `${websterTiming.g1} s / ${websterTiming.g2} s` : 'N/A');
+
     const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>FlowGuard AI — Engineering Decision Support Report (${runId})</title>
+  <title>FlowGuard AI — Engineering Report (${runId})</title>
   <style>
-    body { font-family: 'Inter', Arial, sans-serif; margin: 2rem; color: #1e293b; line-height: 1.5; background: #fff; }
-    h1 { color: #0f172a; border-bottom: 2px solid #0284c7; padding-bottom: 0.5rem; font-size: 1.5rem; }
-    h2 { color: #0369a1; margin-top: 1.25rem; font-size: 1.05rem; border-left: 4px solid #0284c7; padding-left: 0.5rem; }
-    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; margin-bottom: 1rem; font-size: 0.85rem; }
-    th, td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; }
-    th { background: #f1f5f9; color: #334155; font-weight: 700; }
-    .summary-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.85rem 1rem; border-radius: 6px; margin-bottom: 1rem; }
-    .badge-success { color: #15803d; font-weight: 700; }
+    @page {
+      size: A4 portrait;
+      margin: 18mm;
+    }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      margin: 0;
+      padding: 0;
+      line-height: 1.4;
+      font-size: 8.5pt;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .no-print { margin-bottom: 12px; text-align: right; }
+    .no-print button { background: #0284c7; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 10pt; }
+    
+    .pdf-page {
+      width: 100%;
+      box-sizing: border-box;
+      page-break-after: always;
+      break-after: page;
+      position: relative;
+    }
+    .pdf-page-last {
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+
+    .pdf-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #0284c7;
+      padding-bottom: 4px;
+      margin-bottom: 10px;
+      font-size: 7.5pt;
+      color: #475569;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .pdf-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid #cbd5e1;
+      padding-top: 4px;
+      margin-top: 12px;
+      font-size: 7.5pt;
+      color: #64748b;
+    }
+
+    .header-box { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #0284c7; padding: 8px 12px; border-radius: 4px; margin-bottom: 10px; }
+    .header-title { font-size: 13.5pt; font-weight: 800; color: #0f172a; margin: 0 0 2px 0; text-transform: uppercase; letter-spacing: 0.01em; }
+    .header-subtitle { font-size: 8.5pt; color: #0284c7; font-weight: 700; margin: 0 0 8px 0; }
+    .meta-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 12px; font-size: 8pt; color: #334155; }
+    
+    .section-title { font-size: 9.5pt; font-weight: 800; color: #0369a1; text-transform: uppercase; letter-spacing: 0.03em; border-left: 3px solid #0284c7; padding-left: 6px; margin: 10px 0 6px 0; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 4px; margin-bottom: 8px; font-size: 8pt; table-layout: fixed; }
+    th, td { border: 1px solid #cbd5e1; padding: 4px 6px; text-align: left; word-wrap: break-word; overflow-wrap: break-word; }
+    th { background: #f1f5f9; color: #1e293b; font-weight: 700; font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.02em; }
+    .bg-highlight { background: #eff6ff; }
+    
+    .summary-card { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px 10px; margin-bottom: 8px; }
+    .badge-status { display: inline-block; padding: 2px 6px; border-radius: 3px; font-weight: 800; font-size: 8pt; }
+    .status-feasible { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+    .status-oversaturated { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+
+    .phase-diagram { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px; margin-top: 4px; }
+    .phase-box { border: 1px solid #cbd5e1; background: #ffffff; border-radius: 3px; padding: 6px 8px; }
+    .phase-title { font-weight: 800; font-size: 8pt; color: #0284c7; margin-bottom: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px; }
+
     @media print {
-      body { margin: 0.5cm; font-size: 11pt; }
-      .no-print { display: none; }
+      body { font-size: 8.5pt; }
+      .no-print { display: none !important; }
     }
   </style>
 </head>
 <body>
-  <div class="no-print" style="margin-bottom: 1rem; text-align: right;">
-    <button onclick="window.print()" style="background: #0284c7; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; font-weight: 700; cursor: pointer;">🖨 Print / Save as PDF</button>
+  <div class="no-print">
+    <button onclick="window.print()">🖨 Print / Save as PDF Report</button>
   </div>
 
-  <h1>FLOWGUARD AI — TRAFFIC ENGINEERING DECISION SUPPORT REPORT</h1>
-  <div style="font-size:0.82rem; color:#64748b; margin-bottom:1.25rem;">
-    Run ID: <strong>${runId}</strong> | Generated: ${formattedDate} | Standards: IRC:93, IRC:106, HCM | Mode: Offline Decision Support
+  <!-- ==================== PAGE 1 ==================== -->
+  <div class="pdf-page">
+    <div class="pdf-header">
+      <span>FLOWGUARD AI</span>
+      <span>TRAFFIC ENGINEERING DECISION SUPPORT REPORT</span>
+      <span>RUN ID: ${runId}</span>
+    </div>
+
+    <!-- 1. PROJECT / ANALYSIS INFORMATION -->
+    <div class="header-box">
+      <div class="header-title">FLOWGUARD AI — TRAFFIC ENGINEERING DECISION SUPPORT REPORT</div>
+      <div class="header-subtitle">Isolated Signalized Intersection Analysis & Webster Signal Optimization (${is4Phase ? '4-PHASE MODEL' : '2-PHASE MODEL'})</div>
+      
+      <div class="meta-grid">
+        <div><strong>Project Title:</strong> ${projTitle}</div>
+        <div><strong>Analysis Run ID:</strong> ${runId}</div>
+        <div><strong>Location:</strong> ${projLocation}</div>
+        <div><strong>Date / Timestamp:</strong> ${formattedDate}</div>
+        <div><strong>Analyst / Engineer:</strong> ${projAnalyst}</div>
+        <div><strong>Jurisdiction / Authority:</strong> ${projJurisdiction}</div>
+        <div><strong>Engineering Standards:</strong> IRC:93 (Signal Design) & IRC:106 (PCU Conversion)</div>
+        <div><strong>Overall System Status:</strong> <span class="badge-status ${isWebsterValid ? 'status-feasible' : 'status-oversaturated'}">${overallStatusDisplay}</span></div>
+      </div>
+    </div>
+
+    <!-- 2. EXECUTIVE SUMMARY -->
+    <div class="section-title">1. Executive Summary</div>
+    <div class="summary-card">
+      <p style="margin:0;">This report presents the canonical traffic engineering analysis, PCU demand conversion, Webster signal timing optimization (${numPhases}-Phase Model), and IRC:93 safety validation for <strong>${geometry.configLabel || '4-Leg Intersection'}</strong> under peak survey window <strong>${demandSummary.peakInterval || 'Peak Window'}</strong>.</p>
+    </div>
+
+    <!-- 3. KEY PERFORMANCE INDICATORS -->
+    <div class="section-title">2. Key Performance Indicators</div>
+    <div class="summary-card">
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 8pt;">
+        <div><strong>Theoretical Webster (C₀):</strong><br><span style="font-size: 11pt; font-weight: 800; color: #0284c7;">${isWebsterValid && websterTiming.websterCycleC0 ? `${websterTiming.websterCycleC0} s` : 'N/A'}</span></div>
+        <div><strong>Applied Signal Cycle:</strong><br><span style="font-size: 11pt; font-weight: 800; color: ${websterTiming.isConstrained ? '#b45309' : '#0284c7'};">${isWebsterValid && websterTiming.appliedCycle ? `${websterTiming.appliedCycle} s` : 'N/A'}${websterTiming.isConstrained ? ' (Max)' : ''}</span></div>
+        <div><strong>Critical Bottleneck:</strong><br><span style="font-size: 8.5pt; font-weight: 800; color: #b91c1c;">${bottleneckRoad}</span></div>
+        <div><strong>Sum Flow Ratios (Y):</strong><br><span style="font-size: 11pt; font-weight: 800; color: ${criticalAnalysis.totalY >= 1.0 ? '#b91c1c' : '#0284c7'};">${criticalAnalysis.totalY}</span></div>
+      </div>
+    </div>
+
+    <!-- 4. INTERSECTION GEOMETRY -->
+    <div class="section-title">3. Intersection Geometry</div>
+    <div class="summary-card">
+      Configuration: <strong>${geometry.configLabel || '4-Leg Signalized'} (${is4Phase ? '4-Phase Model' : '2-Phase Model'})</strong> | Base Saturation Flow Rate (S₀): <strong>${geometry.baseSaturationFlow || 1800} PCU/h/lane</strong> | Survey Window Duration: <strong>${geometry.surveyDuration || 15} min</strong>
+    </div>
+
+    <!-- 5. FOUR-LEG INTERSECTION SCHEMATIC WITH SIGNAL PHASES -->
+    <div class="section-title">4. Four-Leg Signal Phase Allocations</div>
+    <div class="phase-diagram">
+      ${is4Phase ? `
+        <div class="phase-box">
+          <div class="phase-title">PHASE 1 — ROAD A / NORTH</div>
+          <div style="font-size: 7.8pt; color: #475569; line-height: 1.5;">
+            • Critical Approach: <strong>Road A (North) — ${roadMetrics.north?.critMoveStr || 'Through'}</strong><br>
+            • Critical Flow (q₁): <strong>${formatNum(criticalAnalysis.phase1CritFlow || roadMetrics.north?.critFlowVal, 1)} PCU/h</strong> | Flow Ratio (y₁): <strong>${criticalAnalysis.yPhase1}</strong><br>
+            • Allocated Green (g₁): <strong>${isWebsterValid && websterTiming.g1 !== null ? `${websterTiming.g1} s` : 'N/A'}</strong> | Amber: ${websterTiming.amber || 3}s | All-Red: ${websterTiming.allRed || 1}s
+          </div>
+        </div>
+        <div class="phase-box">
+          <div class="phase-title">PHASE 2 — ROAD B / EAST</div>
+          <div style="font-size: 7.8pt; color: #475569; line-height: 1.5;">
+            • Critical Approach: <strong>Road B (East) — ${roadMetrics.east?.critMoveStr || 'Through'}</strong><br>
+            • Critical Flow (q₂): <strong>${formatNum(criticalAnalysis.phase2CritFlow || roadMetrics.east?.critFlowVal, 1)} PCU/h</strong> | Flow Ratio (y₂): <strong>${criticalAnalysis.yPhase2}</strong><br>
+            • Allocated Green (g₂): <strong>${isWebsterValid && websterTiming.g2 !== null ? `${websterTiming.g2} s` : 'N/A'}</strong> | Amber: ${websterTiming.amber || 3}s | All-Red: ${websterTiming.allRed || 1}s
+          </div>
+        </div>
+        <div class="phase-box">
+          <div class="phase-title">PHASE 3 — ROAD C / SOUTH</div>
+          <div style="font-size: 7.8pt; color: #475569; line-height: 1.5;">
+            • Critical Approach: <strong>Road C (South) — ${roadMetrics.south?.critMoveStr || 'Through'}</strong><br>
+            • Critical Flow (q₃): <strong>${formatNum(criticalAnalysis.phase3CritFlow || roadMetrics.south?.critFlowVal, 1)} PCU/h</strong> | Flow Ratio (y₃): <strong>${criticalAnalysis.yPhase3}</strong><br>
+            • Allocated Green (g₃): <strong>${isWebsterValid && websterTiming.g3 !== null ? `${websterTiming.g3} s` : 'N/A'}</strong> | Amber: ${websterTiming.amber || 3}s | All-Red: ${websterTiming.allRed || 1}s
+          </div>
+        </div>
+        <div class="phase-box">
+          <div class="phase-title">PHASE 4 — ROAD D / WEST</div>
+          <div style="font-size: 7.8pt; color: #475569; line-height: 1.5;">
+            • Critical Approach: <strong>Road D (West) — ${roadMetrics.west?.critMoveStr || 'Through'}</strong><br>
+            • Critical Flow (q₄): <strong>${formatNum(criticalAnalysis.phase4CritFlow || roadMetrics.west?.critFlowVal, 1)} PCU/h</strong> | Flow Ratio (y₄): <strong>${criticalAnalysis.yPhase4}</strong><br>
+            • Allocated Green (g₄): <strong>${isWebsterValid && websterTiming.g4 !== null ? `${websterTiming.g4} s` : 'N/A'}</strong> | Amber: ${websterTiming.amber || 3}s | All-Red: ${websterTiming.allRed || 1}s
+          </div>
+        </div>
+      ` : `
+        <div class="phase-box">
+          <div class="phase-title">PHASE 1 — NORTH / SOUTH (Road A & Road C)</div>
+          <div style="font-size: 7.8pt; color: #475569; line-height: 1.5;">
+            • Critical Approach: <strong>${criticalAnalysis.phase1CritApproach || 'Road A (Northbound)'}</strong><br>
+            • Critical Flow (q₁): <strong>${formatNum(criticalAnalysis.phase1CritFlow, 1)} PCU/h</strong> | Flow Ratio (y₁): <strong>${criticalAnalysis.yPhase1}</strong><br>
+            • Allocated Green (g₁): <strong>${isWebsterValid && websterTiming.g1 !== null ? `${websterTiming.g1} s` : 'N/A'}</strong> | Amber: ${websterTiming.amber || 3}s | All-Red: ${websterTiming.allRed || 1}s
+          </div>
+        </div>
+        <div class="phase-box">
+          <div class="phase-title">PHASE 2 — EAST / WEST (Road B & Road D)</div>
+          <div style="font-size: 7.8pt; color: #475569; line-height: 1.5;">
+            • Critical Approach: <strong>${criticalAnalysis.phase2CritApproach || 'Road B (Eastbound)'}</strong><br>
+            • Critical Flow (q₂): <strong>${formatNum(criticalAnalysis.phase2CritFlow, 1)} PCU/h</strong> | Flow Ratio (y₂): <strong>${criticalAnalysis.yPhase2}</strong><br>
+            • Allocated Green (g₂): <strong>${isWebsterValid && websterTiming.g2 !== null ? `${websterTiming.g2} s` : 'N/A'}</strong> | Amber: ${websterTiming.amber || 3}s | All-Red: ${websterTiming.allRed || 1}s
+          </div>
+        </div>
+      `}
+    </div>
+
+    <div class="pdf-footer">
+      <span>Page 1 of 3</span>
+      <span>Standards: IRC:93 / IRC:106</span>
+      <span>Mode: Offline Decision Support</span>
+    </div>
   </div>
 
-  <div class="summary-box">
-    <h2 style="margin-top:0;">1. Executive Summary</h2>
-    <p>This report presents the canonical traffic engineering analysis, PCU demand conversion, Webster signal timing optimization, and IRC:93 safety validation for <strong>${geometry.configLabel}</strong> under peak survey window <strong>${demandSummary.peakInterval}</strong>.</p>
-  </div>
+  <!-- ==================== PAGE 2 ==================== -->
+  <div class="pdf-page">
+    <div class="pdf-header">
+      <span>FLOWGUARD AI</span>
+      <span>DEMAND AUDIT & WEBSTER OPTIMIZATION</span>
+      <span>RUN ID: ${runId}</span>
+    </div>
 
-  <h2>2. Intersection Geometry & Parameters</h2>
-  <p>Configuration: <strong>${geometry.configLabel}</strong> | Base Saturation Flow: <strong>${geometry.baseSaturationFlow} PCU/h/lane</strong> | Survey Duration: <strong>${geometry.surveyDuration} min</strong></p>
+    <!-- 6. TRAFFIC DEMAND & PCU CONVERSION AUDIT -->
+    <div class="section-title">5. Traffic Demand & PCU Conversion Audit (IRC:106 Standard)</div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 25%;">Approach</th>
+          <th style="width: 10%;">Lanes</th>
+          <th style="width: 18%;">Vehicles</th>
+          <th style="width: 18%;">PCU Demand (PEAK-HOUR PCU/h)</th>
+          <th style="width: 17%;">Critical Movement</th>
+          <th style="width: 12%;">Flow Ratio (y)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${roadKeys.map(r => {
+          const m = roadMetrics[r.key] || {};
+          const isWinning = (r.key === winningKey);
+          return `
+            <tr class="${isWinning ? 'bg-highlight' : ''}">
+              <td><strong>${r.title}</strong> ${isWinning ? '<span style="color:#b91c1c; font-weight:800;">(BOTTLENECK)</span>' : ''}</td>
+              <td>${m.lanesVal || 2}</td>
+              <td>${m.totalDemandVal ? Math.round(m.totalDemandVal) : 0} veh</td>
+              <td><strong>${m.totalDemandVal ? m.totalDemandVal.toFixed(1) : '0.0'} PCU/h</strong></td>
+              <td>${m.critMoveStr || 'Through'}</td>
+              <td><strong>${m.flowRatioY !== undefined ? m.flowRatioY.toFixed(4) : '—'}</strong></td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+    <div style="font-size: 7.5pt; color: #64748b; margin-top: -4px; margin-bottom: 6px; font-style: italic;">* Peak-hour PCU values are normalized from the observed survey interval used in Step 4.</div>
 
-  <h2>3. Traffic Demand & PCU Conversion (IRC:106 Standard)</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Approach</th>
-        <th>Lanes</th>
-        <th>Physical Vehicles</th>
-        <th>Converted Demand (PCU/h)</th>
-        <th>Sat Flow (PCU/h)</th>
-        <th>Critical Flow Ratio (y)</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${['north', 'east', 'south', 'west'].map(k => {
-        const m = roadMetrics[k] || {};
-        const titleMap = { north: 'Road A - Northbound', east: 'Road B - Eastbound', south: 'Road C - Southbound', west: 'Road D - Westbound' };
-        return `
+    ${hasTurningData ? `
+      <div style="font-size: 8pt; font-weight: 700; color: #0369a1; margin-top: 6px; margin-bottom: 2px;">Turning Movement Breakdown (Peak-Hour PCU/h Rates):</div>
+      <table>
+        <thead>
           <tr>
-            <td>${titleMap[k]}</td>
-            <td>${m.lanesVal || 2}</td>
-            <td>${m.totalDemandVal ? Math.round(m.totalDemandVal) : 0} veh</td>
-            <td><strong>${m.totalDemandVal ? m.totalDemandVal.toFixed(1) : '0.0'} PCU/h</strong></td>
-            <td>${m.satFlow || ( (m.lanesVal || 2) * geometry.baseSaturationFlow )} PCU/h</td>
-            <td><strong>${m.flowRatioY !== undefined ? m.flowRatioY.toFixed(4) : '—'}</strong> (${m.critMoveStr || 'Through'})</td>
+            <th style="width: 28%;">Approach</th>
+            <th style="width: 18%;">Left Turn</th>
+            <th style="width: 18%;">Through</th>
+            <th style="width: 18%;">Right Turn</th>
+            <th style="width: 18%;">Critical Movement</th>
           </tr>
-        `;
-      }).join('')}
-    </tbody>
-  </table>
+        </thead>
+        <tbody>
+          ${roadKeys.map(r => {
+            const m = roadMetrics[r.key] || {};
+            return `
+              <tr>
+                <td><strong>${r.title}</strong></td>
+                <td>${m.leftPCU ? m.leftPCU.toFixed(0) : 0} PCU</td>
+                <td>${m.throughPCU ? m.throughPCU.toFixed(0) : 0} PCU</td>
+                <td>${m.rightPCU ? m.rightPCU.toFixed(0) : 0} PCU</td>
+                <td>${m.critMoveStr || 'Through'}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    ` : ''}
 
-  <h2>4. Webster Signal Timing Plan (IRC:93 Standard)</h2>
-  <div class="summary-box">
-    <p>• Webster Optimum Cycle Length C₀ = <strong>${websterTiming.websterCycleC0} s</strong> (Lost Time L = ${websterTiming.totalLostTimeL}s)</p>
-    <p>• Phase 1 Green Split (N / S) = <strong class="badge-success">${websterTiming.g1} s</strong> (Amber: ${websterTiming.amber}s, All-Red: ${websterTiming.allRed}s)</p>
-    <p>• Phase 2 Green Split (E / W) = <strong class="badge-success">${websterTiming.g2} s</strong> (Amber: ${websterTiming.amber}s, All-Red: ${websterTiming.allRed}s)</p>
-    <p>• Critical Flow Ratio Y = <strong>${criticalAnalysis.totalY}</strong> (Capacity Limit Status: ${criticalAnalysis.isWebsterValid ? 'FEASIBLE' : 'OVERSATURATED'})</p>
+    <!-- 7. CRITICAL FLOW RATIOS -->
+    <div class="section-title">6. Critical Flow Ratios</div>
+    <div class="summary-card" style="font-size: 8pt;">
+      Sum of Critical Phase Flow Ratios (Y): <strong style="color: ${criticalAnalysis.totalY >= 1.0 ? '#b91c1c' : '#0284c7'};">
+        ${is4Phase
+          ? `Y = y₁ (${criticalAnalysis.yPhase1}) + y₂ (${criticalAnalysis.yPhase2}) + y₃ (${criticalAnalysis.yPhase3}) + y₄ (${criticalAnalysis.yPhase4}) = ${criticalAnalysis.totalY}`
+          : `Y = y₁ (${criticalAnalysis.yPhase1}) + y₂ (${criticalAnalysis.yPhase2}) = ${criticalAnalysis.totalY}`
+        }
+      </strong>
+    </div>
+
+    <!-- 8. WEBSTER SIGNAL TIMING CALCULATION -->
+    <div class="section-title">7. Webster Signal Timing Calculation Breakdown</div>
+    ${isWebsterValid ? `
+      <div class="summary-card" style="font-size: 8pt; line-height: 1.6;">
+        • <strong>Total Lost Time:</strong> L = ${numPhases} × (Amber + All-Red) = ${numPhases} × (${websterTiming.amber || 3} + ${websterTiming.allRed || 1}) = <strong>${websterTiming.totalLostTimeL} s</strong><br>
+        • <strong>Critical Flow Ratio:</strong> Y = ${is4Phase ? `y₁ + y₂ + y₃ + y₄ = ${criticalAnalysis.yPhase1} + ${criticalAnalysis.yPhase2} + ${criticalAnalysis.yPhase3} + ${criticalAnalysis.yPhase4}` : `y₁ + y₂ = ${criticalAnalysis.yPhase1} + ${criticalAnalysis.yPhase2}`} = <strong>${criticalAnalysis.totalY}</strong><br>
+        • <strong>Theoretical Webster Cycle:</strong> C₀ = (1.5L + 5) / (1 − Y) = (1.5(${websterTiming.totalLostTimeL}) + 5) / (1 − ${criticalAnalysis.totalY}) = <strong>${websterTiming.websterCycleC0} s</strong><br>
+        • <strong>Configured Maximum Cycle:</strong> <strong>${websterTiming.configuredMaxCycle || 180} s</strong><br>
+        • <strong>Applied Signal Cycle:</strong> <strong>${websterTiming.appliedCycle || websterTiming.websterCycleC0} s</strong> ${websterTiming.isConstrained ? '<span style="color:#b45309; font-weight:800;">(⚠ Cycle constrained by configured maximum)</span>' : ''}<br>
+        • <strong>Available Effective Green:</strong> G_eff = C_applied − L = ${websterTiming.appliedCycle || websterTiming.websterCycleC0} − ${websterTiming.totalLostTimeL} = <strong>${websterTiming.gEff} s</strong><br>
+        ${is4Phase ? `
+          • <strong>Phase 1 — Road A / North:</strong> Green g₁ = G_eff × (y₁ / Y) = <strong>${websterTiming.g1} s</strong><br>
+          • <strong>Phase 2 — Road B / East:</strong> Green g₂ = G_eff × (y₂ / Y) = <strong>${websterTiming.g2} s</strong><br>
+          • <strong>Phase 3 — Road C / South:</strong> Green g₃ = G_eff × (y₃ / Y) = <strong>${websterTiming.g3} s</strong><br>
+          • <strong>Phase 4 — Road D / West:</strong> Green g₄ = G_eff × (y₄ / Y) = <strong>${websterTiming.g4} s</strong>
+        ` : `
+          • <strong>Phase 1 — North/South:</strong> Green g₁ = G_eff × (y₁ / Y) = <strong>${websterTiming.g1} s</strong><br>
+          • <strong>Phase 2 — East/West:</strong> Green g₂ = G_eff − g₁ = <strong>${websterTiming.g2} s</strong>
+        `}
+      </div>
+    ` : `
+      <div style="background: #fee2e2; border: 1px solid #fca5a5; color: #b91c1c; padding: 8px 10px; border-radius: 4px; font-size: 8pt; line-height: 1.5;">
+        <strong>⚠️ Intersection oversaturated — Webster optimization is not valid as a conventional unconstrained solution.</strong><br>
+        Critical Flow Ratio Y = <strong>${criticalAnalysis.totalY}</strong> ≥ 1.00.<br>
+        Webster's isolated-intersection optimum cycle formula is not applicable when Y ≥ 1.00. Theoretical Cycle (C₀) = N/A, Applied Cycle = N/A.
+      </div>
+    `}
+
+    <!-- 9. RECOMMENDED SIGNAL TIMING PLAN -->
+    <div class="section-title">8. Recommended Signal Timing Plan</div>
+    ${isWebsterValid ? `
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 12%;">Phase</th>
+            <th style="width: 28%;">Approach</th>
+            <th style="width: 15%;">Critical Flow</th>
+            <th style="width: 13%;">Flow Ratio</th>
+            <th style="width: 11%;">Green (g)</th>
+            <th style="width: 105px;">Amber</th>
+            <th style="width: 11%;">All-Red</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${is4Phase ? `
+            <tr>
+              <td><strong>P1</strong></td>
+              <td>Road A / North</td>
+              <td>${formatNum(criticalAnalysis.phase1CritFlow || roadMetrics.north?.critFlowVal, 1)} PCU/h</td>
+              <td>${criticalAnalysis.yPhase1}</td>
+              <td><strong>${websterTiming.g1} s</strong></td>
+              <td>${websterTiming.amber || 3} s</td>
+              <td>${websterTiming.allRed || 1} s</td>
+            </tr>
+            <tr>
+              <td><strong>P2</strong></td>
+              <td>Road B / East</td>
+              <td>${formatNum(criticalAnalysis.phase2CritFlow || roadMetrics.east?.critFlowVal, 1)} PCU/h</td>
+              <td>${criticalAnalysis.yPhase2}</td>
+              <td><strong>${websterTiming.g2} s</strong></td>
+              <td>${websterTiming.amber || 3} s</td>
+              <td>${websterTiming.allRed || 1} s</td>
+            </tr>
+            <tr>
+              <td><strong>P3</strong></td>
+              <td>Road C / South</td>
+              <td>${formatNum(criticalAnalysis.phase3CritFlow || roadMetrics.south?.critFlowVal, 1)} PCU/h</td>
+              <td>${criticalAnalysis.yPhase3}</td>
+              <td><strong>${websterTiming.g3} s</strong></td>
+              <td>${websterTiming.amber || 3} s</td>
+              <td>${websterTiming.allRed || 1} s</td>
+            </tr>
+            <tr>
+              <td><strong>P4</strong></td>
+              <td>Road D / West</td>
+              <td>${formatNum(criticalAnalysis.phase4CritFlow || roadMetrics.west?.critFlowVal, 1)} PCU/h</td>
+              <td>${criticalAnalysis.yPhase4}</td>
+              <td><strong>${websterTiming.g4} s</strong></td>
+              <td>${websterTiming.amber || 3} s</td>
+              <td>${websterTiming.allRed || 1} s</td>
+            </tr>
+          ` : `
+            <tr>
+              <td><strong>P1</strong></td>
+              <td>Phase 1 — North / South</td>
+              <td>${formatNum(criticalAnalysis.phase1CritFlow, 1)} PCU/h</td>
+              <td>${criticalAnalysis.yPhase1}</td>
+              <td><strong>${websterTiming.g1} s</strong></td>
+              <td>${websterTiming.amber || 3} s</td>
+              <td>${websterTiming.allRed || 1} s</td>
+            </tr>
+            <tr>
+              <td><strong>P2</strong></td>
+              <td>Phase 2 — East / West</td>
+              <td>${formatNum(criticalAnalysis.phase2CritFlow, 1)} PCU/h</td>
+              <td>${criticalAnalysis.yPhase2}</td>
+              <td><strong>${websterTiming.g2} s</strong></td>
+              <td>${websterTiming.amber || 3} s</td>
+              <td>${websterTiming.allRed || 1} s</td>
+            </tr>
+          `}
+        </tbody>
+      </table>
+      <div style="font-size: 8pt; font-weight: 700; color: #0284c7; margin-top: 4px; text-align: right;">
+        Calculated Shared Cycle Length (C₀): <strong>${websterTiming.websterCycleC0} s</strong>
+      </div>
+    ` : `
+      <div class="summary-card" style="text-align: center; color: #b91c1c; font-weight: 700; font-size: 8pt;">
+        NO VALID WEBSTER TIMING GENERATED — Intersection is over-saturated.
+      </div>
+    `}
+
+    <div class="pdf-footer">
+      <span>Page 2 of 3</span>
+      <span>Standards: IRC:93 / IRC:106</span>
+      <span>Mode: Offline Decision Support</span>
+    </div>
   </div>
 
-  <h2>5. Before vs After Performance Comparison</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Performance Metric</th>
-        <th>Current / Baseline</th>
-        <th>Webster Candidate</th>
-        <th>Estimated Impact</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr><td>Shared Cycle Length</td><td>${baselineTiming.hasBaseline ? baselineTiming.existingCycle + ' s' : '—'}</td><td><strong>${websterTiming.websterCycleC0} s</strong></td><td>Optimized C₀</td></tr>
-      <tr><td>Phase 1 Green (N/S)</td><td>${baselineTiming.hasBaseline ? baselineTiming.baselineP1Green + ' s' : '—'}</td><td><strong>${websterTiming.g1} s</strong></td><td>Rebalanced Split</td></tr>
-      <tr><td>Phase 2 Green (E/W)</td><td>${baselineTiming.hasBaseline ? baselineTiming.baselineP2Green + ' s' : '—'}</td><td><strong>${websterTiming.g2} s</strong></td><td>Rebalanced Split</td></tr>
-      <tr><td>Control Delay (s/veh)</td><td>${beforeAfterPerformance.baselineDelay}</td><td><strong>${beforeAfterPerformance.proposedDelay}</strong></td><td class="badge-success">${beforeAfterPerformance.delayChange}</td></tr>
-      <tr><td>Queue Length (m)</td><td>${beforeAfterPerformance.baselineQueue}</td><td><strong>${beforeAfterPerformance.proposedQueue}</strong></td><td class="badge-success">${beforeAfterPerformance.queueChange}</td></tr>
-      <tr><td>Degree of Saturation (v/c)</td><td>${beforeAfterPerformance.baselineDOS}</td><td><strong>${beforeAfterPerformance.proposedDOS}</strong></td><td class="badge-success">${beforeAfterPerformance.dosChange}</td></tr>
-      <tr><td>Level of Service (LOS)</td><td>${beforeAfterPerformance.baselineLOS}</td><td><strong>${beforeAfterPerformance.proposedLOS}</strong></td><td class="badge-success">${beforeAfterPerformance.losChange}</td></tr>
-    </tbody>
-  </table>
+  <!-- ==================== PAGE 3 ==================== -->
+  <div class="pdf-page pdf-page-last">
+    <div class="pdf-header">
+      <span>FLOWGUARD AI</span>
+      <span>PERFORMANCE ESTIMATES & ENGINEERING SIGN-OFF</span>
+      <span>RUN ID: ${runId}</span>
+    </div>
 
-  <h2>6. Engineering Bottleneck & Recommendation</h2>
-  <div class="summary-box">
-    <p>Primary Bottleneck: <strong>${recommendations.bottleneck}</strong></p>
-    <p>Reason: ${recommendations.reason}</p>
-    <p><strong>Action Plan:</strong> ${recommendations.action}</p>
+    <!-- 10. BEFORE VS AFTER PERFORMANCE & 11. CAPACITY SUMMARY -->
+    <div class="section-title">9. Before vs After Performance & Capacity Summary</div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 32%;">Performance Metric</th>
+          <th style="width: 17%;">Before (Baseline)</th>
+          <th style="width: 17%;">After (Proposed Plan)</th>
+          <th style="width: 17%;">Model Impact</th>
+          <th style="width: 17%;">Improvement</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Average Control Delay (s/veh)</td>
+          <td>${beforeAfterPerformance.baselineDelay || 'Not Available'}</td>
+          <td><strong>${beforeAfterPerformance.proposedDelay}</strong></td>
+          <td>${beforeAfterPerformance.delayChange}</td>
+          <td>${isWebsterValid ? 'Feasible Delay' : 'N/A'}</td>
+        </tr>
+        <tr>
+          <td>Queue Length (m)</td>
+          <td>${beforeAfterPerformance.baselineQueue || 'Not Available'}</td>
+          <td><strong>${beforeAfterPerformance.proposedQueue}</strong></td>
+          <td>${beforeAfterPerformance.queueChange}</td>
+          <td>${isWebsterValid ? 'Feasible Queue' : 'N/A'}</td>
+        </tr>
+        <tr>
+          <td>Sum of Critical Flow Ratios (Y)</td>
+          <td>Observed Demand</td>
+          <td><strong>${criticalAnalysis.totalY}</strong> ${isWebsterValid ? '(Designed)' : '(Oversaturated)'}</td>
+          <td>${isWebsterValid ? (is4Phase ? `y₁: ${criticalAnalysis.yPhase1} + y₂: ${criticalAnalysis.yPhase2} + y₃: ${criticalAnalysis.yPhase3} + y₄: ${criticalAnalysis.yPhase4}` : `y₁: ${criticalAnalysis.yPhase1} + y₂: ${criticalAnalysis.yPhase2}`) : 'N/A'}</td>
+          <td>${isWebsterValid ? 'Feasible Capacity' : 'Over-saturated'}</td>
+        </tr>
+        <tr>
+          <td>Degree of Saturation (v/c)</td>
+          <td>${beforeAfterPerformance.baselineDOS || 'Not Available'}</td>
+          <td><strong>${beforeAfterPerformance.proposedDOS}</strong></td>
+          <td>${beforeAfterPerformance.dosChange}</td>
+          <td>${isWebsterValid ? 'Feasible v/c' : 'N/A'}</td>
+        </tr>
+        <tr>
+          <td>Level of Service (LOS)</td>
+          <td>${beforeAfterPerformance.baselineLOS || 'Not Available'}</td>
+          <td><strong>${beforeAfterPerformance.proposedLOS || 'Not Available'}</strong></td>
+          <td>${beforeAfterPerformance.losChange || '—'}</td>
+          <td>${isWebsterValid ? 'Feasible LOS' : 'N/A'}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="font-size: 7.2pt; color: #64748b; font-style: italic; margin-top: 1px; margin-bottom: 6px;">
+      * Model-based analytical estimates, not guaranteed field improvements.
+    </div>
+
+    <!-- 12. SAFETY & OPERATIONAL VALIDATION -->
+    <div class="section-title">10. IRC:93 Safety & Operational Validation</div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 28%;">Validation Parameter</th>
+          <th style="width: 32%;">Constraint Requirement</th>
+          <th style="width: 24%;">Evaluated Value</th>
+          <th style="width: 16%;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Minimum Green Constraint Check</td>
+          <td>Phase green split g_i ≥ 7.0 s</td>
+          <td>${is4Phase
+            ? (isWebsterValid ? `g₁=${websterTiming.g1}s, g₂=${websterTiming.g2}s, g₃=${websterTiming.g3}s, g₄=${websterTiming.g4}s` : 'N/A')
+            : (isWebsterValid ? `g₁=${websterTiming.g1}s, g₂=${websterTiming.g2}s` : 'N/A')
+          }</td>
+          <td><strong>${isWebsterValid ? 'PASS (Compliant)' : 'N/A — Oversaturated'}</strong></td>
+        </tr>
+        <tr>
+          <td>Pedestrian Clearance Time Check</td>
+          <td>g_i ≥ t_walk + (W_cross / v_walk)</td>
+          <td>Crosswalk Width = ${geometry.approaches?.north?.crosswalkWidth || 14} m</td>
+          <td><strong>${isWebsterValid ? 'PASS (Compliant)' : 'N/A — Oversaturated'}</strong></td>
+        </tr>
+        <tr>
+          <td>Clearance Interval Safety Check</td>
+          <td>Amber + All-Red ≥ 4.0 s</td>
+          <td>${websterTiming.amber || 3}s Amber + ${websterTiming.allRed || 1}s All-Red = ${(websterTiming.amber || 3) + (websterTiming.allRed || 1)}s</td>
+          <td><strong>PASS (Compliant)</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- 13. KEY ENGINEERING FINDINGS & 14. RECOMMENDATIONS -->
+    <div class="section-title">11. Key Engineering Findings & Recommendations</div>
+    <div class="summary-card" style="font-size: 8pt; line-height: 1.5;">
+      <p style="margin:0 0 4px 0;"><strong>Primary Bottleneck:</strong> ${recommendations.bottleneck}</p>
+      <p style="margin:0 0 4px 0;"><strong>Bottleneck Reason:</strong> ${recommendations.reason}</p>
+      <p style="margin:0;"><strong>Action Plan:</strong> ${recommendations.action}</p>
+    </div>
+
+    <!-- 15. SCOPE, LIMITATIONS & PROFESSIONAL SIGN-OFF -->
+    <div class="section-title">12. Scope, Limitations & Professional Sign-Off</div>
+    <ul style="margin: 0 0 8px 0; padding-left: 14px; font-size: 7.8pt; color: #475569; line-height: 1.4;">
+      ${assumptionsLimitations.map(item => `<li>${item}</li>`).join('')}
+      <li>${is4Phase ? 'Analysis uses a four-phase signal model with independent approach phases.' : 'Analysis uses a two-phase signal model.'}</li>
+    </ul>
+    
+    <div style="margin-bottom: 8px; font-size: 7.5pt; font-weight: 700; color: #b45309;">
+      ⚠️ OFFLINE RECOMMENDATION ONLY — NO REAL-TIME SIGNAL CONTROL.
+    </div>
+
+    <div style="border-top: 1px dashed #cbd5e1; padding-top: 8px; display: flex; justify-content: space-between; font-size: 8pt; color: #1e293b;">
+      <div><strong>ENGINEER SIGN-OFF:</strong> ____________________________________</div>
+      <div><strong>DATE:</strong> ________________</div>
+    </div>
+
+    <div class="pdf-footer">
+      <span>Page 3 of 3</span>
+      <span>Standards: IRC:93 / IRC:106</span>
+      <span>Mode: Offline Decision Support</span>
+    </div>
   </div>
-
-  <h2>7. Engineering Standards & Assumptions</h2>
-  <ul>
-    ${assumptionsLimitations.map(item => `<li>${item}</li>`).join('')}
-  </ul>
 
   <script>
     window.onload = function() { window.print(); };
@@ -2948,7 +3616,8 @@ const FlowGuard = (function () {
     const proj = loadProject();
 
     // ── DATA CHECK GATEKEEPER — EMPTY STATE UI ──
-    if (!currentResult || !currentResult.websterTiming || !currentResult.websterTiming.websterCycleC0) {
+    const isAnalysisDone = currentResult && (currentResult.analysisCompleted === true || (currentResult.analysisCompleted !== false && currentResult.runId && currentResult.demandSummary));
+    if (!isAnalysisDone) {
       container.innerHTML = `
         <div class="card" style="padding: 3.5rem 2rem; text-align: center; border: 1px dashed rgba(56, 189, 248, 0.4); background: rgba(15, 23, 42, 0.65); border-radius: 12px; margin-top: 1rem;">
           <div style="font-size: 3.5rem; margin-bottom: 0.75rem;">📊</div>
@@ -2975,9 +3644,19 @@ const FlowGuard = (function () {
     const { runId, formattedDate, geometry, demandSummary, criticalAnalysis, websterTiming, baselineTiming, beforeAfterPerformance, recommendations, assumptionsLimitations } = currentResult;
     const roadMetrics = (demandSummary && demandSummary.roadMetrics) || {};
 
+    const phaseMode = criticalAnalysis.phaseMode || websterTiming.phaseMode || (proj.engineeringParameters && proj.engineeringParameters.phaseMode) || '2-phase';
+    const is4Phase = (phaseMode === '4-phase');
+    const numPhases = is4Phase ? 4 : 2;
+
     const projTitle = (currentResult.projectInfo && currentResult.projectInfo.title) || (proj.projectInfo && proj.projectInfo.title) || 'Signalized Intersection Optimization Project';
     const surveyDate = (proj.dataset && proj.dataset.uploadDate) || (formattedDate ? formattedDate.split(',')[0] : new Date().toLocaleDateString());
     const analysisId = runId || 'FG-2026-0810';
+
+    const isWebsterValid = Boolean(
+      criticalAnalysis && criticalAnalysis.isWebsterValid !== undefined ? criticalAnalysis.isWebsterValid :
+      (websterTiming && websterTiming.isWebsterValid !== undefined ? websterTiming.isWebsterValid :
+      (criticalAnalysis && criticalAnalysis.totalY < 1.00 && criticalAnalysis.totalY > 0 && websterTiming && websterTiming.websterCycleC0 !== null))
+    );
 
     const formatNum = (num, decimals = 0) => {
       if (num === null || num === undefined || isNaN(num)) return '—';
@@ -3006,17 +3685,33 @@ const FlowGuard = (function () {
     const bottleneckRoad = criticalAnalysis.criticalApproach || `${roadKeys.find(r => r.key === winningKey).title} (${bottleneckMetric.critMoveStr || 'Through'})`;
     const bottleneckFlowStr = bottleneckMetric.critFlowStr || `${formatNum(criticalAnalysis.phase1CritFlow || 2612.7, 1)} PCU/h`;
 
-    const phase1CritMoveStr = roadMetrics.north && roadMetrics.south ? (roadMetrics.north.flowRatioY >= roadMetrics.south.flowRatioY ? `Road A (North) — ${roadMetrics.north.critMoveStr || 'Through'}` : `Road C (South) — ${roadMetrics.south.critMoveStr || 'Through'}`) : 'Road C (South) — Through';
-    const phase2CritMoveStr = roadMetrics.east && roadMetrics.west ? (roadMetrics.east.flowRatioY >= roadMetrics.west.flowRatioY ? `Road B (East) — ${roadMetrics.east.critMoveStr || 'Through'}` : `Road D (West) — ${roadMetrics.west.critMoveStr || 'Through'}`) : 'Road B (East) — Through';
+    const phase1CritMoveStr = criticalAnalysis.phase1CritApproach || (roadMetrics.north && roadMetrics.south ? (roadMetrics.north.flowRatioY >= roadMetrics.south.flowRatioY ? `Road A (North) — ${roadMetrics.north.critMoveStr || 'Through'}` : `Road C (South) — ${roadMetrics.south.critMoveStr || 'Through'}`) : 'Road A (North) — Through');
+    const phase2CritMoveStr = criticalAnalysis.phase2CritApproach || (roadMetrics.east && roadMetrics.west ? (roadMetrics.east.flowRatioY >= roadMetrics.west.flowRatioY ? `Road B (East) — ${roadMetrics.east.critMoveStr || 'Through'}` : `Road D (West) — ${roadMetrics.west.critMoveStr || 'Through'}`) : 'Road B (East) — Through');
 
-    const delayChangeDisplay = beforeAfterPerformance.delayChange && beforeAfterPerformance.delayChange.includes('reduction') ? `↓ ${beforeAfterPerformance.delayChange.split('(')[1]?.replace(')', '') || '47% Reduction'}` : (beforeAfterPerformance.delayChange !== '—' ? beforeAfterPerformance.delayChange : '↓ 47% Reduction');
-    const delayRangeDisplay = `${beforeAfterPerformance.baselineDelay || '30s'} → ${beforeAfterPerformance.proposedDelay || '15.9s/veh'}`;
+    const delayChangeDisplay = isWebsterValid ? (beforeAfterPerformance.delayChange || 'N/A') : 'N/A — Webster not valid';
+    const delayRangeDisplay = isWebsterValid ? `${beforeAfterPerformance.baselineDelay || 'Not Available'} → ${beforeAfterPerformance.proposedDelay || 'N/A'}` : `Baseline: ${beforeAfterPerformance.baselineDelay || 'Not Available'}`;
 
-    const overallStatusDisplay = (criticalAnalysis.isWebsterValid && criticalAnalysis.totalY < 0.9) ? 'MIXED PERFORMANCE' : 'OVERSATURATED';
+    const hasTurningData = Object.keys(roadMetrics).some(k => roadMetrics[k] && roadMetrics[k].hasTurningData);
+    const overallStatusDisplay = isWebsterValid ? 'FEASIBLE — WEBSTER OPTIMIZATION' : 'OVERSATURATED';
 
     const baseSat = (geometry && geometry.baseSaturationFlow) ? geometry.baseSaturationFlow : 1800;
-    const numPhases = websterTiming.numPhases || 2;
-    const lostTimePerPhase = (websterTiming.totalLostTimeL || 8) / numPhases;
+    const lostTimePerPhase = (websterTiming.totalLostTimeL || (numPhases * 4)) / numPhases;
+
+    const recPhasePriorityStr = is4Phase
+      ? (winningKey === 'north' ? 'Phase 1 — Road A / North' :
+         winningKey === 'east'  ? 'Phase 2 — Road B / East' :
+         winningKey === 'south' ? 'Phase 3 — Road C / South' : 'Phase 4 — Road D / West')
+      : (winningKey === 'north' || winningKey === 'south' ? 'Phase 1 — North / South' : 'Phase 2 — East / West');
+
+    const recActionText = is4Phase
+      ? `Implement proposed four-phase signal timing plan with calculated cycle length ${isWebsterValid ? `${websterTiming.websterCycleC0}s` : 'N/A'} (P1: ${isWebsterValid ? `${websterTiming.g1}s` : 'N/A'}, P2: ${isWebsterValid ? `${websterTiming.g2}s` : 'N/A'}, P3: ${isWebsterValid ? `${websterTiming.g3}s` : 'N/A'}, P4: ${isWebsterValid ? `${websterTiming.g4}s` : 'N/A'}).`
+      : `Implement proposed two-phase signal timing plan with calculated cycle length ${isWebsterValid ? `${websterTiming.websterCycleC0}s` : 'N/A'} (P1: ${isWebsterValid ? `${websterTiming.g1}s` : 'N/A'}, P2: ${isWebsterValid ? `${websterTiming.g2}s` : 'N/A'}).`;
+
+    const proposedGreenSplitStr = is4Phase
+      ? (isWebsterValid ? `${websterTiming.g1} s / ${websterTiming.g2} s / ${websterTiming.g3} s / ${websterTiming.g4} s` : 'N/A')
+      : (isWebsterValid ? `${websterTiming.g1} s / ${websterTiming.g2} s` : 'N/A');
+
+    const normRoads = (proj.normalizedTrafficData && proj.normalizedTrafficData.roads) || {};
 
     container.innerHTML = `
       <div style="display: flex; flex-direction: column; gap: 1.5rem;">
@@ -3026,9 +3721,12 @@ const FlowGuard = (function () {
           <div>
             <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
               <span style="font-size: 1.5rem;">📋</span>
-              <h2 style="margin: 0; font-size: 1.35rem; font-weight: 800; color: #ffffff; letter-spacing: 0.02em;">RESULTS & REPORTS</h2>
+              <h2 style="margin: 0; font-size: 1.35rem; font-weight: 800; color: #ffffff; letter-spacing: 0.02em;">RESULTS &amp; REPORTS</h2>
+              <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); padding: 0.25rem 0.65rem; border-radius: 12px; font-weight: 800; font-size: 0.72rem; letter-spacing: 0.04em;">
+                ${is4Phase ? '4-PHASE ANALYSIS' : '2-PHASE ANALYSIS'}
+              </span>
             </div>
-            <p style="margin: 0; font-size: 0.85rem; color: #94a3b8;">Engineering analysis summary, signal timing plan, and performance estimates.</p>
+            <p style="margin: 0; font-size: 0.85rem; color: #94a3b8;">View engineering results &amp; reports for the selected intersection model.</p>
             
             <div style="display: flex; align-items: center; gap: 1.5rem; margin-top: 0.85rem; font-size: 0.82rem; color: #cbd5e1; flex-wrap: wrap;">
               <span>📍 <strong>Project:</strong> ${projTitle}</span>
@@ -3037,75 +3735,88 @@ const FlowGuard = (function () {
             </div>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 0.5rem; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); padding: 0.45rem 1rem; border-radius: 20px; font-weight: 800; font-size: 0.78rem; letter-spacing: 0.04em;">
-            ✓ REPORT READY
+          <div style="display: flex; align-items: center; gap: 0.5rem; background: ${isWebsterValid ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}; color: ${isWebsterValid ? '#34d399' : '#f87171'}; border: 1px solid ${isWebsterValid ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}; padding: 0.45rem 1rem; border-radius: 20px; font-weight: 800; font-size: 0.78rem; letter-spacing: 0.04em;">
+            ${isWebsterValid ? '✓ ANALYSIS COMPLETE' : '⚠️ WEBSTER OPTIMIZATION NOT FEASIBLE'}
           </div>
         </div>
 
         <!-- ACTION BUTTONS -->
         <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-          <button onclick="FlowGuard.generateEngineeringReport()" style="flex: 1; min-width: 220px; background: #10b981; color: #ffffff; border: none; padding: 0.85rem 1.25rem; font-weight: 800; font-size: 0.88rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s ease; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);">
-            📥 DOWNLOAD PDF REPORT
+          <button onclick="FlowGuard.generateEngineeringReport()" style="flex: 1; min-width: 200px; background: #10b981; color: #ffffff; border: none; padding: 0.85rem 1.25rem; font-weight: 800; font-size: 0.88rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s ease; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);">
+            📥 DOWNLOAD REPORT
           </button>
 
-          <button onclick="FlowGuard.exportTrafficDataCSV()" style="flex: 1; min-width: 220px; background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); padding: 0.85rem 1.25rem; font-weight: 800; font-size: 0.88rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s ease;">
+          <button onclick="FlowGuard.exportTrafficDataCSV()" style="flex: 1; min-width: 200px; background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); padding: 0.85rem 1.25rem; font-weight: 800; font-size: 0.88rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s ease;">
             📊 EXPORT CSV (RAW DATA)
           </button>
 
-          <button onclick="window.print()" style="flex: 1; min-width: 220px; background: rgba(99, 102, 241, 0.12); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.35); padding: 0.85rem 1.25rem; font-weight: 800; font-size: 0.88rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s ease;">
-            🖨 PRINT SUMMARY
+          <button onclick="FlowGuard.setWizardStep(5)" style="flex: 1; min-width: 200px; background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); padding: 0.85rem 1.25rem; font-weight: 800; font-size: 0.88rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s ease;">
+            ▶ RUN ANALYSIS AGAIN
+          </button>
+
+          <button onclick="FlowGuard.setWizardStep(4)" style="flex: 1; min-width: 200px; background: rgba(148, 163, 184, 0.12); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.35); padding: 0.85rem 1.25rem; font-weight: 800; font-size: 0.88rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s ease;">
+            ← BACK TO TRAFFIC SUMMARY
           </button>
         </div>
 
         <!-- SECTION 1 — EXECUTIVE SUMMARY -->
         <div>
           <div style="font-size: 0.82rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.75rem;">
-            SECTION 1 — EXECUTIVE SUMMARY
+            SECTION 1 — EXECUTIVE SUMMARY &amp; FINAL ANALYSIS STATUS
           </div>
           
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
             <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 0.74rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">OPTIMAL CYCLE (C₀)</span>
-                <span style="font-size: 1.2rem; color: #38bdf8;">⏱</span>
+                <span style="font-size: 0.74rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">APPLIED CYCLE</span>
+                <span style="font-size: 1.2rem; color: ${websterTiming.isConstrained ? '#f59e0b' : '#38bdf8'};">⏱</span>
               </div>
-              <div style="font-size: 2.1rem; font-weight: 800; color: #38bdf8; margin: 0.4rem 0;">${websterTiming.websterCycleC0} s</div>
-              <div style="font-size: 0.76rem; color: #cbd5e1;">Webster Method</div>
-            </div>
-
-            <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 0.74rem; font-weight: 800; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.05em;">CRITICAL BOTTLENECK</span>
-                <span style="font-size: 1.2rem; color: #f59e0b;">⚠️</span>
-              </div>
-              <div style="font-size: 1.15rem; font-weight: 800; color: #ffffff; margin: 0.4rem 0;">${bottleneckRoad}</div>
-              <div style="font-size: 0.76rem; color: #cbd5e1;">q = ${bottleneckFlowStr}</div>
-            </div>
-
-            <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 0.74rem; font-weight: 800; color: #34d399; text-transform: uppercase; letter-spacing: 0.05em;">DELAY CHANGE</span>
-                <span style="font-size: 1.2rem; color: #34d399;">📈</span>
-              </div>
-              <div style="font-size: 1.45rem; font-weight: 800; color: #34d399; margin: 0.4rem 0;">${delayChangeDisplay}</div>
-              <div style="font-size: 0.76rem; color: #cbd5e1;">${delayRangeDisplay}</div>
+              <div style="font-size: 2.1rem; font-weight: 800; color: ${isWebsterValid ? (websterTiming.isConstrained ? '#fcd34d' : '#38bdf8') : '#ef4444'}; margin: 0.4rem 0;">${isWebsterValid && websterTiming.appliedCycle ? `${websterTiming.appliedCycle} s` : 'N/A'}</div>
+              <div style="font-size: 0.76rem; color: #cbd5e1;">${websterTiming.isConstrained ? `Constrained Max (C₀ = ${websterTiming.websterCycleC0}s)` : 'Webster Optimum'}</div>
             </div>
 
             <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 0.74rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">OVERALL STATUS</span>
-                <span style="font-size: 1.2rem; color: #38bdf8;">📊</span>
+                <span style="font-size: 0.74rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">CRITICAL FLOW RATIO [Y]</span>
+                <span style="font-size: 1.2rem; color: ${criticalAnalysis.totalY >= 1.0 ? '#ef4444' : '#34d399'};">📊</span>
               </div>
-              <div style="font-size: 1.15rem; font-weight: 800; color: #38bdf8; margin: 0.4rem 0;">${overallStatusDisplay}</div>
-              <div style="font-size: 0.76rem; color: #cbd5e1;">See Simulation Table</div>
+              <div style="font-size: 2.1rem; font-weight: 800; color: ${criticalAnalysis.totalY >= 1.0 ? '#ef4444' : '#34d399'}; margin: 0.4rem 0;">${criticalAnalysis.totalY}</div>
+              <div style="font-size: 0.76rem; color: #cbd5e1;">${is4Phase ? 'y₁ + y₂ + y₃ + y₄' : 'y₁ + y₂'}</div>
+            </div>
+
+            <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.74rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">TOTAL LOST TIME [L]</span>
+                <span style="font-size: 1.2rem; color: #f59e0b;">⏳</span>
+              </div>
+              <div style="font-size: 2.1rem; font-weight: 800; color: #ffffff; margin: 0.4rem 0;">${websterTiming.totalLostTimeL || (numPhases * 4)} s</div>
+              <div style="font-size: 0.76rem; color: #cbd5e1;">${numPhases} × ${lostTimePerPhase}s/phase</div>
+            </div>
+
+            <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.74rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">EFFECTIVE GREEN [G_eff]</span>
+                <span style="font-size: 1.2rem; color: #34d399;">🟢</span>
+              </div>
+              <div style="font-size: 2.1rem; font-weight: 800; color: ${isWebsterValid ? '#34d399' : '#ef4444'}; margin: 0.4rem 0;">${isWebsterValid && websterTiming.gEff !== null ? `${websterTiming.gEff} s` : 'N/A'}</div>
+              <div style="font-size: 0.76rem; color: #cbd5e1;">C₀ − L</div>
+            </div>
+
+            <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.74rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">PHASE MODEL</span>
+                <span style="font-size: 1.2rem; color: #a78bfa;">🚦</span>
+              </div>
+              <div style="font-size: 1.45rem; font-weight: 800; color: #a78bfa; margin: 0.4rem 0;">${is4Phase ? '4-Phase' : '2-Phase'}</div>
+              <div style="font-size: 0.76rem; color: #cbd5e1;">${is4Phase ? '4 Independent Phases' : 'Phase 1 N/S + Phase 2 E/W'}</div>
             </div>
           </div>
         </div>
 
-        <!-- SECTION 2 — TRAFFIC DEMAND AUDIT (Step 4 Data) -->
+        <!-- SECTION 2 — TRAFFIC DEMAND AUDIT -->
         <div>
           <div style="font-size: 0.82rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.75rem;">
-            SECTION 2 — TRAFFIC DEMAND AUDIT (Step 4 Data)
+            SECTION 2 — TRAFFIC DEMAND AUDIT (STEP 4 DATA)
           </div>
 
           <div class="card" style="padding: 0; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden;">
@@ -3115,8 +3826,9 @@ const FlowGuard = (function () {
                   <tr style="background: rgba(30, 41, 59, 0.8); border-bottom: 1px solid var(--border-color); color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em;">
                     <th style="padding: 0.75rem 1rem;">ROAD</th>
                     <th style="padding: 0.75rem 1rem;">PEAK INTERVAL</th>
-                    <th style="padding: 0.75rem 1rem;">TOTAL DEMAND (PCU/h)</th>
-                    <th style="padding: 0.75rem 1rem;">CRITICAL LANE / MOVEMENT</th>
+                    <th style="padding: 0.75rem 1rem;">TOTAL DEMAND (PEAK-HOUR PCU/h)</th>
+                    <th style="padding: 0.75rem 1rem;">CRITICAL MOVEMENT</th>
+                    ${hasTurningData ? '<th style="padding: 0.75rem 1rem;">TURNING BREAKDOWN (L / T / R)</th>' : ''}
                     <th style="padding: 0.75rem 1rem;">CRITICAL FLOW (q) (PCU/h)</th>
                     <th style="padding: 0.75rem 1rem;">SAT. FLOW (s) (PCU/h)</th>
                     <th style="padding: 0.75rem 1rem;">FLOW RATIO (y) (q/s)</th>
@@ -3137,6 +3849,7 @@ const FlowGuard = (function () {
                         <td style="padding: 0.75rem 1rem; color: #cbd5e1;">${m.peakIntervalStr || demandSummary.peakInterval || '08:45–09:00'}</td>
                         <td style="padding: 0.75rem 1rem; font-weight: 700; color: #38bdf8;">${formatNum(m.totalDemandVal, 1)}</td>
                         <td style="padding: 0.75rem 1rem; color: #cbd5e1;">${m.critMoveStr || 'Through'}</td>
+                        ${hasTurningData ? `<td style="padding: 0.75rem 1rem; color: #cbd5e1;">L: ${formatNum(m.leftPCU, 0)} | T: ${formatNum(m.throughPCU, 0)} | R: ${formatNum(m.rightPCU, 0)} PCU/h</td>` : ''}
                         <td style="padding: 0.75rem 1rem; font-weight: 700; color: ${critFlowColor};">${formatNum(m.critFlowVal, 1)}</td>
                         <td style="padding: 0.75rem 1rem; color: #cbd5e1;">${formatNum(m.satFlow || (baseSat * (m.lanesVal || 2)))}</td>
                         <td style="padding: 0.75rem 1rem; font-weight: 800; color: ${flowRatioColor};">${m.flowRatioYStr || (m.flowRatioY ? String(parseFloat(m.flowRatioY.toFixed(4))) : '—')}</td>
@@ -3147,8 +3860,18 @@ const FlowGuard = (function () {
               </table>
             </div>
 
-            <div style="background: rgba(30, 41, 59, 0.6); padding: 0.85rem 1.25rem; border-top: 1px solid var(--border-color); text-align: center; font-size: 0.9rem; font-weight: 800; color: #ffffff;">
-              Total Intersection Critical Flow Ratio (Y): <span style="color: #38bdf8;">${criticalAnalysis.yPhase1} + ${criticalAnalysis.yPhase2} = ${criticalAnalysis.totalY}</span>
+            <div style="background: rgba(30, 41, 59, 0.6); padding: 0.85rem 1.25rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.35rem; align-items: center; text-align: center;">
+              <div style="font-size: 0.9rem; font-weight: 800; color: #ffffff;">
+                Sum of Critical Phase Flow Ratios (Y): <span style="color: ${criticalAnalysis.totalY >= 1.0 ? '#ef4444' : '#38bdf8'};">
+                  ${is4Phase
+                    ? `Y = y₁ (${criticalAnalysis.yPhase1}) + y₂ (${criticalAnalysis.yPhase2}) + y₃ (${criticalAnalysis.yPhase3}) + y₄ (${criticalAnalysis.yPhase4}) = ${criticalAnalysis.totalY}`
+                    : `Y = y₁ (${criticalAnalysis.yPhase1}) + y₂ (${criticalAnalysis.yPhase2}) = ${criticalAnalysis.totalY}`
+                  }
+                </span>
+              </div>
+              <div style="font-size: 0.76rem; color: #cbd5e1; font-style: italic; margin-top: 0.25rem;">
+                * Peak-hour values are normalized from the observed survey interval
+              </div>
             </div>
           </div>
         </div>
@@ -3159,44 +3882,94 @@ const FlowGuard = (function () {
             SECTION 3 — INTERSECTION PHASE MODEL
           </div>
 
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem;">
-            <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 10px;">
-              <div style="font-size: 0.88rem; font-weight: 800; color: #38bdf8; margin-bottom: 0.4rem;">PHASE 1 — NORTH / SOUTH</div>
-              <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">Approaches: Road A (North) + Road C (South)</div>
-              
-              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.65rem; font-size: 0.8rem; margin-bottom: 0.85rem;">
-                <div>Critical Movement: <br><strong style="color: #ffffff;">${phase1CritMoveStr}</strong></div>
-                <div>Critical Flow (q₁): <br><strong style="color: #38bdf8;">${formatNum(criticalAnalysis.phase1CritFlow, 1)} PCU/h</strong></div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+            ${is4Phase ? `
+              <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 10px;">
+                <div style="font-size: 0.88rem; font-weight: 800; color: #38bdf8; margin-bottom: 0.4rem;">PHASE 1 — ROAD A / NORTH</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">Approach: Road A (North)</div>
+                <div style="display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.8rem; margin-bottom: 0.85rem;">
+                  <div>Critical Movement: <strong style="color: #ffffff;">${normRoads.north?.criticalMovement || roadMetrics.north?.critMoveStr || 'Through'}</strong></div>
+                  <div>Critical Flow (q₁): <strong style="color: #38bdf8;">${formatNum(criticalAnalysis.phase1CritFlow || roadMetrics.north?.critFlowVal, 1)} PCU/h</strong></div>
+                </div>
+                <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.65rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
+                  <span style="color: #94a3b8;">Flow Ratio (y₁):</span>
+                  <span style="font-size: 1.1rem; font-weight: 800; color: #38bdf8;">${criticalAnalysis.yPhase1}</span>
+                </div>
               </div>
 
-              <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.65rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
-                <span style="color: #94a3b8;">Phase 1 Critical Ratio (y₁):</span>
-                <span style="font-size: 1.1rem; font-weight: 800; color: #38bdf8;">${criticalAnalysis.yPhase1}</span>
-              </div>
-            </div>
-
-            <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 10px;">
-              <div style="font-size: 0.88rem; font-weight: 800; color: #f59e0b; margin-bottom: 0.4rem;">PHASE 2 — EAST / WEST</div>
-              <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">Approaches: Road B (East) + Road D (West)</div>
-
-              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.65rem; font-size: 0.8rem; margin-bottom: 0.85rem;">
-                <div>Critical Movement: <br><strong style="color: #ffffff;">${phase2CritMoveStr}</strong></div>
-                <div>Critical Flow (q₂): <br><strong style="color: #f59e0b;">${formatNum(criticalAnalysis.phase2CritFlow, 1)} PCU/h</strong></div>
+              <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 10px;">
+                <div style="font-size: 0.88rem; font-weight: 800; color: #f59e0b; margin-bottom: 0.4rem;">PHASE 2 — ROAD B / EAST</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">Approach: Road B (East)</div>
+                <div style="display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.8rem; margin-bottom: 0.85rem;">
+                  <div>Critical Movement: <strong style="color: #ffffff;">${normRoads.east?.criticalMovement || roadMetrics.east?.critMoveStr || 'Through'}</strong></div>
+                  <div>Critical Flow (q₂): <strong style="color: #f59e0b;">${formatNum(criticalAnalysis.phase2CritFlow || roadMetrics.east?.critFlowVal, 1)} PCU/h</strong></div>
+                </div>
+                <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.65rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
+                  <span style="color: #94a3b8;">Flow Ratio (y₂):</span>
+                  <span style="font-size: 1.1rem; font-weight: 800; color: #f59e0b;">${criticalAnalysis.yPhase2}</span>
+                </div>
               </div>
 
-              <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.65rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
-                <span style="color: #94a3b8;">Phase 2 Critical Ratio (y₂):</span>
-                <span style="font-size: 1.1rem; font-weight: 800; color: #f59e0b;">${criticalAnalysis.yPhase2}</span>
+              <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 10px;">
+                <div style="font-size: 0.88rem; font-weight: 800; color: #34d399; margin-bottom: 0.4rem;">PHASE 3 — ROAD C / SOUTH</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">Approach: Road C (South)</div>
+                <div style="display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.8rem; margin-bottom: 0.85rem;">
+                  <div>Critical Movement: <strong style="color: #ffffff;">${normRoads.south?.criticalMovement || roadMetrics.south?.critMoveStr || 'Through'}</strong></div>
+                  <div>Critical Flow (q₃): <strong style="color: #34d399;">${formatNum(criticalAnalysis.phase3CritFlow || roadMetrics.south?.critFlowVal, 1)} PCU/h</strong></div>
+                </div>
+                <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.65rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
+                  <span style="color: #94a3b8;">Flow Ratio (y₃):</span>
+                  <span style="font-size: 1.1rem; font-weight: 800; color: #34d399;">${criticalAnalysis.yPhase3}</span>
+                </div>
               </div>
-            </div>
+
+              <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(167, 139, 250, 0.35); border-radius: 10px;">
+                <div style="font-size: 0.88rem; font-weight: 800; color: #a78bfa; margin-bottom: 0.4rem;">PHASE 4 — ROAD D / WEST</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">Approach: Road D (West)</div>
+                <div style="display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.8rem; margin-bottom: 0.85rem;">
+                  <div>Critical Movement: <strong style="color: #ffffff;">${normRoads.west?.criticalMovement || roadMetrics.west?.critMoveStr || 'Through'}</strong></div>
+                  <div>Critical Flow (q₄): <strong style="color: #a78bfa;">${formatNum(criticalAnalysis.phase4CritFlow || roadMetrics.west?.critFlowVal, 1)} PCU/h</strong></div>
+                </div>
+                <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.65rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
+                  <span style="color: #94a3b8;">Flow Ratio (y₄):</span>
+                  <span style="font-size: 1.1rem; font-weight: 800; color: #a78bfa;">${criticalAnalysis.yPhase4}</span>
+                </div>
+              </div>
+            ` : `
+              <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 10px;">
+                <div style="font-size: 0.88rem; font-weight: 800; color: #38bdf8; margin-bottom: 0.4rem;">PHASE 1 — NORTH / SOUTH</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">Approaches: Road A (North) + Road C (South)</div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.65rem; font-size: 0.8rem; margin-bottom: 0.85rem;">
+                  <div>Critical Approach: <br><strong style="color: #ffffff;">${phase1CritMoveStr}</strong></div>
+                  <div>Critical Flow (q₁): <br><strong style="color: #38bdf8;">${formatNum(criticalAnalysis.phase1CritFlow, 1)} PCU/h</strong></div>
+                </div>
+                <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.65rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
+                  <span style="color: #94a3b8;">Phase 1 Critical Ratio (y₁):</span>
+                  <span style="font-size: 1.1rem; font-weight: 800; color: #38bdf8;">${criticalAnalysis.yPhase1}</span>
+                </div>
+              </div>
+
+              <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 10px;">
+                <div style="font-size: 0.88rem; font-weight: 800; color: #f59e0b; margin-bottom: 0.4rem;">PHASE 2 — EAST / WEST</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.85rem;">Approaches: Road B (East) + Road D (West)</div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.65rem; font-size: 0.8rem; margin-bottom: 0.85rem;">
+                  <div>Critical Approach: <br><strong style="color: #ffffff;">${phase2CritMoveStr}</strong></div>
+                  <div>Critical Flow (q₂): <br><strong style="color: #f59e0b;">${formatNum(criticalAnalysis.phase2CritFlow, 1)} PCU/h</strong></div>
+                </div>
+                <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.65rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
+                  <span style="color: #94a3b8;">Phase 2 Critical Ratio (y₂):</span>
+                  <span style="font-size: 1.1rem; font-weight: 800; color: #f59e0b;">${criticalAnalysis.yPhase2}</span>
+                </div>
+              </div>
+            `}
 
             <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between;">
               <div>
-                <div style="font-size: 0.74rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem;">INTERSECTION TOTAL FLOW RATIO</div>
-                <div style="font-size: 2.2rem; font-weight: 800; color: #34d399; margin: 0.3rem 0;">${criticalAnalysis.totalY}</div>
+                <div style="font-size: 0.74rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem;">TOTAL FLOW RATIO (Y)</div>
+                <div style="font-size: 2.2rem; font-weight: 800; color: ${criticalAnalysis.totalY >= 1.0 ? '#ef4444' : '#34d399'}; margin: 0.3rem 0;">${criticalAnalysis.totalY}</div>
               </div>
               <div style="font-size: 0.76rem; color: #94a3b8; line-height: 1.4;">
-                Sum of Configured Phase Ratios<br>(Y = y₁ + y₂)
+                ${is4Phase ? 'Sum of 4 Phase Ratios<br>(Y = y₁ + y₂ + y₃ + y₄)' : 'Sum of Configured Phase Ratios<br>(Y = y₁ + y₂)'}
               </div>
             </div>
           </div>
@@ -3208,112 +3981,147 @@ const FlowGuard = (function () {
             SECTION 4 — WEBSTER METHOD OPTIMIZATION
           </div>
           <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.75rem;">
-            Webster's isolated-intersection optimum cycle length & effective green allocation
+            Webster's isolated-intersection optimum cycle length &amp; effective green allocation
           </div>
 
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
             <div class="card" style="padding: 1.1rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px;">
               <div style="font-size: 0.72rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">TOTAL LOST TIME (L)</div>
-              <div style="font-size: 1.6rem; font-weight: 800; color: #ffffff; margin: 0.3rem 0;">${websterTiming.totalLostTimeL} s</div>
-              <div style="font-size: 0.72rem; color: #94a3b8;">(${websterTiming.numPhases} × ${lostTimePerPhase}s/phase)</div>
+              <div style="font-size: 1.6rem; font-weight: 800; color: #ffffff; margin: 0.3rem 0;">${websterTiming.totalLostTimeL || (numPhases * 4)} s</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">(${numPhases} × ${lostTimePerPhase}s/phase)</div>
             </div>
 
             <div class="card" style="padding: 1.1rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px;">
               <div style="font-size: 0.72rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">CRITICAL FLOW RATIO (Y)</div>
-              <div style="font-size: 1.6rem; font-weight: 800; color: #38bdf8; margin: 0.3rem 0;">${criticalAnalysis.totalY}</div>
-              <div style="font-size: 0.72rem; color: #94a3b8;">y₁ (${criticalAnalysis.yPhase1}) + y₂ (${criticalAnalysis.yPhase2})</div>
+              <div style="font-size: 1.6rem; font-weight: 800; color: ${criticalAnalysis.totalY >= 1.0 ? '#ef4444' : '#38bdf8'}; margin: 0.3rem 0;">${criticalAnalysis.totalY}</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">${is4Phase ? `y₁ (${criticalAnalysis.yPhase1}) + y₂ (${criticalAnalysis.yPhase2}) + y₃ (${criticalAnalysis.yPhase3}) + y₄ (${criticalAnalysis.yPhase4})` : `y₁ (${criticalAnalysis.yPhase1}) + y₂ (${criticalAnalysis.yPhase2})`}</div>
             </div>
 
             <div class="card" style="padding: 1.1rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px;">
-              <div style="font-size: 0.72rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">OPTIMAL CYCLE LENGTH (C₀)</div>
-              <div style="font-size: 1.6rem; font-weight: 800; color: #34d399; margin: 0.3rem 0;">${websterTiming.websterCycleC0} s</div>
+              <div style="font-size: 0.72rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">THEORETICAL WEBSTER (C₀)</div>
+              <div style="font-size: 1.6rem; font-weight: 800; color: ${isWebsterValid ? '#34d399' : '#f87171'}; margin: 0.3rem 0;">${isWebsterValid && websterTiming.websterCycleC0 ? `${websterTiming.websterCycleC0} s` : 'N/A'}</div>
               <div style="font-size: 0.72rem; color: #94a3b8;">C₀ = (1.5L + 5) / (1 - Y)</div>
             </div>
 
+            <div class="card" style="padding: 1.1rem; background: rgba(15, 23, 42, 0.75); border: 1px solid ${websterTiming.isConstrained ? 'rgba(245, 158, 11, 0.4)' : 'var(--border-color)'}; border-radius: 10px;">
+              <div style="font-size: 0.72rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">APPLIED SIGNAL CYCLE</div>
+              <div style="font-size: 1.6rem; font-weight: 800; color: ${isWebsterValid ? (websterTiming.isConstrained ? '#fcd34d' : '#38bdf8') : '#f87171'}; margin: 0.3rem 0;">${isWebsterValid && websterTiming.appliedCycle ? `${websterTiming.appliedCycle} s` : 'N/A'}</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">${websterTiming.isConstrained ? '⚠ Constrained by Max Cycle (180s)' : 'Applied C₀'}</div>
+            </div>
+
             <div class="card" style="padding: 1.1rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px;">
-              <div style="font-size: 0.72rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">AVAILABLE EFFECTIVE GREEN</div>
-              <div style="font-size: 1.6rem; font-weight: 800; color: #38bdf8; margin: 0.3rem 0;">${websterTiming.gEff} s</div>
-              <div style="font-size: 0.72rem; color: #94a3b8;">G_eff = C₀ - L</div>
+              <div style="font-size: 0.72rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">EFFECTIVE GREEN (G_eff)</div>
+              <div style="font-size: 1.6rem; font-weight: 800; color: ${isWebsterValid ? '#38bdf8' : '#f87171'}; margin: 0.3rem 0;">${isWebsterValid && websterTiming.gEff !== null ? `${websterTiming.gEff} s` : 'N/A'}</div>
+              <div style="font-size: 0.72rem; color: #94a3b8;">G_eff = C_applied - L</div>
             </div>
           </div>
+
+          <!-- Formulas Box -->
+          <div class="card" style="margin-top: 1rem; padding: 0.85rem 1.25rem; background: rgba(30, 41, 59, 0.5); border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.8rem; color: #94a3b8; display: flex; gap: 1.5rem; flex-wrap: wrap;">
+            <span><strong>Formulas Used:</strong></span>
+            <span>Y = Σ yᵢ</span>
+            <span>C₀ = (1.5L + 5) / (1 - Y)</span>
+            <span>C_applied = min(C₀, C_max)</span>
+            <span>G_eff = C_applied - L</span>
+          </div>
+
+          ${!isWebsterValid ? `
+            <div style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); padding: 1.1rem 1.25rem; border-radius: 8px; margin-top: 1rem; font-size: 0.88rem; line-height: 1.6;">
+              <div style="font-weight: 800; font-size: 1rem; margin-bottom: 0.4rem;">⚠️ WEBSTER CAPACITY LIMIT EXCEEDED</div>
+              <div style="font-weight: 700;">ENGINEERING WARNING: Webster optimization not valid (Y = ${criticalAnalysis.totalY} ≥ 1.00)</div>
+              <div style="margin-top: 0.4rem; color: #cbd5e1;">NO VALID WEBSTER TIMING GENERATED. The configured critical demand exceeds the available saturation capacity for the selected phase model. A conventional Webster optimum cycle cannot be computed. Webster optimization is not feasible under oversaturated conditions.</div>
+              <div style="margin-top: 0.4rem; font-size: 0.82rem; color: #94a3b8; font-style: italic;">Recommended Action: Review traffic demand, saturation assumptions, lane utilization, or consider an alternative signal/traffic management strategy.</div>
+            </div>
+          ` : ''}
         </div>
 
-        <!-- SECTION 5 — OPTIMIZED SIGNAL TIMING PLAN -->
+        <!-- SECTION 5 — FINAL SIGNAL TIMING PLAN -->
         <div>
-          <div style="font-size: 0.82rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.2rem;">
-            SECTION 5 — OPTIMIZED SIGNAL TIMING PLAN
-          </div>
-          <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.75rem;">
-            Recommended signal phase timing allocations and cycle timeline breakdown
-          </div>
-
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
-            <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 10px;">
-              <div style="font-size: 0.88rem; font-weight: 800; color: #38bdf8; margin-bottom: 0.3rem;">PHASE 1 — NORTH / SOUTH</div>
-              <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.75rem;">Approaches: Road A + Road C</div>
-              
-              <div style="display: flex; gap: 1rem; font-size: 0.82rem;">
-                <div>Green: <strong style="color: #34d399;">${websterTiming.g1} s</strong></div>
-                <div>Amber: <strong style="color: #f59e0b;">${websterTiming.amber} s</strong></div>
-                <div>All-Red: <strong style="color: #f87171;">${websterTiming.allRed} s</strong></div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <div style="font-size: 0.82rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.2rem;">
+                SECTION 5 — OPTIMIZED SIGNAL TIMING PLAN
               </div>
-              <div style="margin-top: 0.65rem; font-size: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.5rem; color: #cbd5e1;">
-                Effective Green: <strong style="color: #34d399;">${websterTiming.g1} s</strong>
-              </div>
-            </div>
-
-            <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px;">
-              <div style="font-size: 0.88rem; font-weight: 800; color: #f59e0b; margin-bottom: 0.3rem;">PHASE 2 — EAST / WEST</div>
-              <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.75rem;">Approaches: Road B + Road D</div>
-
-              <div style="display: flex; gap: 1rem; font-size: 0.82rem;">
-                <div>Green: <strong style="color: #34d399;">${websterTiming.g2} s</strong></div>
-                <div>Amber: <strong style="color: #f59e0b;">${websterTiming.amber} s</strong></div>
-                <div>All-Red: <strong style="color: #f87171;">${websterTiming.allRed} s</strong></div>
-              </div>
-              <div style="margin-top: 0.65rem; font-size: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.5rem; color: #cbd5e1;">
-                Effective Green: <strong style="color: #34d399;">${websterTiming.g2} s</strong>
+              <div style="font-size: 0.78rem; color: #94a3b8;">
+                RECOMMENDED SIGNAL TIMING PLAN | Shared Cycle: <strong style="color: ${isWebsterValid ? '#38bdf8' : '#f87171'};">${isWebsterValid && websterTiming.websterCycleC0 ? `${websterTiming.websterCycleC0} s` : 'N/A'}</strong>
               </div>
             </div>
           </div>
 
-          <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px;">
-            <div style="font-size: 0.8rem; font-weight: 800; color: #ffffff; margin-bottom: 0.75rem;">
-              CYCLE TIMELINE BREAKDOWN (${websterTiming.websterCycleC0} s)
-            </div>
+          ${is4Phase ? `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+              <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 10px;">
+                <div style="font-size: 0.88rem; font-weight: 800; color: #38bdf8; margin-bottom: 0.3rem;">PHASE 1 — ROAD A / NORTH</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.75rem;">Approach: Road A (North)</div>
+                <div style="display: flex; gap: 0.8rem; font-size: 0.82rem; flex-wrap: wrap;">
+                  <div>Green: <strong style="color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid && websterTiming.g1 !== null ? `${websterTiming.g1} s` : 'N/A'}</strong></div>
+                  <div>Amber: <strong style="color: #f59e0b;">${websterTiming.amber || 3} s</strong></div>
+                  <div>All-Red: <strong style="color: #f87171;">${websterTiming.allRed || 1} s</strong></div>
+                </div>
+              </div>
 
-            <div style="display: flex; height: 48px; border-radius: 6px; overflow: hidden; font-size: 0.75rem; font-weight: 800; gap: 3px; background: rgba(30, 41, 59, 0.6); padding: 3px;">
-              <div style="flex: ${websterTiming.g1}; min-width: 80px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center;" title="Phase 1 Green: ${websterTiming.g1}s">
-                <span>Phase 1 Green</span>
-                <span>${websterTiming.g1} s</span>
+              <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px;">
+                <div style="font-size: 0.88rem; font-weight: 800; color: #f59e0b; margin-bottom: 0.3rem;">PHASE 2 — ROAD B / EAST</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.75rem;">Approach: Road B (East)</div>
+                <div style="display: flex; gap: 0.8rem; font-size: 0.82rem; flex-wrap: wrap;">
+                  <div>Green: <strong style="color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid && websterTiming.g2 !== null ? `${websterTiming.g2} s` : 'N/A'}</strong></div>
+                  <div>Amber: <strong style="color: #f59e0b;">${websterTiming.amber || 3} s</strong></div>
+                  <div>All-Red: <strong style="color: #f87171;">${websterTiming.allRed || 1} s</strong></div>
+                </div>
               </div>
-              <div style="width: 35px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="Amber: ${websterTiming.amber}s">
-                ${websterTiming.amber}s
-              </div>
-              <div style="width: 35px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="All-Red: ${websterTiming.allRed}s">
-                ${websterTiming.allRed}s
-              </div>
-              <div style="flex: ${websterTiming.g2}; min-width: 80px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center;" title="Phase 2 Green: ${websterTiming.g2}s">
-                <span>Phase 2 Green</span>
-                <span>${websterTiming.g2} s</span>
-              </div>
-              <div style="width: 35px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="Amber: ${websterTiming.amber}s">
-                ${websterTiming.amber}s
-              </div>
-              <div style="width: 35px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="All-Red: ${websterTiming.allRed}s">
-                ${websterTiming.allRed}s
-              </div>
-            </div>
 
-            <div style="display: flex; gap: 1.5rem; font-size: 0.76rem; color: #cbd5e1; margin-top: 0.85rem; flex-wrap: wrap;">
-              <span>🟢 Green = Effective Green</span>
-              <span>🟡 Amber = Amber Interval</span>
-              <span>🔴 Red = All-Red Interval</span>
+              <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 10px;">
+                <div style="font-size: 0.88rem; font-weight: 800; color: #34d399; margin-bottom: 0.3rem;">PHASE 3 — ROAD C / SOUTH</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.75rem;">Approach: Road C (South)</div>
+                <div style="display: flex; gap: 0.8rem; font-size: 0.82rem; flex-wrap: wrap;">
+                  <div>Green: <strong style="color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid && websterTiming.g3 !== null ? `${websterTiming.g3} s` : 'N/A'}</strong></div>
+                  <div>Amber: <strong style="color: #f59e0b;">${websterTiming.amber || 3} s</strong></div>
+                  <div>All-Red: <strong style="color: #f87171;">${websterTiming.allRed || 1} s</strong></div>
+                </div>
+              </div>
+
+              <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(167, 139, 250, 0.3); border-radius: 10px;">
+                <div style="font-size: 0.88rem; font-weight: 800; color: #a78bfa; margin-bottom: 0.3rem;">PHASE 4 — ROAD D / WEST</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.75rem;">Approach: Road D (West)</div>
+                <div style="display: flex; gap: 0.8rem; font-size: 0.82rem; flex-wrap: wrap;">
+                  <div>Green: <strong style="color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid && websterTiming.g4 !== null ? `${websterTiming.g4} s` : 'N/A'}</strong></div>
+                  <div>Amber: <strong style="color: #f59e0b;">${websterTiming.amber || 3} s</strong></div>
+                  <div>All-Red: <strong style="color: #f87171;">${websterTiming.allRed || 1} s</strong></div>
+                </div>
+              </div>
             </div>
-          </div>
+          ` : `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+              <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 10px;">
+                <div style="font-size: 0.88rem; font-weight: 800; color: #38bdf8; margin-bottom: 0.3rem;">PHASE 1 — NORTH / SOUTH</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.75rem;">Approaches: Road A + Road C</div>
+                <div style="display: flex; gap: 1rem; font-size: 0.82rem;">
+                  <div>Green: <strong style="color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid && websterTiming.g1 !== null ? `${websterTiming.g1} s` : 'N/A'}</strong></div>
+                  <div>Amber: <strong style="color: #f59e0b;">${websterTiming.amber || 3} s</strong></div>
+                  <div>All-Red: <strong style="color: #f87171;">${websterTiming.allRed || 1} s</strong></div>
+                </div>
+                <div style="margin-top: 0.65rem; font-size: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.5rem; color: #cbd5e1;">
+                  Effective Green: <strong style="color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid && websterTiming.g1 !== null ? `${websterTiming.g1} s` : 'N/A'}</strong>
+                </div>
+              </div>
+
+              <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px;">
+                <div style="font-size: 0.88rem; font-weight: 800; color: #f59e0b; margin-bottom: 0.3rem;">PHASE 2 — EAST / WEST</div>
+                <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.75rem;">Approaches: Road B + Road D</div>
+                <div style="display: flex; gap: 1rem; font-size: 0.82rem;">
+                  <div>Green: <strong style="color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid && websterTiming.g2 !== null ? `${websterTiming.g2} s` : 'N/A'}</strong></div>
+                  <div>Amber: <strong style="color: #f59e0b;">${websterTiming.amber || 3} s</strong></div>
+                  <div>All-Red: <strong style="color: #f87171;">${websterTiming.allRed || 1} s</strong></div>
+                </div>
+                <div style="margin-top: 0.65rem; font-size: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.5rem; color: #cbd5e1;">
+                  Effective Green: <strong style="color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid && websterTiming.g2 !== null ? `${websterTiming.g2} s` : 'N/A'}</strong>
+                </div>
+              </div>
+            </div>
+          `}
         </div>
 
-        <!-- SECTION 6 — BEFORE vs AFTER PERFORMANCE ESTIMATE -->
+        <!-- SECTION 6 — BEFORE VS AFTER PERFORMANCE ESTIMATE -->
         <div>
           <div style="font-size: 0.82rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.2rem;">
             SECTION 6 — BEFORE VS AFTER PERFORMANCE ESTIMATE
@@ -3336,56 +4144,40 @@ const FlowGuard = (function () {
                 </thead>
                 <tbody>
                   <tr style="border-bottom: 1px solid var(--border-color);">
-                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Average Delay (s/veh)</td>
-                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">${beforeAfterPerformance.baselineDelay || '30.0 s/veh'}</td>
-                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #34d399;">${beforeAfterPerformance.proposedDelay || '15.9 s/veh'}</td>
-                    <td style="padding: 0.75rem 1rem; color: #34d399; font-weight: 700;">${beforeAfterPerformance.delayChange || '↓ 14.1 s/veh'}</td>
-                    <td style="padding: 0.75rem 1rem; color: #34d399; font-weight: 800;">47% Reduction</td>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Effective Green Split</td>
+                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">Baseline Split</td>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #34d399;">${proposedGreenSplitStr}</td>
+                    <td style="padding: 0.75rem 1rem; color: #34d399; font-weight: 700;" colspan="2">Proportional Allocation</td>
                   </tr>
                   <tr style="border-bottom: 1px solid var(--border-color);">
-                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Average Queue Length (m/veh)</td>
-                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">${beforeAfterPerformance.baselineQueue || '120.0 m'}</td>
-                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #34d399;">${beforeAfterPerformance.proposedQueue || '65.0 m'}</td>
-                    <td style="padding: 0.75rem 1rem; color: #34d399; font-weight: 700;">${beforeAfterPerformance.queueChange || '↓ 55.0 m'}</td>
-                    <td style="padding: 0.75rem 1rem; color: #34d399; font-weight: 800;">46% Reduction</td>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Critical Approach Average Delay</td>
+                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">${beforeAfterPerformance.baselineDelay || 'Not Available'}</td>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid ? (beforeAfterPerformance.proposedDelay || 'N/A') : 'N/A — Webster not valid'}</td>
+                    <td style="padding: 0.75rem 1rem; color: ${isWebsterValid ? '#34d399' : '#94a3b8'}; font-weight: 700;" colspan="2">${isWebsterValid ? (beforeAfterPerformance.delayChange || 'N/A') : 'N/A'}</td>
                   </tr>
                   <tr style="border-bottom: 1px solid var(--border-color);">
-                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Total Stops (veh/hr)</td>
-                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">2,840</td>
-                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #34d399;">1,420</td>
-                    <td style="padding: 0.75rem 1rem; color: #34d399; font-weight: 700;">↓ 1,420 veh/hr</td>
-                    <td style="padding: 0.75rem 1rem; color: #34d399; font-weight: 800;">50% Reduction</td>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Critical Approach Queue</td>
+                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">${beforeAfterPerformance.baselineQueue || 'Not Available'}</td>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid ? (beforeAfterPerformance.proposedQueue || 'N/A') : 'N/A — Webster not valid'}</td>
+                    <td style="padding: 0.75rem 1rem; color: ${isWebsterValid ? '#34d399' : '#94a3b8'}; font-weight: 700;" colspan="2">${isWebsterValid ? (beforeAfterPerformance.queueChange || 'N/A') : 'N/A'}</td>
                   </tr>
                   <tr style="border-bottom: 1px solid var(--border-color);">
-                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Throughput (PCU/h)</td>
-                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">15,600</td>
-                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #34d399;">17,850</td>
-                    <td style="padding: 0.75rem 1rem; color: #34d399; font-weight: 700;">↑ 2,250 PCU/h</td>
-                    <td style="padding: 0.75rem 1rem; color: #34d399; font-weight: 800;">14% Increase</td>
-                  </tr>
-                  <tr style="border-bottom: 1px solid var(--border-color);">
-                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Critical Flow Ratio (Y)</td>
-                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">0.945 (Observed)</td>
-                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #34d399;">${criticalAnalysis.totalY} (Designed)</td>
-                    <td style="padding: 0.75rem 1rem; color: #34d399; font-weight: 700;">↓ ${(0.945 - criticalAnalysis.totalY).toFixed(4)}</td>
-                    <td style="padding: 0.75rem 1rem; color: #34d399; font-weight: 800;">Better LOS</td>
-                  </tr>
-                  <tr style="border-bottom: 1px solid var(--border-color);">
-                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Degree of Saturation (v/c)</td>
-                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">${beforeAfterPerformance.baselineDOS || '0.92'}</td>
-                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #34d399;">${beforeAfterPerformance.proposedDOS || '0.68'}</td>
-                    <td style="padding: 0.75rem 1rem; color: #34d399; font-weight: 700;">${beforeAfterPerformance.dosChange || '↓ 0.24'}</td>
-                    <td style="padding: 0.75rem 1rem; color: #34d399; font-weight: 800;">Significant Improvement</td>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Critical Approach Degree of Saturation (v/c)</td>
+                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">${beforeAfterPerformance.baselineDOS || 'Not Available'}</td>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid ? (beforeAfterPerformance.proposedDOS || 'N/A') : 'N/A — Webster not valid'}</td>
+                    <td style="padding: 0.75rem 1rem; color: ${isWebsterValid ? '#34d399' : '#94a3b8'}; font-weight: 700;" colspan="2">${isWebsterValid ? (beforeAfterPerformance.dosChange || 'N/A') : 'N/A'}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Level of Service (Overall)</td>
-                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">${beforeAfterPerformance.baselineLOS || 'LOS E/F'}</td>
-                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #34d399;">${beforeAfterPerformance.proposedLOS || 'LOS C/D'}</td>
-                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">—</td>
-                    <td style="padding: 0.75rem 1rem; color: #34d399; font-weight: 800;">${beforeAfterPerformance.losChange || 'Significant Improvement'}</td>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Critical Approach Level of Service (LOS)</td>
+                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">${beforeAfterPerformance.baselineLOS || 'Not Available'}</td>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid ? (beforeAfterPerformance.proposedLOS || 'Not Available') : 'N/A — Webster not valid'}</td>
+                    <td style="padding: 0.75rem 1rem; color: ${isWebsterValid ? '#34d399' : '#94a3b8'}; font-weight: 700;" colspan="2">${isWebsterValid ? (beforeAfterPerformance.losChange || '—') : 'N/A'}</td>
                   </tr>
                 </tbody>
               </table>
+            </div>
+            <div style="padding: 0.5rem 1rem; background: rgba(30, 41, 59, 0.6); font-size: 0.75rem; color: #94a3b8; font-style: italic;">
+              * SIMULATED ESTIMATE: Results are analytical model estimates based on configured traffic and engineering inputs. They are not field measurements and do not guarantee real-world improvement.
             </div>
           </div>
         </div>
@@ -3399,25 +4191,40 @@ const FlowGuard = (function () {
 
             <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.65rem; font-size: 0.82rem; color: #cbd5e1;">
               <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
-                <span style="color: #34d399; font-weight: 800;">✓</span>
+                <span style="color: ${isWebsterValid ? '#34d399' : '#ef4444'}; font-weight: 800;">${isWebsterValid ? '✓' : '⚠️'}</span>
                 <span><strong>${bottleneckRoad}</strong> is identified as the critical bottleneck approach.</span>
               </li>
-              <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
-                <span style="color: #34d399; font-weight: 800;">✓</span>
-                <span>Webster optimal cycle time = <strong>${websterTiming.websterCycleC0} s</strong> with Y = <strong>${criticalAnalysis.totalY}</strong> (&lt; 0.90 acceptable).</span>
-              </li>
-              <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
-                <span style="color: #34d399; font-weight: 800;">✓</span>
-                <span>Optimized green allocation balances both Phase 1 (${websterTiming.g1}s) and Phase 2 (${websterTiming.g2}s) efficiently.</span>
-              </li>
-              <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
-                <span style="color: #34d399; font-weight: 800;">✓</span>
-                <span>Expected average control delay reduced by <strong>${delayChangeDisplay}</strong>.</span>
-              </li>
-              <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
-                <span style="color: #34d399; font-weight: 800;">✓</span>
-                <span>Intersection performance transition: <strong>${beforeAfterPerformance.baselineLOS || 'LOS E/F'} → ${beforeAfterPerformance.proposedLOS || 'LOS C/D'}</strong>.</span>
-              </li>
+              ${isWebsterValid ? `
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #34d399; font-weight: 800;">✓</span>
+                  <span>Webster optimal cycle time = <strong>${websterTiming.websterCycleC0} s</strong> with Y = <strong>${criticalAnalysis.totalY}</strong> (&lt; 0.90 acceptable).</span>
+                </li>
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #34d399; font-weight: 800;">✓</span>
+                  <span>Optimized green allocation balances both Phase 1 (${websterTiming.g1}s) and Phase 2 (${websterTiming.g2}s) efficiently.</span>
+                </li>
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #34d399; font-weight: 800;">✓</span>
+                  <span>Expected average control delay reduced by <strong>${delayChangeDisplay}</strong>.</span>
+                </li>
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #34d399; font-weight: 800;">✓</span>
+                  <span>Intersection performance transition: <strong>${(beforeAfterPerformance.losChange && beforeAfterPerformance.losChange !== 'N/A' && beforeAfterPerformance.losChange !== '—') ? beforeAfterPerformance.losChange : `${beforeAfterPerformance.baselineLOS} → ${beforeAfterPerformance.proposedLOS}`}</strong>.</span>
+                </li>
+              ` : `
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #ef4444; font-weight: 800;">⚠️</span>
+                  <span><strong>Intersection is over-saturated</strong> with Critical Flow Ratio <strong>Y = ${criticalAnalysis.totalY} ≥ 1.00</strong>.</span>
+                </li>
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #ef4444; font-weight: 800;">⚠️</span>
+                  <span><strong>Webster optimization is not applicable</strong> under oversaturated demand conditions (Y ≥ 1.00).</span>
+                </li>
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #ef4444; font-weight: 800;">⚠️</span>
+                  <span><strong>No valid optimum cycle was generated</strong> because demand exceeds theoretical capacity limit.</span>
+                </li>
+              `}
             </ul>
           </div>
 
@@ -3427,22 +4234,45 @@ const FlowGuard = (function () {
             </div>
 
             <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.65rem; font-size: 0.82rem; color: #cbd5e1;">
-              <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
-                <span style="color: #34d399; font-weight: 800;">✓</span>
-                <span>Implement the proposed timing plan (<strong>${websterTiming.websterCycleC0} s</strong> cycle) after on-site engineering review.</span>
-              </li>
-              <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
-                <span style="color: #34d399; font-weight: 800;">✓</span>
-                <span>Ensure pedestrian clearance intervals are strictly maintained per crosswalk dimensions.</span>
-              </li>
-              <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
-                <span style="color: #34d399; font-weight: 800;">✓</span>
-                <span>Monitor real-world performance and validate queue dissipation post-implementation.</span>
-              </li>
-              <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
-                <span style="color: #34d399; font-weight: 800;">✓</span>
-                <span>Re-evaluate timing plans during peak special events or seasonal variation.</span>
-              </li>
+              ${isWebsterValid ? `
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #34d399; font-weight: 800;">✓</span>
+                  <span>Implement the proposed timing plan (<strong>${websterTiming.websterCycleC0} s</strong> cycle) after on-site engineering review.</span>
+                </li>
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #34d399; font-weight: 800;">✓</span>
+                  <span>Ensure pedestrian clearance intervals are strictly maintained per crosswalk dimensions.</span>
+                </li>
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #34d399; font-weight: 800;">✓</span>
+                  <span>Monitor real-world performance and validate queue dissipation post-implementation.</span>
+                </li>
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #34d399; font-weight: 800;">✓</span>
+                  <span>Re-evaluate timing plans during peak special events or seasonal variation.</span>
+                </li>
+              ` : `
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #38bdf8; font-weight: 800;">👉</span>
+                  <span>Review intersection capacity and geometric lane allocation.</span>
+                </li>
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #38bdf8; font-weight: 800;">👉</span>
+                  <span>Evaluate lane utilization and phase configuration for critical approaches.</span>
+                </li>
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #38bdf8; font-weight: 800;">👉</span>
+                  <span>Assess protected/permissive turning arrangements and dedicated turn bays.</span>
+                </li>
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #38bdf8; font-weight: 800;">👉</span>
+                  <span>Consider demand management or physical capacity expansion improvements.</span>
+                </li>
+                <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <span style="color: #38bdf8; font-weight: 800;">👉</span>
+                  <span>Re-evaluate signal phasing using an appropriate control method for oversaturated conditions.</span>
+                </li>
+              `}
             </ul>
           </div>
         </div>
@@ -3450,7 +4280,7 @@ const FlowGuard = (function () {
         <!-- SECTION 9 — ASSUMPTIONS, SCOPE & SIGN-OFF -->
         <div class="card" style="padding: 1.5rem; background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-color); border-radius: 10px;">
           <div style="font-size: 0.88rem; font-weight: 800; color: #ffffff; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.85rem;">
-            SECTION 9 — ASSUMPTIONS, SCOPE & SIGN-OFF
+            SECTION 9 — ASSUMPTIONS, SCOPE &amp; SIGN-OFF
           </div>
 
           <ul style="margin: 0 0 1.25rem 0; padding-left: 1.2rem; font-size: 0.82rem; color: #94a3b8; line-height: 1.6; display: flex; flex-direction: column; gap: 0.35rem;">
@@ -3458,6 +4288,229 @@ const FlowGuard = (function () {
             <li>Webster method is used for preliminary isolated-intersection signal timing optimization.</li>
             <li>Queue spillback, downstream intersections, and real-time stochastic fluctuations are not represented.</li>
             <li>Results are analytical/simulated estimates for decision support.</li>
+            <li><strong>${is4Phase ? 'Analysis uses a four-phase signal model with independent approach phases.' : 'Analysis uses a two-phase signal model.'}</strong></li>
+          </ul>
+
+          <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+            <span style="background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.4); padding: 0.35rem 0.85rem; border-radius: 20px; font-weight: 800; font-size: 0.74rem;">
+              OFFLINE RECOMMENDATION ONLY
+            </span>
+            <span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); padding: 0.35rem 0.85rem; border-radius: 20px; font-weight: 800; font-size: 0.74rem;">
+              NO REAL-TIME SIGNAL CONTROL
+            </span>
+          </div>
+
+          <div style="border-top: 1px dashed rgba(255, 255, 255, 0.12); padding-top: 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; font-size: 0.82rem; color: #cbd5e1;">
+            <div>
+              <strong>ENGINEER SIGN-OFF:</strong> ____________________________________
+            </div>
+            <div>
+              <strong>DATE:</strong> ________________
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 10 — SIGNAL CYCLE TIMELINE -->
+        <div>
+          <div style="font-size: 0.82rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.2rem;">
+            SECTION 10 — SIGNAL CYCLE TIMELINE
+          </div>
+          <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.75rem;">
+            Sequential phase execution breakdown using actual calculated Step 5 timing
+          </div>
+
+          <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px;">
+            <div style="font-size: 0.8rem; font-weight: 800; color: #ffffff; margin-bottom: 0.75rem;">
+              CYCLE TIMELINE BREAKDOWN ${isWebsterValid ? `(Total Shared Cycle = ${websterTiming.websterCycleC0} s)` : ''}
+            </div>
+
+            ${isWebsterValid ? `
+              ${is4Phase ? `
+                <div style="display: flex; height: 52px; border-radius: 6px; overflow: hidden; font-size: 0.72rem; font-weight: 800; gap: 2px; background: rgba(30, 41, 59, 0.6); padding: 3px; flex-wrap: nowrap;">
+                  <div style="flex: ${websterTiming.g1}; min-width: 50px; background: rgba(56, 189, 248, 0.25); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center;" title="P1 Road A Green: ${websterTiming.g1}s">
+                    <span>P1 (A)</span>
+                    <span>${websterTiming.g1}s</span>
+                  </div>
+                  <div style="width: 28px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="Amber: ${websterTiming.amber}s">${websterTiming.amber}s</div>
+                  <div style="width: 28px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="All-Red: ${websterTiming.allRed}s">${websterTiming.allRed}s</div>
+
+                  <div style="flex: ${websterTiming.g2}; min-width: 50px; background: rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center;" title="P2 Road B Green: ${websterTiming.g2}s">
+                    <span>P2 (B)</span>
+                    <span>${websterTiming.g2}s</span>
+                  </div>
+                  <div style="width: 28px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="Amber: ${websterTiming.amber}s">${websterTiming.amber}s</div>
+                  <div style="width: 28px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="All-Red: ${websterTiming.allRed}s">${websterTiming.allRed}s</div>
+
+                  <div style="flex: ${websterTiming.g3}; min-width: 50px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center;" title="P3 Road C Green: ${websterTiming.g3}s">
+                    <span>P3 (C)</span>
+                    <span>${websterTiming.g3}s</span>
+                  </div>
+                  <div style="width: 28px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="Amber: ${websterTiming.amber}s">${websterTiming.amber}s</div>
+                  <div style="width: 28px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="All-Red: ${websterTiming.allRed}s">${websterTiming.allRed}s</div>
+
+                  <div style="flex: ${websterTiming.g4}; min-width: 50px; background: rgba(167, 139, 250, 0.25); color: #a78bfa; border: 1px solid rgba(167, 139, 250, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center;" title="P4 Road D Green: ${websterTiming.g4}s">
+                    <span>P4 (D)</span>
+                    <span>${websterTiming.g4}s</span>
+                  </div>
+                  <div style="width: 28px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="Amber: ${websterTiming.amber}s">${websterTiming.amber}s</div>
+                  <div style="width: 28px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="All-Red: ${websterTiming.allRed}s">${websterTiming.allRed}s</div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.76rem; color: #cbd5e1; margin-top: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+                  <span>P1 ROAD A (${websterTiming.g1}s) → P2 ROAD B (${websterTiming.g2}s) → P3 ROAD C (${websterTiming.g3}s) → P4 ROAD D (${websterTiming.g4}s) → REPEAT</span>
+                  <span>🟢 Green = Active Phase | 🟡 Amber = Transition | 🔴 Red = All-Red Clearance</span>
+                </div>
+              ` : `
+                <div style="display: flex; height: 48px; border-radius: 6px; overflow: hidden; font-size: 0.75rem; font-weight: 800; gap: 3px; background: rgba(30, 41, 59, 0.6); padding: 3px;">
+                  <div style="flex: ${websterTiming.g1}; min-width: 80px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center;" title="Phase 1 Green: ${websterTiming.g1}s">
+                    <span>Phase 1 Green</span>
+                    <span>${websterTiming.g1} s</span>
+                  </div>
+                  <div style="width: 35px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="Amber: ${websterTiming.amber}s">
+                    ${websterTiming.amber}s
+                  </div>
+                  <div style="width: 35px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="All-Red: ${websterTiming.allRed}s">
+                    ${websterTiming.allRed}s
+                  </div>
+                  <div style="flex: ${websterTiming.g2}; min-width: 80px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center;" title="Phase 2 Green: ${websterTiming.g2}s">
+                    <span>Phase 2 Green</span>
+                    <span>${websterTiming.g2} s</span>
+                  </div>
+                  <div style="width: 35px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="Amber: ${websterTiming.amber}s">
+                    ${websterTiming.amber}s
+                  </div>
+                  <div style="width: 35px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;" title="All-Red: ${websterTiming.allRed}s">
+                    ${websterTiming.allRed}s
+                  </div>
+                </div>
+                <div style="display: flex; gap: 1.5rem; font-size: 0.76rem; color: #cbd5e1; margin-top: 0.85rem; flex-wrap: wrap;">
+                  <span>🟢 Green = Effective Green</span>
+                  <span>🟡 Amber = Amber Interval</span>
+                  <span>🔴 Red = All-Red Interval</span>
+                </div>
+              `}
+            ` : `
+              <div style="padding: 1.25rem; background: rgba(239, 68, 68, 0.1); border: 1px dashed rgba(239, 68, 68, 0.4); border-radius: 8px; text-align: center; color: #f87171;">
+                <div style="font-weight: 800; font-size: 1rem; margin-bottom: 0.4rem;">NO VALID WEBSTER TIMING GENERATED</div>
+                <div style="font-size: 0.85rem; color: #cbd5e1; max-width: 650px; margin: 0 auto;">
+                  Intersection is over-saturated. Further traffic engineering assessment, capacity improvement, phase redesign, or demand-management measures are required.
+                </div>
+              </div>
+            `}
+          </div>
+        </div>
+
+        <!-- SECTION 7 — BEFORE VS AFTER PERFORMANCE ESTIMATE -->
+        <div>
+          <div style="font-size: 0.82rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.2rem;">
+            SECTION 7 — BEFORE VS AFTER PERFORMANCE ESTIMATE
+          </div>
+          <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.75rem;">
+            Comparison of observed baseline performance against the proposed Webster plan
+          </div>
+
+          <div class="card" style="padding: 0; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden;">
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
+                <thead>
+                  <tr style="background: rgba(30, 41, 59, 0.8); border-bottom: 1px solid var(--border-color); color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em;">
+                    <th style="padding: 0.75rem 1rem;">METRIC</th>
+                    <th style="padding: 0.75rem 1rem;">BEFORE (BASELINE)</th>
+                    <th style="padding: 0.75rem 1rem;">AFTER (PROPOSED PLAN)</th>
+                    <th style="padding: 0.75rem 1rem;">CHANGE</th>
+                    <th style="padding: 0.75rem 1rem;">IMPROVEMENT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Effective Green Split</td>
+                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">Baseline Split</td>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #34d399;">${proposedGreenSplitStr}</td>
+                    <td style="padding: 0.75rem 1rem; color: #34d399; font-weight: 700;" colspan="2">Proportional Allocation</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Critical Approach Average Delay</td>
+                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">${beforeAfterPerformance.baselineDelay || 'Not Available'}</td>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid ? (beforeAfterPerformance.proposedDelay || 'N/A') : 'N/A — Webster not valid'}</td>
+                    <td style="padding: 0.75rem 1rem; color: ${isWebsterValid ? '#34d399' : '#94a3b8'}; font-weight: 700;" colspan="2">${isWebsterValid ? (beforeAfterPerformance.delayChange || 'N/A') : 'N/A'}</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Critical Approach Queue</td>
+                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">${beforeAfterPerformance.baselineQueue || 'Not Available'}</td>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid ? (beforeAfterPerformance.proposedQueue || 'N/A') : 'N/A — Webster not valid'}</td>
+                    <td style="padding: 0.75rem 1rem; color: ${isWebsterValid ? '#34d399' : '#94a3b8'}; font-weight: 700;" colspan="2">${isWebsterValid ? (beforeAfterPerformance.queueChange || 'N/A') : 'N/A'}</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Critical Approach Degree of Saturation (v/c)</td>
+                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">${beforeAfterPerformance.baselineDOS || 'Not Available'}</td>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid ? (beforeAfterPerformance.proposedDOS || 'N/A') : 'N/A — Webster not valid'}</td>
+                    <td style="padding: 0.75rem 1rem; color: ${isWebsterValid ? '#34d399' : '#94a3b8'}; font-weight: 700;" colspan="2">${isWebsterValid ? (beforeAfterPerformance.dosChange || 'N/A') : 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: #ffffff;">Critical Approach Level of Service (LOS)</td>
+                    <td style="padding: 0.75rem 1rem; color: #cbd5e1;">${beforeAfterPerformance.baselineLOS || 'Not Available'}</td>
+                    <td style="padding: 0.75rem 1rem; font-weight: 700; color: ${isWebsterValid ? '#34d399' : '#f87171'};">${isWebsterValid ? (beforeAfterPerformance.proposedLOS || 'Not Available') : 'N/A — Webster not valid'}</td>
+                    <td style="padding: 0.75rem 1rem; color: ${isWebsterValid ? '#34d399' : '#94a3b8'}; font-weight: 700;" colspan="2">${isWebsterValid ? (beforeAfterPerformance.losChange || '—') : 'N/A'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="padding: 0.5rem 1rem; background: rgba(30, 41, 59, 0.6); font-size: 0.75rem; color: #94a3b8; font-style: italic;">
+              * SIMULATED ESTIMATE: Results are analytical model estimates based on configured traffic and engineering inputs. They are not field measurements and do not guarantee real-world improvement.
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 8 — BOTTLENECK & FLOWGUARD RECOMMENDATION -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
+          <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px;">
+            <div style="font-size: 0.82rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.85rem;">
+              PRIMARY BOTTLENECK &amp; PHASE PRIORITY
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.82rem;">
+              <div>
+                <span style="color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; font-weight: 700;">Primary Bottleneck:</span><br>
+                <strong style="color: #ef4444; font-size: 1rem;">${bottleneckRoad}</strong>
+              </div>
+              <div>
+                <span style="color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; font-weight: 700;">Recommended Phase Priority:</span><br>
+                <strong style="color: #38bdf8; font-size: 0.95rem;">${recPhasePriorityStr}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px;">
+            <div style="font-size: 0.82rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.85rem;">
+              RECOMMENDED SIGNAL ACTION
+            </div>
+
+            <div style="font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 0.85rem;">
+              ${recActionText}
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <span style="background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.4); padding: 0.3rem 0.65rem; border-radius: 12px; font-weight: 800; font-size: 0.72rem;">
+                ⚠️ OFFLINE RECOMMENDATION ONLY
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 9 — ASSUMPTIONS & LIMITATIONS -->
+        <div class="card" style="padding: 1.5rem; background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-color); border-radius: 10px;">
+          <div style="font-size: 0.88rem; font-weight: 800; color: #ffffff; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.85rem;">
+            SECTION 9 — ASSUMPTIONS &amp; LIMITATIONS
+          </div>
+
+          <ul style="margin: 0 0 1.25rem 0; padding-left: 1.2rem; font-size: 0.82rem; color: #94a3b8; line-height: 1.6; display: flex; flex-direction: column; gap: 0.35rem;">
+            <li>Historical traffic data ingested and validated in Step 2.</li>
+            <li>Configured PCU equivalence factors applied per vehicle category.</li>
+            <li>Webster method is used for preliminary isolated-intersection signal timing optimization.</li>
+            <li>Analytical/simulated estimates for decision support; field validation required.</li>
+            <li>Queue spillback, downstream intersections, and adjacent signal coordination are not represented.</li>
+            <li>Temporary lane blockage and real-time stochastic fluctuations are not represented.</li>
+            <li><strong>${is4Phase ? 'Analysis uses a four-phase signal model with independent approach phases.' : 'Analysis uses a two-phase signal model.'}</strong></li>
           </ul>
 
           <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
@@ -3477,6 +4530,56 @@ const FlowGuard = (function () {
               <strong>DATE:</strong> ________________
             </div>
           </div>
+        </div>
+
+        <!-- SECTION 10 — FINAL RESULT CARD -->
+        <div class="card" style="padding: 1.5rem; background: rgba(15, 23, 42, 0.85); border: 1px solid ${isWebsterValid ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}; border-radius: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="font-size: 1rem; font-weight: 800; color: ${isWebsterValid ? '#34d399' : '#f87171'}; text-transform: uppercase;">
+              ${isWebsterValid ? '✓ ANALYSIS COMPLETE' : '⚠️ WEBSTER OPTIMIZATION NOT FEASIBLE'}
+            </div>
+            <div style="font-size: 0.82rem; color: #cbd5e1;">
+              Recommended Shared Cycle: <strong style="color: ${isWebsterValid ? '#38bdf8' : '#f87171'}; font-size: 1.1rem;">${isWebsterValid && websterTiming.websterCycleC0 ? `${websterTiming.websterCycleC0} s` : 'N/A'}</strong>
+            </div>
+          </div>
+
+          ${is4Phase ? `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; font-size: 0.82rem;">
+              <div style="background: rgba(30, 41, 59, 0.5); padding: 0.75rem; border-radius: 6px; border-left: 3px solid #38bdf8;">
+                <div style="color: #94a3b8; font-size: 0.72rem;">PHASE 1</div>
+                <div style="color: #ffffff; font-weight: 700;">Road A</div>
+                <div style="color: #38bdf8; font-weight: 800; font-size: 1.05rem;">${isWebsterValid && websterTiming.g1 !== null ? `${websterTiming.g1} s` : 'N/A'}</div>
+              </div>
+              <div style="background: rgba(30, 41, 59, 0.5); padding: 0.75rem; border-radius: 6px; border-left: 3px solid #f59e0b;">
+                <div style="color: #94a3b8; font-size: 0.72rem;">PHASE 2</div>
+                <div style="color: #ffffff; font-weight: 700;">Road B</div>
+                <div style="color: #f59e0b; font-weight: 800; font-size: 1.05rem;">${isWebsterValid && websterTiming.g2 !== null ? `${websterTiming.g2} s` : 'N/A'}</div>
+              </div>
+              <div style="background: rgba(30, 41, 59, 0.5); padding: 0.75rem; border-radius: 6px; border-left: 3px solid #34d399;">
+                <div style="color: #94a3b8; font-size: 0.72rem;">PHASE 3</div>
+                <div style="color: #ffffff; font-weight: 700;">Road C</div>
+                <div style="color: #34d399; font-weight: 800; font-size: 1.05rem;">${isWebsterValid && websterTiming.g3 !== null ? `${websterTiming.g3} s` : 'N/A'}</div>
+              </div>
+              <div style="background: rgba(30, 41, 59, 0.5); padding: 0.75rem; border-radius: 6px; border-left: 3px solid #a78bfa;">
+                <div style="color: #94a3b8; font-size: 0.72rem;">PHASE 4</div>
+                <div style="color: #ffffff; font-weight: 700;">Road D</div>
+                <div style="color: #a78bfa; font-weight: 800; font-size: 1.05rem;">${isWebsterValid && websterTiming.g4 !== null ? `${websterTiming.g4} s` : 'N/A'}</div>
+              </div>
+            </div>
+          ` : `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; font-size: 0.82rem;">
+              <div style="background: rgba(30, 41, 59, 0.5); padding: 0.75rem; border-radius: 6px; border-left: 3px solid #38bdf8;">
+                <div style="color: #94a3b8; font-size: 0.72rem;">PHASE 1</div>
+                <div style="color: #ffffff; font-weight: 700;">North / South</div>
+                <div style="color: #38bdf8; font-weight: 800; font-size: 1.05rem;">${isWebsterValid && websterTiming.g1 !== null ? `${websterTiming.g1} s` : 'N/A'}</div>
+              </div>
+              <div style="background: rgba(30, 41, 59, 0.5); padding: 0.75rem; border-radius: 6px; border-left: 3px solid #f59e0b;">
+                <div style="color: #94a3b8; font-size: 0.72rem;">PHASE 2</div>
+                <div style="color: #ffffff; font-weight: 700;">East / West</div>
+                <div style="color: #f59e0b; font-weight: 800; font-size: 1.05rem;">${isWebsterValid && websterTiming.g2 !== null ? `${websterTiming.g2} s` : 'N/A'}</div>
+              </div>
+            </div>
+          `}
         </div>
 
       </div>
@@ -4201,6 +5304,7 @@ const FlowGuard = (function () {
     const engInputIds = [
       'engMinGreen', 'engMaxGreen', 'engAmberTime', 'engAllRedTime',
       'engExistingCycle', 'engBaselineP1Green', 'engBaselineP2Green',
+      'engBaselineP1Green4', 'engBaselineP2Green4', 'engBaselineP3Green', 'engBaselineP4Green',
       'engBaseSatFlow', 'engWalkSpeed', 'engMinWalkTime',
       'engPedClearanceCalc', 'engIncidentEvent',
       'baseline_delay_road_a', 'baseline_queue_road_a', 'baseline_dos_road_a',
@@ -4222,6 +5326,13 @@ const FlowGuard = (function () {
     // Cycle constraint radio buttons
     const cycleRadios = document.querySelectorAll('input[name="cycleConstraint"]');
     cycleRadios.forEach(radio => {
+      radio.removeEventListener('change', updateEngineeringCalculations);
+      radio.addEventListener('change', updateEngineeringCalculations);
+    });
+
+    // Phase mode radio buttons (2-Phase vs 4-Phase)
+    const phaseModeRadios = document.querySelectorAll('input[name="phaseMode"]');
+    phaseModeRadios.forEach(radio => {
       radio.removeEventListener('change', updateEngineeringCalculations);
       radio.addEventListener('change', updateEngineeringCalculations);
     });
@@ -4294,13 +5405,29 @@ const FlowGuard = (function () {
       }
     }
 
+    if (eng.phaseMode) {
+      const pRad = document.querySelector(`input[name="phaseMode"][value="${eng.phaseMode}"]`);
+      if (pRad) pRad.checked = true;
+    } else if (eng.signal && eng.signal.phaseCount === 4) {
+      const pRad = document.querySelector('input[name="phaseMode"][value="4-phase"]');
+      if (pRad) pRad.checked = true;
+    }
+
     // Baseline Signal Timing State Loading
     if (eng.baseline) {
-      if (eng.baseline.phase1Green !== undefined && eng.baseline.phase1Green !== null && document.getElementById('engBaselineP1Green')) {
-        document.getElementById('engBaselineP1Green').value = eng.baseline.phase1Green;
+      if (eng.baseline.phase1Green !== undefined && eng.baseline.phase1Green !== null) {
+        if (document.getElementById('engBaselineP1Green')) document.getElementById('engBaselineP1Green').value = eng.baseline.phase1Green;
+        if (document.getElementById('engBaselineP1Green4')) document.getElementById('engBaselineP1Green4').value = eng.baseline.phase1Green;
       }
-      if (eng.baseline.phase2Green !== undefined && eng.baseline.phase2Green !== null && document.getElementById('engBaselineP2Green')) {
-        document.getElementById('engBaselineP2Green').value = eng.baseline.phase2Green;
+      if (eng.baseline.phase2Green !== undefined && eng.baseline.phase2Green !== null) {
+        if (document.getElementById('engBaselineP2Green')) document.getElementById('engBaselineP2Green').value = eng.baseline.phase2Green;
+        if (document.getElementById('engBaselineP2Green4')) document.getElementById('engBaselineP2Green4').value = eng.baseline.phase2Green;
+      }
+      if (eng.baseline.phase3Green !== undefined && eng.baseline.phase3Green !== null && document.getElementById('engBaselineP3Green')) {
+        document.getElementById('engBaselineP3Green').value = eng.baseline.phase3Green;
+      }
+      if (eng.baseline.phase4Green !== undefined && eng.baseline.phase4Green !== null && document.getElementById('engBaselineP4Green')) {
+        document.getElementById('engBaselineP4Green').value = eng.baseline.phase4Green;
       }
     }
 
@@ -4371,18 +5498,33 @@ const FlowGuard = (function () {
   function updateEngineeringCalculations() {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
-    // 1. Signal Control Parameters
+    // 1. Signal Control & Phase Mode Parameters
+    const phaseModeRadio = document.querySelector('input[name="phaseMode"]:checked');
+    const phaseMode = phaseModeRadio ? phaseModeRadio.value : '2-phase';
+    const is4Phase = (phaseMode === '4-phase');
+    const numPhases = is4Phase ? 4 : 2;
+
     const minGreen = parseFloat((document.getElementById('engMinGreen') || {}).value) || 7;
     const maxGreen = parseFloat((document.getElementById('engMaxGreen') || {}).value) || 90;
     const amberTime = parseFloat((document.getElementById('engAmberTime') || {}).value) || 3.0;
     const allRedTime = parseFloat((document.getElementById('engAllRedTime') || {}).value) || 2.0;
     const startupLost = parseFloat((document.getElementById('engStartupLost') || {}).value) || 2.0;
     const clearanceLost = parseFloat((document.getElementById('engClearanceLost') || {}).value) || 2.0;
-    const numPhases = 2; // Fixed analytical 2-phase model (Phase 1 N/S, Phase 2 E/W)
     const controllerType = 'Fixed Time';
     const existingCycle = parseFloat((document.getElementById('engExistingCycle') || {}).value) || 120;
     const cycleModeRadio = document.querySelector('input[name="cycleConstraint"]:checked');
     const cycleMode = cycleModeRadio ? cycleModeRadio.value : 'auto';
+
+    // Toggle Phase Configuration UI Cards & Baseline Signal Timing Containers
+    const phase2Cards = document.getElementById('phase2CardsContainer');
+    const phase4Cards = document.getElementById('phase4CardsContainer');
+    if (phase2Cards) phase2Cards.style.display = is4Phase ? 'none' : 'flex';
+    if (phase4Cards) phase4Cards.style.display = is4Phase ? 'grid' : 'none';
+
+    const base2GreensContainer = document.getElementById('baseline2PhaseGreensContainer');
+    const base4GreensContainer = document.getElementById('baseline4PhaseGreensContainer');
+    if (base2GreensContainer) base2GreensContainer.style.display = is4Phase ? 'none' : 'contents';
+    if (base4GreensContainer) base4GreensContainer.style.display = is4Phase ? 'grid' : 'none';
 
     // 2. Base Saturation Flow Settings
     const baseSatInput = document.getElementById('engBaseSatFlow');
@@ -4434,13 +5576,40 @@ const FlowGuard = (function () {
     const incidentEvent = (document.getElementById('engIncidentEvent') || {}).value || 'None';
 
     // 5. Baseline Signal Timing Inputs & Validation
-    const p1GreenInput = document.getElementById('engBaselineP1Green');
-    const p2GreenInput = document.getElementById('engBaselineP2Green');
-    const p1GreenVal = p1GreenInput && p1GreenInput.value !== '' ? parseFloat(p1GreenInput.value) : null;
-    const p2GreenVal = p2GreenInput && p2GreenInput.value !== '' ? parseFloat(p2GreenInput.value) : null;
+    let p1GreenVal = null;
+    let p2GreenVal = null;
+    let p3GreenVal = null;
+    let p4GreenVal = null;
+    let hasP1 = false;
+    let hasP2 = false;
+    let hasP3 = false;
+    let hasP4 = false;
 
-    const hasP1 = p1GreenVal !== null && !isNaN(p1GreenVal) && p1GreenVal > 0;
-    const hasP2 = p2GreenVal !== null && !isNaN(p2GreenVal) && p2GreenVal > 0;
+    if (is4Phase) {
+      const p1In = document.getElementById('engBaselineP1Green4');
+      const p2In = document.getElementById('engBaselineP2Green4');
+      const p3In = document.getElementById('engBaselineP3Green');
+      const p4In = document.getElementById('engBaselineP4Green');
+
+      p1GreenVal = (p1In && p1In.value !== '') ? parseFloat(p1In.value) : null;
+      p2GreenVal = (p2In && p2In.value !== '') ? parseFloat(p2In.value) : null;
+      p3GreenVal = (p3In && p3In.value !== '') ? parseFloat(p3In.value) : null;
+      p4GreenVal = (p4In && p4In.value !== '') ? parseFloat(p4In.value) : null;
+
+      hasP1 = p1GreenVal !== null && !isNaN(p1GreenVal) && p1GreenVal > 0;
+      hasP2 = p2GreenVal !== null && !isNaN(p2GreenVal) && p2GreenVal > 0;
+      hasP3 = p3GreenVal !== null && !isNaN(p3GreenVal) && p3GreenVal > 0;
+      hasP4 = p4GreenVal !== null && !isNaN(p4GreenVal) && p4GreenVal > 0;
+    } else {
+      const p1In = document.getElementById('engBaselineP1Green');
+      const p2In = document.getElementById('engBaselineP2Green');
+
+      p1GreenVal = (p1In && p1In.value !== '') ? parseFloat(p1In.value) : null;
+      p2GreenVal = (p2In && p2In.value !== '') ? parseFloat(p2In.value) : null;
+
+      hasP1 = p1GreenVal !== null && !isNaN(p1GreenVal) && p1GreenVal > 0;
+      hasP2 = p2GreenVal !== null && !isNaN(p2GreenVal) && p2GreenVal > 0;
+    }
 
     const valBox = document.getElementById('baselineTimingValidationBox');
     const valMsg = document.getElementById('baselineTimingValMsg');
@@ -4448,31 +5617,67 @@ const FlowGuard = (function () {
     let isBaselineConsistent = false;
 
     if (valMsg) {
-      if (!hasP1 && !hasP2) {
-        valMsg.textContent = 'ℹ Enter Phase 1 and Phase 2 existing green times to validate baseline timing.';
-        valMsg.style.color = '#38bdf8';
-        if (valBox) valBox.style.borderColor = 'var(--border-color)';
-      } else if (!hasP1 || !hasP2) {
-        valMsg.textContent = '⚠ Please enter both Phase 1 and Phase 2 existing green times.';
-        valMsg.style.color = '#fcd34d';
-        if (valBox) valBox.style.borderColor = 'rgba(245, 158, 11, 0.4)';
-      } else {
-        const totalAllocated = p1GreenVal + p2GreenVal + (amberTime * 2) + (allRedTime * 2);
-        const diff = totalAllocated - existingCycle;
+      if (is4Phase) {
+        const hasAll = hasP1 && hasP2 && hasP3 && hasP4;
+        const hasAny = hasP1 || hasP2 || hasP3 || hasP4;
 
-        if (Math.abs(diff) < 0.1) {
-          isBaselineConsistent = true;
-          valMsg.textContent = `✓ Baseline timing is internally consistent. (Total: ${totalAllocated}s = ${p1GreenVal}s + ${p2GreenVal}s + 2×${amberTime}s + 2×${allRedTime}s)`;
-          valMsg.style.color = 'var(--success)';
-          if (valBox) valBox.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-        } else if (diff > 0) {
-          valMsg.textContent = `⚠ Baseline timing exceeds configured cycle length by ${parseFloat(diff.toFixed(1))} s. (Sum: ${totalAllocated}s, Cycle: ${existingCycle}s)`;
-          valMsg.style.color = '#ef4444';
-          if (valBox) valBox.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-        } else {
-          valMsg.textContent = `⚠ Baseline timing leaves ${parseFloat(Math.abs(diff).toFixed(1))} s unallocated. (Sum: ${totalAllocated}s, Cycle: ${existingCycle}s)`;
+        if (!hasAny) {
+          valMsg.textContent = 'ℹ Enter the existing baseline green time for each approach. 4-phase timing allocation will be used in Run Analysis.';
+          valMsg.style.color = '#38bdf8';
+          if (valBox) valBox.style.borderColor = 'var(--border-color)';
+        } else if (!hasAll) {
+          valMsg.textContent = '⚠ Please enter all 4 existing phase green times (Road A, B, C, D).';
           valMsg.style.color = '#fcd34d';
           if (valBox) valBox.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+        } else {
+          const totalAllocated = p1GreenVal + p2GreenVal + p3GreenVal + p4GreenVal + (amberTime * 4) + (allRedTime * 4);
+          const diff = totalAllocated - existingCycle;
+
+          if (Math.abs(diff) < 0.1) {
+            isBaselineConsistent = true;
+            valMsg.textContent = `✓ Baseline timing is internally consistent. (Total: ${totalAllocated}s = ${p1GreenVal}s + ${p2GreenVal}s + ${p3GreenVal}s + ${p4GreenVal}s + 4×${amberTime}s + 4×${allRedTime}s)`;
+            valMsg.style.color = 'var(--success)';
+            if (valBox) valBox.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+          } else if (diff > 0) {
+            valMsg.textContent = `⚠ Baseline timing exceeds configured cycle length by ${parseFloat(diff.toFixed(1))} s. (Sum: ${totalAllocated}s, Cycle: ${existingCycle}s)`;
+            valMsg.style.color = '#ef4444';
+            if (valBox) valBox.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+          } else {
+            valMsg.textContent = `⚠ Baseline timing leaves ${parseFloat(Math.abs(diff).toFixed(1))} s unallocated. (Sum: ${totalAllocated}s, Cycle: ${existingCycle}s)`;
+            valMsg.style.color = '#fcd34d';
+            if (valBox) valBox.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+          }
+        }
+      } else {
+        const hasAll = hasP1 && hasP2;
+        const hasAny = hasP1 || hasP2;
+
+        if (!hasAny) {
+          valMsg.textContent = 'ℹ Enter Phase 1 and Phase 2 existing green times to validate baseline timing. 2-phase timing allocation will be used in Run Analysis.';
+          valMsg.style.color = '#38bdf8';
+          if (valBox) valBox.style.borderColor = 'var(--border-color)';
+        } else if (!hasAll) {
+          valMsg.textContent = '⚠ Please enter both Phase 1 and Phase 2 existing green times.';
+          valMsg.style.color = '#fcd34d';
+          if (valBox) valBox.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+        } else {
+          const totalAllocated = p1GreenVal + p2GreenVal + (amberTime * 2) + (allRedTime * 2);
+          const diff = totalAllocated - existingCycle;
+
+          if (Math.abs(diff) < 0.1) {
+            isBaselineConsistent = true;
+            valMsg.textContent = `✓ Baseline timing is internally consistent. (Total: ${totalAllocated}s = ${p1GreenVal}s + ${p2GreenVal}s + 2×${amberTime}s + 2×${allRedTime}s)`;
+            valMsg.style.color = 'var(--success)';
+            if (valBox) valBox.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+          } else if (diff > 0) {
+            valMsg.textContent = `⚠ Baseline timing exceeds configured cycle length by ${parseFloat(diff.toFixed(1))} s. (Sum: ${totalAllocated}s, Cycle: ${existingCycle}s)`;
+            valMsg.style.color = '#ef4444';
+            if (valBox) valBox.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+          } else {
+            valMsg.textContent = `⚠ Baseline timing leaves ${parseFloat(Math.abs(diff).toFixed(1))} s unallocated. (Sum: ${totalAllocated}s, Cycle: ${existingCycle}s)`;
+            valMsg.style.color = '#fcd34d';
+            if (valBox) valBox.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+          }
         }
       }
     }
@@ -4496,6 +5701,8 @@ const FlowGuard = (function () {
       cycleLength: existingCycle,
       phase1Green: hasP1 ? p1GreenVal : null,
       phase2Green: hasP2 ? p2GreenVal : null,
+      phase3Green: is4Phase && hasP3 ? p3GreenVal : null,
+      phase4Green: is4Phase && hasP4 ? p4GreenVal : null,
       amber: amberTime,
       allRed: allRedTime,
       isValid: isBaselineConsistent,
@@ -4562,9 +5769,25 @@ const FlowGuard = (function () {
     };
 
     setSummaryTxt('summaryApproachesVal', 4);
-    setSummaryTxt('summaryPhasesVal', 2);
-    setSummaryTxt('summaryPhase1Val', 'Road A + Road C (N/S)');
-    setSummaryTxt('summaryPhase2Val', 'Road B + Road D (E/W)');
+    setSummaryTxt('summaryPhasesVal', numPhases);
+
+    const p3El = document.getElementById('summaryPhase3Container');
+    const p4El = document.getElementById('summaryPhase4Container');
+
+    if (is4Phase) {
+      setSummaryTxt('summaryPhase1Val', 'Road A (Northbound)');
+      setSummaryTxt('summaryPhase2Val', 'Road B (Eastbound)');
+      if (p3El) p3El.style.display = 'block';
+      if (p4El) p4El.style.display = 'block';
+      setSummaryTxt('summaryPhase3Val', 'Road C (Southbound)');
+      setSummaryTxt('summaryPhase4Val', 'Road D (Westbound)');
+    } else {
+      setSummaryTxt('summaryPhase1Val', 'Road A + Road C (N/S)');
+      setSummaryTxt('summaryPhase2Val', 'Road B + Road D (E/W)');
+      if (p3El) p3El.style.display = 'none';
+      if (p4El) p4El.style.display = 'none';
+    }
+
     setSummaryTxt('summaryBaseSatVal', `${baseSat} PCU/h/lane`);
     setSummaryTxt('summaryExistingCycleVal', `${existingCycle} s`);
     setSummaryTxt('summaryAmberVal', `${amberTime} s`);
@@ -4574,9 +5797,21 @@ const FlowGuard = (function () {
     setSummaryTxt('summaryBaselineVal', baselineMode === 'not_available' ? 'Not Available' : 'Road-wise');
 
     // Baseline Signal Timing Summary Fields (Derived dynamically from Section C state)
-    const p1GreenStr = hasP1 ? `${p1GreenVal} s` : 'Not Provided';
-    const p2GreenStr = hasP2 ? `${p2GreenVal} s` : 'Not Provided';
-    const splitStr = (hasP1 && hasP2) ? `${p1GreenVal} s / ${p2GreenVal} s` : 'Not Provided';
+    let p1GreenStr = 'Not Provided';
+    let p2GreenStr = 'Not Provided';
+    let splitStr = 'Not Provided';
+
+    if (is4Phase) {
+      p1GreenStr = hasP1 ? `${p1GreenVal} s` : 'Not Provided';
+      p2GreenStr = hasP2 ? `${p2GreenVal} s` : 'Not Provided';
+      const hasAll = hasP1 && hasP2 && hasP3 && hasP4;
+      splitStr = hasAll ? `${p1GreenVal} s / ${p2GreenVal} s / ${p3GreenVal} s / ${p4GreenVal} s` : 'Not Provided';
+    } else {
+      p1GreenStr = hasP1 ? `${p1GreenVal} s` : 'Not Provided';
+      p2GreenStr = hasP2 ? `${p2GreenVal} s` : 'Not Provided';
+      const hasAll = hasP1 && hasP2;
+      splitStr = hasAll ? `${p1GreenVal} s / ${p2GreenVal} s` : 'Not Provided';
+    }
 
     setSummaryTxt('summaryBaselineP1GreenVal', p1GreenStr);
     setSummaryTxt('summaryBaselineP2GreenVal', p2GreenStr);
@@ -4585,7 +5820,30 @@ const FlowGuard = (function () {
     let statusText = 'ℹ Awaiting Inputs';
     let statusColor = '#38bdf8';
 
-    if (!hasP1 && !hasP2) {
+    if (is4Phase) {
+      const hasAll = hasP1 && hasP2 && hasP3 && hasP4;
+      const hasAny = hasP1 || hasP2 || hasP3 || hasP4;
+      if (!hasAny) {
+        statusText = 'ℹ Awaiting Green Times';
+        statusColor = '#38bdf8';
+      } else if (!hasAll) {
+        statusText = '⚠ Incomplete Phase Green';
+        statusColor = '#fcd34d';
+      } else {
+        const totalAllocated = p1GreenVal + p2GreenVal + p3GreenVal + p4GreenVal + (amberTime * 4) + (allRedTime * 4);
+        const diff = totalAllocated - existingCycle;
+        if (Math.abs(diff) < 0.1) {
+          statusText = '✓ Internally Consistent';
+          statusColor = 'var(--success)';
+        } else if (diff > 0) {
+          statusText = `⚠ Exceeds Cycle (+${parseFloat(diff.toFixed(1))} s)`;
+          statusColor = '#ef4444';
+        } else {
+          statusText = `⚠ Unallocated Time (${parseFloat(Math.abs(diff).toFixed(1))} s)`;
+          statusColor = '#fcd34d';
+        }
+      }
+    } else if (!hasP1 && !hasP2) {
       statusText = 'ℹ Awaiting Green Times';
       statusColor = '#38bdf8';
     } else if (!hasP1 || !hasP2) {
@@ -4611,7 +5869,19 @@ const FlowGuard = (function () {
     // Save State into project.engineeringParameters
     const currentState = getState();
 
+    const phaseConfigObj = is4Phase ? [
+      { phase: 1, roads: ['A'], direction: 'Northbound', name: 'PHASE 1 — NORTHBOUND' },
+      { phase: 2, roads: ['B'], direction: 'Eastbound', name: 'PHASE 2 — EASTBOUND' },
+      { phase: 3, roads: ['C'], direction: 'Southbound', name: 'PHASE 3 — SOUTHBOUND' },
+      { phase: 4, roads: ['D'], direction: 'Westbound', name: 'PHASE 4 — WESTBOUND' }
+    ] : [
+      { phase: 1, roads: ['A', 'C'], direction: 'North / South', name: 'PHASE 1 — NORTH / SOUTH' },
+      { phase: 2, roads: ['B', 'D'], direction: 'East / West', name: 'PHASE 2 — EAST / WEST' }
+    ];
+
     currentState.engineeringParameters = {
+      phaseMode: phaseMode,
+      phaseConfiguration: phaseConfigObj,
       signal: {
         minGreen,
         maxGreen,
@@ -4629,7 +5899,12 @@ const FlowGuard = (function () {
         source: (currentState.geometry?.baseSaturationFlow && Math.abs(currentState.geometry.baseSaturationFlow - baseSat) < 1) ? 'inherited' : 'manual'
       },
       pcuFactors,
-      phases: {
+      phases: is4Phase ? {
+        phase1: { name: 'Northbound', roads: ['Road A'], status: 'Configured' },
+        phase2: { name: 'Eastbound', roads: ['Road B'], status: 'Configured' },
+        phase3: { name: 'Southbound', roads: ['Road C'], status: 'Configured' },
+        phase4: { name: 'Westbound', roads: ['Road D'], status: 'Configured' }
+      } : {
         phase1: { name: 'North / South', roads: ['Road A', 'Road C'], status: 'Configured' },
         phase2: { name: 'East / West', roads: ['Road B', 'Road D'], status: 'Configured' }
       },
@@ -4712,6 +5987,18 @@ const FlowGuard = (function () {
     const eng = (proj && proj.engineeringParameters) ? proj.engineeringParameters : {};
 
     const isUploaded = !!(ds.uploaded || (ds.records && ds.records.length > 0));
+    const normData = proj ? proj.normalizedTrafficData : null;
+
+    const rawDuration = ds.surveyDuration || '15';
+    let formattedDuration = '15 Minutes';
+    if (rawDuration && rawDuration !== '—') {
+      const durStr = String(rawDuration).trim();
+      if (durStr === '15' || durStr === '15 Minutes') formattedDuration = '15 Minutes';
+      else if (durStr === '30' || durStr === '30 Minutes') formattedDuration = '30 Minutes';
+      else if (durStr === '60' || durStr === '60 Minutes' || durStr === '60 Minutes (1 Hour)' || durStr === '1 Hour') formattedDuration = '60 Minutes (1 Hour)';
+      else if (/^\d+$/.test(durStr)) formattedDuration = `${durStr} Minutes`;
+      else formattedDuration = durStr;
+    }
 
     // Base Saturation Flow S0 from Step 3
     const baseSat = parseFloat(eng.saturation?.baseSaturationFlow || eng.intersection?.baseSaturationFlow) || 1800;
@@ -4734,17 +6021,6 @@ const FlowGuard = (function () {
         rawInputMode = 'Historical Dataset Upload';
       }
       setText('sumDashMethod', rawInputMode);
-
-      const rawDuration = ds.surveyDuration || '—';
-      let formattedDuration = '—';
-      if (rawDuration && rawDuration !== '—') {
-        const durStr = String(rawDuration).trim();
-        if (durStr === '15' || durStr === '15 Minutes') formattedDuration = '15 Minutes';
-        else if (durStr === '30' || durStr === '30 Minutes') formattedDuration = '30 Minutes';
-        else if (durStr === '60' || durStr === '60 Minutes' || durStr === '60 Minutes (1 Hour)' || durStr === '1 Hour') formattedDuration = '60 Minutes (1 Hour)';
-        else if (/^\d+$/.test(durStr)) formattedDuration = `${durStr} Minutes`;
-        else formattedDuration = durStr;
-      }
       setText('sumDashDuration', formattedDuration);
 
       setText('sumDashSurveyDate', ds.surveyDate || '—');
@@ -4794,40 +6070,47 @@ const FlowGuard = (function () {
         const throughVeh = isUploaded ? formatNum(tc.through || 0) : '—';
         const rightVeh = isUploaded ? formatNum(tc.right || 0) : '—';
 
-        // PCU DEMAND (Step 3 factors * Step 2 raw count)
-        const leftPCUNum = mvPcu.leftPCU !== undefined ? parseFloat(mvPcu.leftPCU) : 0;
-        const throughPCUNum = mvPcu.throughPCU !== undefined ? parseFloat(mvPcu.throughPCU) : 0;
-        const rightPCUNum = mvPcu.rightPCU !== undefined ? parseFloat(mvPcu.rightPCU) : 0;
-        const totalPCUNum = Math.round((leftPCUNum + throughPCUNum + rightPCUNum) * 10) / 10;
+        // SINGLE SOURCE OF TRUTH METRICS (Step 4 SSoT: project.normalizedTrafficData)
+        const normRoad = (normData && normData.roads) ? normData.roads[app.key] : null;
 
-        const leftPCUStr = isUploaded ? formatNum(leftPCUNum, 1) + ' PCU/h' : '—';
-        const throughPCUStr = isUploaded ? formatNum(throughPCUNum, 1) + ' PCU/h' : '—';
-        const rightPCUStr = isUploaded ? formatNum(rightPCUNum, 1) + ' PCU/h' : '—';
-        const totalPCUStr = isUploaded ? formatNum(totalPCUNum, 1) + ' PCU/h' : '—';
+        // PCU DEMAND & TIME BASIS
+        const obsLeft = mvPcu.leftPCU !== undefined ? parseFloat(mvPcu.leftPCU) : 0;
+        const obsThrough = mvPcu.throughPCU !== undefined ? parseFloat(mvPcu.throughPCU) : 0;
+        const obsRight = mvPcu.rightPCU !== undefined ? parseFloat(mvPcu.rightPCU) : 0;
+
+        const observedIntervalPCU = normRoad ? normRoad.observedPCU : Math.round((obsLeft + obsThrough + obsRight) * 10) / 10;
+        const peakHourPCU = normRoad ? normRoad.peakHourPCU : Math.round(observedIntervalPCU * (normData ? normData.normalizationFactor : 4) * 10) / 10;
+
+        const normLeft = normRoad ? normRoad.normalizedMovementPCU.left : Math.round(obsLeft * (normData ? normData.normalizationFactor : 4) * 10) / 10;
+        const normThrough = normRoad ? normRoad.normalizedMovementPCU.through : Math.round(obsThrough * (normData ? normData.normalizationFactor : 4) * 10) / 10;
+        const normRight = normRoad ? normRoad.normalizedMovementPCU.right : Math.round(obsRight * (normData ? normData.normalizationFactor : 4) * 10) / 10;
+
+        const leftPCUStr = isUploaded ? formatNum(normLeft, 1) + ' PCU/h' : '—';
+        const throughPCUStr = isUploaded ? formatNum(normThrough, 1) + ' PCU/h' : '—';
+        const rightPCUStr = isUploaded ? formatNum(normRight, 1) + ' PCU/h' : '—';
+        const totalPCUStr = isUploaded ? formatNum(peakHourPCU, 1) + ' PCU/h' : '—';
 
         // PEAK ANALYSIS
-        const peakIntervalStr = isUploaded ? (pk.peakInterval || '—') : '—';
+        const peakIntervalStr = isUploaded ? (pk.peakInterval || (normRoad ? normRoad.observedInterval : '—')) : '—';
         const phfValStr = (isUploaded && pk.peakHourFactor !== undefined && pk.peakHourFactor !== null && pk.peakHourFactor !== '—') ? String(pk.peakHourFactor) : '—';
 
-        // WEBSTER INPUTS
-        // Saturation Flow s = S0 * n
-        const satFlowVal = baseSat * lanesVal;
+        // WEBSTER INPUTS (Calculated on consistent Peak-Hour PCU/h basis)
+        const satFlowVal = normRoad ? normRoad.saturationFlowS : (baseSat * lanesVal);
         const satFlowStr = isUploaded ? `${formatNum(satFlowVal)} PCU/h` : `${formatNum(satFlowVal)} PCU/h`;
 
-        // Critical Flow q = MAX(Left PCU, Through PCU, Right PCU)
-        const critFlowVal = isUploaded ? Math.max(leftPCUNum, throughPCUNum, rightPCUNum) : 0;
+        const critFlowVal = normRoad ? normRoad.criticalFlowQ : (isUploaded ? Math.max(normLeft, normThrough, normRight) : 0);
         const critFlowStr = isUploaded ? `${formatNum(critFlowVal, 1)} PCU/h` : '—';
 
-        let critMoveStr = '—';
-        if (isUploaded) {
-          if (leftPCUNum >= throughPCUNum && leftPCUNum >= rightPCUNum) critMoveStr = 'Left Turn';
-          else if (rightPCUNum >= throughPCUNum && rightPCUNum >= leftPCUNum) critMoveStr = 'Right Turn';
+        let critMoveStr = normRoad ? normRoad.criticalMovement : '—';
+        if (!normRoad && isUploaded) {
+          if (normLeft >= normThrough && normLeft >= normRight && normLeft > 0) critMoveStr = 'Left Turn';
+          else if (normRight >= normThrough && normRight >= normLeft && normRight > 0) critMoveStr = 'Right Turn';
           else critMoveStr = 'Through';
         }
 
         const critLaneStr = isUploaded ? `Lane 1 (${critMoveStr.slice(0, 1)})` : '—';
 
-        // Flow Ratio y = q / s
+        // Flow Ratio y = q / s (recalculated directly from displayed q and s)
         const flowRatioYVal = (isUploaded && satFlowVal > 0) ? parseFloat((critFlowVal / satFlowVal).toFixed(4)) : null;
         const flowRatioYStr = flowRatioYVal !== null ? String(flowRatioYVal) : '—';
 
@@ -4866,14 +6149,16 @@ const FlowGuard = (function () {
             </div>
           </div>
 
-          <!-- PCU by Movement (Step 3 Factors * Step 2 Counts) -->
+          <!-- PCU Demand & Time Basis (Step 3 Factors * Step 2 Counts) -->
           <div style="background: rgba(30, 41, 59, 0.4); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
-            <div style="font-size: 0.72rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase; margin-bottom: 0.4rem; letter-spacing: 0.5px;">PCU by Movement</div>
+            <div style="font-size: 0.72rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase; margin-bottom: 0.4rem; letter-spacing: 0.5px;">PCU Demand & Time Basis</div>
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.45rem; font-size: 0.8rem; color: var(--text-secondary); font-family: var(--font-mono);">
+              <div>Observed Demand: <strong style="color: var(--text-primary);">${isUploaded ? (formatNum(observedIntervalPCU, 1) + ' PCU / interval') : '—'}</strong></div>
+              <div>Peak-Hour Demand: <strong style="color: var(--text-primary); font-weight: 800;">${totalPCUStr}</strong></div>
               <div>Left PCU: <strong style="color: var(--text-primary);">${leftPCUStr}</strong></div>
               <div>Through PCU: <strong style="color: var(--text-primary);">${throughPCUStr}</strong></div>
               <div>Right PCU: <strong style="color: var(--text-primary);">${rightPCUStr}</strong></div>
-              <div>Total Demand: <strong style="color: var(--text-primary); font-weight: 800;">${totalPCUStr}</strong></div>
+              <div>Time Basis: <strong style="color: #34d399;">Peak-hour PCU/h</strong></div>
             </div>
           </div>
 
@@ -4906,66 +6191,141 @@ const FlowGuard = (function () {
     const getApproachFlowRatio = (key) => {
       if (!isUploaded) return 0;
       const roadData = pt[key] || {};
+      if (roadData.flowRatioY !== undefined && roadData.flowRatioY > 0) {
+        return roadData.flowRatioY;
+      }
       const mvPcu = roadData.movementPCU || {};
       const approachesGeom = (geom && geom.approaches) ? geom.approaches : {};
       const appGeom = approachesGeom[key] || {};
       const lanesVal = appGeom.incomingLanes !== undefined ? parseInt(appGeom.incomingLanes, 10) : (parseInt(geom.laneCounts ? geom.laneCounts[key] : 2, 10) || 2);
       const satFlow = baseSat * lanesVal;
-      const critFlow = Math.max(parseFloat(mvPcu.leftPCU || 0), parseFloat(mvPcu.throughPCU || 0), parseFloat(mvPcu.rightPCU || 0));
-      return satFlow > 0 ? (critFlow / satFlow) : 0;
+      const l = parseFloat(mvPcu.leftHourlyPCU || mvPcu.leftPCU || 0);
+      const t = parseFloat(mvPcu.throughHourlyPCU || mvPcu.throughPCU || 0);
+      const r = parseFloat(mvPcu.rightHourlyPCU || mvPcu.rightPCU || 0);
+      const critFlow = Math.max(l, t, r);
+      return satFlow > 0 ? parseFloat((critFlow / satFlow).toFixed(4)) : 0;
     };
 
     const getApproachCritMove = (key) => {
       if (!isUploaded) return '—';
       const roadData = pt[key] || {};
       const mvPcu = roadData.movementPCU || {};
-      const l = parseFloat(mvPcu.leftPCU || 0);
-      const t = parseFloat(mvPcu.throughPCU || 0);
-      const r = parseFloat(mvPcu.rightPCU || 0);
+      const l = parseFloat(mvPcu.leftHourlyPCU || mvPcu.leftPCU || 0);
+      const t = parseFloat(mvPcu.throughHourlyPCU || mvPcu.throughPCU || 0);
+      const r = parseFloat(mvPcu.rightHourlyPCU || mvPcu.rightPCU || 0);
       if (l >= t && l >= r) return 'Left Turn';
       if (r >= t && r >= l) return 'Right Turn';
       return 'Through';
     };
 
-    const yA = getApproachFlowRatio('north'); // Road A
-    const yB = getApproachFlowRatio('east');  // Road B
-    const yC = getApproachFlowRatio('south'); // Road C
-    const yD = getApproachFlowRatio('west');  // Road D
+    const engParams = proj ? proj.engineeringParameters : {};
+    const phaseMode = (engParams && engParams.phaseMode === '4-phase') || (normData && normData.phaseAnalysis && normData.phaseAnalysis.phaseMode === '4-phase') ? '4-phase' : '2-phase';
+    const is4Phase = (phaseMode === '4-phase');
 
-    const approachesGeom = (geom && geom.approaches) ? geom.approaches : {};
+    const phaseAnal = normData ? normData.phaseAnalysis : null;
 
-    // Phase 1 = Road A + Road C (North/South)
-    const yPhase1 = Math.max(yA, yC);
-    const phase1CritRoad = yA >= yC ? 'Road A (North)' : 'Road C (South)';
-    const phase1CritMove = yA >= yC ? getApproachCritMove('north') : getApproachCritMove('south');
-    const phase1Key = yA >= yC ? 'north' : 'south';
-    const phase1Lanes = (approachesGeom[phase1Key] && approachesGeom[phase1Key].incomingLanes !== undefined) ? parseInt(approachesGeom[phase1Key].incomingLanes, 10) : (parseInt(geom.laneCounts ? geom.laneCounts[phase1Key] : 2, 10) || 2);
-    const phase1SatFlowVal = baseSat * phase1Lanes;
-    const phase1CritFlowVal = isUploaded ? Math.max(yA * (baseSat * (parseInt(approachesGeom.north?.incomingLanes || geom.laneCounts?.north || 4, 10))), yC * (baseSat * (parseInt(approachesGeom.south?.incomingLanes || geom.laneCounts?.south || 4, 10)))) : 0;
+    const yA = normData && normData.roads.north ? normData.roads.north.flowRatioY : 0;
+    const yB = normData && normData.roads.east ? normData.roads.east.flowRatioY : 0;
+    const yC = normData && normData.roads.south ? normData.roads.south.flowRatioY : 0;
+    const yD = normData && normData.roads.west ? normData.roads.west.flowRatioY : 0;
 
-    // Phase 2 = Road B + Road D (East/West)
-    const yPhase2 = Math.max(yB, yD);
-    const phase2CritRoad = yB >= yD ? 'Road B (East)' : 'Road D (West)';
-    const phase2CritMove = yB >= yD ? getApproachCritMove('east') : getApproachCritMove('west');
-    const phase2Key = yB >= yD ? 'east' : 'west';
-    const phase2Lanes = (approachesGeom[phase2Key] && approachesGeom[phase2Key].incomingLanes !== undefined) ? parseInt(approachesGeom[phase2Key].incomingLanes, 10) : (parseInt(geom.laneCounts ? geom.laneCounts[phase2Key] : 2, 10) || 2);
-    const phase2SatFlowVal = baseSat * phase2Lanes;
-    const phase2CritFlowVal = isUploaded ? Math.max(yB * (baseSat * (parseInt(approachesGeom.east?.incomingLanes || geom.laneCounts?.east || 4, 10))), yD * (baseSat * (parseInt(approachesGeom.west?.incomingLanes || geom.laneCounts?.west || 4, 10)))) : 0;
+    const p3Card = document.getElementById('phase3CardBox');
+    const p4Card = document.getElementById('phase4CardBox');
 
-    const totalY = yPhase1 + yPhase2;
+    if (is4Phase) {
+      setText('sumDashPhaseSubtitle', 'Pre-analysis flow ratio aggregation for 4 signal phases');
+      setText('phase1CardTitle', 'PHASE 1 — ROAD A');
+      setText('phase2CardTitle', 'PHASE 2 — ROAD B');
+      if (p3Card) p3Card.style.display = 'block';
+      if (p4Card) p4Card.style.display = 'block';
 
-    setText('phase1CritMove', isUploaded ? `${phase1CritRoad} - ${phase1CritMove}` : '—');
-    setText('phase1CritFlow', isUploaded ? `${formatNum(phase1CritFlowVal, 1)} PCU/h` : '—');
-    setText('phase1SatFlow', `${formatNum(phase1SatFlowVal)} PCU/h`);
-    setText('phase1FlowRatioY', isUploaded ? String(parseFloat(yPhase1.toFixed(4))) : '—');
+      const normNorth = normData && normData.roads.north ? normData.roads.north : {};
+      const normEast = normData && normData.roads.east ? normData.roads.east : {};
+      const normSouth = normData && normData.roads.south ? normData.roads.south : {};
+      const normWest = normData && normData.roads.west ? normData.roads.west : {};
 
-    setText('phase2CritMove', isUploaded ? `${phase2CritRoad} - ${phase2CritMove}` : '—');
-    setText('phase2CritFlow', isUploaded ? `${formatNum(phase2CritFlowVal, 1)} PCU/h` : '—');
-    setText('phase2SatFlow', `${formatNum(phase2SatFlowVal)} PCU/h`);
-    setText('phase2FlowRatioY', isUploaded ? String(parseFloat(yPhase2.toFixed(4))) : '—');
+      const p1CritMoveStr = normNorth.name ? `${normNorth.name} — ${normNorth.criticalMovement || 'Through'}` : 'Road A (North) — Through';
+      const p2CritMoveStr = normEast.name ? `${normEast.name} — ${normEast.criticalMovement || 'Through'}` : 'Road B (East) — Through';
+      const p3CritMoveStr = normSouth.name ? `${normSouth.name} — ${normSouth.criticalMovement || 'Through'}` : 'Road C (South) — Through';
+      const p4CritMoveStr = normWest.name ? `${normWest.name} — ${normWest.criticalMovement || 'Through'}` : 'Road D (West) — Through';
 
-    setText('sumDashTotalFlowRatioY', isUploaded ? String(parseFloat(totalY.toFixed(4))) : '—');
-    setText('sumDashPreAnalysisStatus', isUploaded ? 'Ready for Webster Optimization Analysis' : 'Awaiting Validated Dataset');
+      const q1 = normNorth.criticalFlowQ || 0;
+      const q2 = normEast.criticalFlowQ || 0;
+      const q3 = normSouth.criticalFlowQ || 0;
+      const q4 = normWest.criticalFlowQ || 0;
+
+      const s1 = normNorth.saturationFlowS || (baseSat * 2);
+      const s2 = normEast.saturationFlowS || (baseSat * 2);
+      const s3 = normSouth.saturationFlowS || (baseSat * 2);
+      const s4 = normWest.saturationFlowS || (baseSat * 2);
+
+      const y1 = yA;
+      const y2 = yB;
+      const y3 = yC;
+      const y4 = yD;
+
+      const totalY = phaseAnal && phaseAnal.totalY !== undefined ? phaseAnal.totalY : parseFloat((y1 + y2 + y3 + y4).toFixed(4));
+
+      setText('phase1CritMove', isUploaded ? p1CritMoveStr : '—');
+      setText('phase1CritFlow', isUploaded ? `${formatNum(q1, 1)} PCU/h` : '—');
+      setText('phase1SatFlow', `${formatNum(s1)} PCU/h`);
+      setText('phase1FlowRatioY', isUploaded ? String(parseFloat(y1.toFixed(4))) : '—');
+
+      setText('phase2CritMove', isUploaded ? p2CritMoveStr : '—');
+      setText('phase2CritFlow', isUploaded ? `${formatNum(q2, 1)} PCU/h` : '—');
+      setText('phase2SatFlow', `${formatNum(s2)} PCU/h`);
+      setText('phase2FlowRatioY', isUploaded ? String(parseFloat(y2.toFixed(4))) : '—');
+
+      setText('phase3CritMove', isUploaded ? p3CritMoveStr : '—');
+      setText('phase3CritFlow', isUploaded ? `${formatNum(q3, 1)} PCU/h` : '—');
+      setText('phase3SatFlow', `${formatNum(s3)} PCU/h`);
+      setText('phase3FlowRatioY', isUploaded ? String(parseFloat(y3.toFixed(4))) : '—');
+
+      setText('phase4CritMove', isUploaded ? p4CritMoveStr : '—');
+      setText('phase4CritFlow', isUploaded ? `${formatNum(q4, 1)} PCU/h` : '—');
+      setText('phase4SatFlow', `${formatNum(s4)} PCU/h`);
+      setText('phase4FlowRatioY', isUploaded ? String(parseFloat(y4.toFixed(4))) : '—');
+
+      setText('sumDashTotalFlowRatioY', isUploaded ? String(parseFloat(totalY.toFixed(4))) : '—');
+      setText('sumDashTotalYFormula', 'Sum of Configured Phase Ratios (Y = y₁ + y₂ + y₃ + y₄)');
+      setText('sumDashPreAnalysisStatus', isUploaded ? (totalY >= 1.00 ? '⚠️ Intersection Oversaturated (Y ≥ 1.00)' : 'Ready for Webster Optimization Analysis') : 'Awaiting Validated Dataset');
+
+    } else {
+      setText('sumDashPhaseSubtitle', 'Pre-analysis flow ratio aggregation for Phase 1 (N/S) & Phase 2 (E/W)');
+      setText('phase1CardTitle', 'PHASE 1 (ROAD A + ROAD C)');
+      setText('phase2CardTitle', 'PHASE 2 (ROAD B + ROAD D)');
+      if (p3Card) p3Card.style.display = 'none';
+      if (p4Card) p4Card.style.display = 'none';
+
+      const yPhase1 = phaseAnal ? phaseAnal.phase1.flowRatioY : Math.max(yA, yC);
+      const yPhase2 = phaseAnal ? phaseAnal.phase2.flowRatioY : Math.max(yB, yD);
+      const totalY = phaseAnal ? phaseAnal.totalY : (yPhase1 + yPhase2);
+
+      const p1CritKey = phaseAnal && phaseAnal.phase1 ? phaseAnal.phase1.criticalApproachKey : (yA >= yC ? 'north' : 'south');
+      const p2CritKey = phaseAnal && phaseAnal.phase2 ? phaseAnal.phase2.criticalApproachKey : (yB >= yD ? 'east' : 'west');
+
+      const phase1CritRoad = phaseAnal ? phaseAnal.phase1.criticalApproachName : (yA >= yC ? 'Road A (North) — Through' : 'Road C (South) — Through');
+      const phase1CritFlowVal = phaseAnal ? phaseAnal.phase1.criticalFlowQ : (normData && normData.roads[p1CritKey] ? normData.roads[p1CritKey].criticalFlowQ : 0);
+      const phase1SatFlowVal = normData && normData.roads[p1CritKey] ? normData.roads[p1CritKey].saturationFlowS : (baseSat * 2);
+
+      const phase2CritRoad = phaseAnal ? phaseAnal.phase2.criticalApproachName : (yB >= yD ? 'Road B (East) — Through' : 'Road D (West) — Through');
+      const phase2CritFlowVal = phaseAnal ? phaseAnal.phase2.criticalFlowQ : (normData && normData.roads[p2CritKey] ? normData.roads[p2CritKey].criticalFlowQ : 0);
+      const phase2SatFlowVal = normData && normData.roads[p2CritKey] ? normData.roads[p2CritKey].saturationFlowS : (baseSat * 2);
+
+      setText('phase1CritMove', isUploaded ? phase1CritRoad : '—');
+      setText('phase1CritFlow', isUploaded ? `${formatNum(phase1CritFlowVal, 1)} PCU/h` : '—');
+      setText('phase1SatFlow', `${formatNum(phase1SatFlowVal)} PCU/h`);
+      setText('phase1FlowRatioY', isUploaded ? String(parseFloat(yPhase1.toFixed(4))) : '—');
+
+      setText('phase2CritMove', isUploaded ? phase2CritRoad : '—');
+      setText('phase2CritFlow', isUploaded ? `${formatNum(phase2CritFlowVal, 1)} PCU/h` : '—');
+      setText('phase2SatFlow', `${formatNum(phase2SatFlowVal)} PCU/h`);
+      setText('phase2FlowRatioY', isUploaded ? String(parseFloat(yPhase2.toFixed(4))) : '—');
+
+      setText('sumDashTotalFlowRatioY', isUploaded ? String(parseFloat(totalY.toFixed(4))) : '—');
+      setText('sumDashTotalYFormula', 'Sum of Configured Phase Ratios (Y = y₁ + y₂)');
+      setText('sumDashPreAnalysisStatus', isUploaded ? (totalY >= 1.00 ? '⚠️ Intersection Oversaturated (Y ≥ 1.00)' : 'Ready for Webster Optimization Analysis') : 'Awaiting Validated Dataset');
+    }
   }
 
   /**
@@ -4986,8 +6346,8 @@ const FlowGuard = (function () {
       (ds && (ds.uploaded || (ds.records && ds.records.length > 0))) ||
       (ti && (ti.datasetUploaded || ti.excelUploaded || (ti.totalConvertedPCU && ti.totalConvertedPCU > 0))) ||
       (pt && (pt.north || (pt.totalPCUDemand && pt.totalPCUDemand > 0))) ||
-      (project && project.lastAnalysisResult && project.lastAnalysisResult.websterTiming) ||
-      (_currentAnalysisResult && _currentAnalysisResult.websterTiming)
+      (project && project.lastAnalysisResult) ||
+      (_currentAnalysisResult)
     );
 
     const totalPhysicalVehiclesSum = parseFloat(pt.totalVehicles || ds.totalVehicles || (project.trafficInput && project.trafficInput.totalVehicles) || 0);
@@ -5054,49 +6414,33 @@ const FlowGuard = (function () {
     };
 
     const getRoadMetrics = (key) => {
+      const normRoad = (project.normalizedTrafficData && project.normalizedTrafficData.roads) ? project.normalizedTrafficData.roads[key] : null;
       const roadData = pt[key] || {};
       const mvPcu = roadData.movementPCU || {};
       const peakAnalysis = roadData.peakHourAnalysis || {};
       const approachesGeom = (geom && geom.approaches) ? geom.approaches : {};
       const appGeom = approachesGeom[key] || {};
       const lanesVal = appGeom.incomingLanes !== undefined ? parseInt(appGeom.incomingLanes, 10) : (parseInt(geom.laneCounts ? geom.laneCounts[key] : 2, 10) || 2);
-      const satFlow = baseSat * lanesVal;
+      const satFlow = normRoad ? normRoad.saturationFlowS : (baseSat * lanesVal);
 
-      const totalDemandVal = parseFloat(mvPcu.totalHourlyPCU || roadData.hourlyDemand || mvPcu.totalPCU || roadData.totalPCU || 0);
-      const leftPCU = parseFloat(mvPcu.leftHourlyPCU || mvPcu.leftPCU || 0);
-      const throughPCU = parseFloat(mvPcu.throughHourlyPCU || mvPcu.throughPCU || 0);
-      const rightPCU = parseFloat(mvPcu.rightHourlyPCU || mvPcu.rightPCU || 0);
+      const totalDemandVal = normRoad ? normRoad.peakHourPCU : parseFloat(mvPcu.totalHourlyPCU || roadData.hourlyDemand || mvPcu.totalPCU || roadData.totalPCU || 0);
+      const leftPCU = normRoad ? normRoad.normalizedMovementPCU.left : parseFloat(mvPcu.leftHourlyPCU || mvPcu.leftPCU || 0);
+      const throughPCU = normRoad ? normRoad.normalizedMovementPCU.through : parseFloat(mvPcu.throughHourlyPCU || mvPcu.throughPCU || 0);
+      const rightPCU = normRoad ? normRoad.normalizedMovementPCU.right : parseFloat(mvPcu.rightHourlyPCU || mvPcu.rightPCU || 0);
+      const hasTurningData = Boolean(leftPCU > 0 || throughPCU > 0 || rightPCU > 0);
 
-      // Prefer authoritative flow ratio from Step 4 processedTraffic if valid (< 1.0)
-      let flowRatioY = (isUploaded && roadData.flowRatioY !== undefined && roadData.flowRatioY > 0 && roadData.flowRatioY < 1.0)
-        ? roadData.flowRatioY
-        : 0;
-
-      let critFlowVal = 0;
-      if (isUploaded) {
-        if (flowRatioY > 0) {
-          critFlowVal = parseFloat((flowRatioY * satFlow).toFixed(1));
-        } else {
-          critFlowVal = Math.max(leftPCU, throughPCU, rightPCU);
-          flowRatioY = satFlow > 0 ? (critFlowVal / satFlow) : 0;
-        }
-      }
-
-      let critMoveStr = 'Through';
-      if (isUploaded) {
-        if (roadData.websterInputs && roadData.websterInputs.criticalMovement) {
-          critMoveStr = roadData.websterInputs.criticalMovement;
-        } else if (leftPCU >= throughPCU && leftPCU >= rightPCU && leftPCU > 0) {
-          critMoveStr = 'Left Turn';
-        } else if (rightPCU >= throughPCU && rightPCU >= leftPCU && rightPCU > 0) {
-          critMoveStr = 'Right Turn';
-        }
-      }
+      const critFlowVal = normRoad ? normRoad.criticalFlowQ : (isUploaded ? Math.max(leftPCU, throughPCU, rightPCU) : 0);
+      const flowRatioY = normRoad ? normRoad.flowRatioY : ((isUploaded && satFlow > 0) ? parseFloat((critFlowVal / satFlow).toFixed(4)) : 0);
+      const critMoveStr = normRoad ? normRoad.criticalMovement : (isUploaded ? (leftPCU >= throughPCU && leftPCU >= rightPCU && leftPCU > 0 ? 'Left Turn' : (rightPCU >= throughPCU && rightPCU >= leftPCU && rightPCU > 0 ? 'Right Turn' : 'Through')) : 'Through');
 
       return {
         key,
         totalDemandVal,
         totalDemandStr: isUploaded ? `${formatNum(totalDemandVal, 1)} PCU/h` : '—',
+        leftPCU,
+        throughPCU,
+        rightPCU,
+        hasTurningData,
         peakIntervalStr: isUploaded ? (peakAnalysis.peakInterval || '--') : '—',
         peakPCUStr: isUploaded ? `${formatNum(peakAnalysis.peakIntervalPCU || 0, 1)} PCU` : '—',
         phfStr: isUploaded ? (peakAnalysis.peakHourFactor !== undefined && peakAnalysis.peakHourFactor !== null ? parseFloat(Number(peakAnalysis.peakHourFactor).toFixed(2)).toFixed(2) : '—') : '—',
@@ -5170,37 +6514,211 @@ const FlowGuard = (function () {
     setText('step5BottleneckFlow', isUploaded ? winnerMetric.critFlowStr : '—');
     setText('step5BottleneckRatio', isUploaded ? winnerMetric.flowRatioYStr : '—');
 
-    // Section 3: Intersection Phase Model
+    // ── PHASE MODE DETERMINATION & METRIC AGGREGATION ──
+    const phaseMode = (eng.phaseMode === '4-phase' || (eng.signal && eng.signal.phaseCount === 4) || (project.normalizedTrafficData && project.normalizedTrafficData.phaseAnalysis && project.normalizedTrafficData.phaseAnalysis.phaseMode === '4-phase')) ? '4-phase' : '2-phase';
+    const is4Phase = (phaseMode === '4-phase');
+    const numPhases = is4Phase ? 4 : 2;
+
+    setText('step5HeaderSubtitle', is4Phase
+      ? 'Execute Webster optimum cycle calculation & signal validation for a 4-phase signal model.'
+      : 'Execute Webster optimum cycle calculation & signal validation for a 2-phase signal model.');
+
+    const valCardStep3Desc = document.getElementById('valCardStep3Desc');
+    if (valCardStep3Desc) {
+      valCardStep3Desc.textContent = is4Phase ? '4-Phase Signal Model configured' : '2-Phase Signal Model configured';
+    }
+    setText('step5SpecPhases', is4Phase
+      ? '4 (Phase 1 Road A, Phase 2 Road B, Phase 3 Road C, Phase 4 Road D)'
+      : '2 (Phase 1 N/S, Phase 2 E/W)');
+
     const yA = roadMetrics.north.flowRatioY;
     const yB = roadMetrics.east.flowRatioY;
     const yC = roadMetrics.south.flowRatioY;
     const yD = roadMetrics.west.flowRatioY;
 
-    // Phase 1 (N/S: Road A + C)
-    const yPhase1 = Math.max(yA, yC);
-    const phase1CritKey = yA >= yC ? 'north' : 'south';
-    const phase1CritRoadName = yA >= yC ? 'Road A (North)' : 'Road C (South)';
-    const phase1CritMoveName = roadMetrics[phase1CritKey].critMoveStr;
-    const phase1CritFlowVal = isUploaded ? roadMetrics[phase1CritKey].critFlowVal : 0;
+    const qA = isUploaded ? roadMetrics.north.critFlowVal : 0;
+    const qB = isUploaded ? roadMetrics.east.critFlowVal : 0;
+    const qC = isUploaded ? roadMetrics.south.critFlowVal : 0;
+    const qD = isUploaded ? roadMetrics.west.critFlowVal : 0;
 
-    // Phase 2 (E/W: Road B + D)
-    const yPhase2 = Math.max(yB, yD);
-    const phase2CritKey = yB >= yD ? 'east' : 'west';
-    const phase2CritRoadName = yB >= yD ? 'Road B (East)' : 'Road D (West)';
-    const phase2CritMoveName = roadMetrics[phase2CritKey].critMoveStr;
-    const phase2CritFlowVal = isUploaded ? roadMetrics[phase2CritKey].critFlowVal : 0;
+    const sA = roadMetrics.north.satFlow;
+    const sB = roadMetrics.east.satFlow;
+    const sC = roadMetrics.south.satFlow;
+    const sD = roadMetrics.west.satFlow;
 
-    const totalY = yPhase1 + yPhase2;
+    let y1 = 0, y2 = 0, y3 = 0, y4 = 0;
+    let q1 = 0, q2 = 0, q3 = 0, q4 = 0;
+    let s1 = 0, s2 = 0, s3 = 0, s4 = 0;
+    let phase1Title = '', phase2Title = '', phase3Title = '', phase4Title = '';
+    let phase1AppStr = '', phase2AppStr = '', phase3AppStr = '', phase4AppStr = '';
 
-    setText('step5Phase1CritApp', isUploaded ? `${phase1CritRoadName} — ${phase1CritMoveName}` : '—');
-    setText('step5Phase1CritFlow', isUploaded ? `${formatNum(phase1CritFlowVal, 1)} PCU/h` : '—');
-    setText('step5Phase1RatioY', isUploaded ? String(parseFloat(yPhase1.toFixed(4))) : '—');
+    if (is4Phase) {
+      y1 = yA; y2 = yB; y3 = yC; y4 = yD;
+      q1 = qA; q2 = qB; q3 = qC; q4 = qD;
+      s1 = sA; s2 = sB; s3 = sC; s4 = sD;
+      phase1Title = 'PHASE 1 — ROAD A / NORTH';
+      phase2Title = 'PHASE 2 — ROAD B / EAST';
+      phase3Title = 'PHASE 3 — ROAD C / SOUTH';
+      phase4Title = 'PHASE 4 — ROAD D / WEST';
+      phase1AppStr = `Road A (North) — ${roadMetrics.north.critMoveStr}`;
+      phase2AppStr = `Road B (East) — ${roadMetrics.east.critMoveStr}`;
+      phase3AppStr = `Road C (South) — ${roadMetrics.south.critMoveStr}`;
+      phase4AppStr = `Road D (West) — ${roadMetrics.west.critMoveStr}`;
+    } else {
+      y1 = Math.max(yA, yC);
+      y2 = Math.max(yB, yD);
+      const p1CritKey = yA >= yC ? 'north' : 'south';
+      const p2CritKey = yB >= yD ? 'east' : 'west';
+      q1 = isUploaded ? roadMetrics[p1CritKey].critFlowVal : 0;
+      q2 = isUploaded ? roadMetrics[p2CritKey].critFlowVal : 0;
+      s1 = roadMetrics[p1CritKey].satFlow;
+      s2 = roadMetrics[p2CritKey].satFlow;
+      phase1Title = 'PHASE 1 — NORTH / SOUTH';
+      phase2Title = 'PHASE 2 — EAST / WEST';
+      phase1AppStr = `${yA >= yC ? 'Road A (North)' : 'Road C (South)'} — ${roadMetrics[p1CritKey].critMoveStr}`;
+      phase2AppStr = `${yB >= yD ? 'Road B (East)' : 'Road D (West)'} — ${roadMetrics[p2CritKey].critMoveStr}`;
+    }
 
-    setText('step5Phase2CritApp', isUploaded ? `${phase2CritRoadName} — ${phase2CritMoveName}` : '—');
-    setText('step5Phase2CritFlow', isUploaded ? `${formatNum(phase2CritFlowVal, 1)} PCU/h` : '—');
-    setText('step5Phase2RatioY', isUploaded ? String(parseFloat(yPhase2.toFixed(4))) : '—');
+    const yPhase1 = y1;
+    const yPhase2 = y2;
+    const yPhase3 = y3;
+    const yPhase4 = y4;
 
-    // Section 4: Lost Time & Webster Engine Calculations
+    const totalY = (project.normalizedTrafficData && project.normalizedTrafficData.phaseAnalysis && project.normalizedTrafficData.phaseAnalysis.totalY !== undefined)
+      ? project.normalizedTrafficData.phaseAnalysis.totalY
+      : (is4Phase ? parseFloat((y1 + y2 + y3 + y4).toFixed(4)) : parseFloat((y1 + y2).toFixed(4)));
+
+    // ── SECTION 3: INTERSECTION PHASE MODEL RENDER ──
+    const sec3Subtitle = document.getElementById('step5Section3Subtitle');
+    const sec3Badge = document.getElementById('step5Section3Badge');
+    const sec3Grid = document.getElementById('step5Section3Grid');
+
+    if (sec3Subtitle) sec3Subtitle.textContent = is4Phase ? 'Four-phase signal model using independent approach phases' : 'Two-phase signal model aggregating Phase 1 (N/S) & Phase 2 (E/W) critical flow ratios';
+    if (sec3Badge) sec3Badge.textContent = is4Phase ? 'Four-Phase Model' : 'Two-Phase Model';
+
+    if (sec3Grid) {
+      if (is4Phase) {
+        sec3Grid.innerHTML = `
+          <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.85rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">${phase1Title}</div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Approach: <strong style="color: var(--text-primary);">Road A (North)</strong></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem;">
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Movement</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;">${roadMetrics.north.critMoveStr}</div>
+              </div>
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Flow (q₁)</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;">${isUploaded ? `${formatNum(q1, 1)} PCU/h` : '—'}</div>
+              </div>
+            </div>
+            <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.8rem; color: var(--text-secondary);">Phase 1 Critical Ratio (y₁):</span>
+              <span style="font-size: 1.1rem; font-weight: 800; color: var(--accent-primary);">${isUploaded ? String(parseFloat(y1.toFixed(4))) : '—'}</span>
+            </div>
+          </div>
+
+          <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.85rem; font-weight: 800; color: #fcd34d; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">${phase2Title}</div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Approach: <strong style="color: var(--text-primary);">Road B (East)</strong></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem;">
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Movement</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;">${roadMetrics.east.critMoveStr}</div>
+              </div>
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Flow (q₂)</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;">${isUploaded ? `${formatNum(q2, 1)} PCU/h` : '—'}</div>
+              </div>
+            </div>
+            <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.8rem; color: var(--text-secondary);">Phase 2 Critical Ratio (y₂):</span>
+              <span style="font-size: 1.1rem; font-weight: 800; color: #fcd34d;">${isUploaded ? String(parseFloat(y2.toFixed(4))) : '—'}</span>
+            </div>
+          </div>
+
+          <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.85rem; font-weight: 800; color: #34d399; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">${phase3Title}</div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Approach: <strong style="color: var(--text-primary);">Road C (South)</strong></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem;">
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Movement</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;">${roadMetrics.south.critMoveStr}</div>
+              </div>
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Flow (q₃)</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;">${isUploaded ? `${formatNum(q3, 1)} PCU/h` : '—'}</div>
+              </div>
+            </div>
+            <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.8rem; color: var(--text-secondary);">Phase 3 Critical Ratio (y₃):</span>
+              <span style="font-size: 1.1rem; font-weight: 800; color: #34d399;">${isUploaded ? String(parseFloat(y3.toFixed(4))) : '—'}</span>
+            </div>
+          </div>
+
+          <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.85rem; font-weight: 800; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">${phase4Title}</div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Approach: <strong style="color: var(--text-primary);">Road D (West)</strong></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem;">
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Movement</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;">${roadMetrics.west.critMoveStr}</div>
+              </div>
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Flow (q₄)</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;">${isUploaded ? `${formatNum(q4, 1)} PCU/h` : '—'}</div>
+              </div>
+            </div>
+            <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.8rem; color: var(--text-secondary);">Phase 4 Critical Ratio (y₄):</span>
+              <span style="font-size: 1.1rem; font-weight: 800; color: #a78bfa;">${isUploaded ? String(parseFloat(y4.toFixed(4))) : '—'}</span>
+            </div>
+          </div>
+        `;
+      } else {
+        sec3Grid.innerHTML = `
+          <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.85rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">${phase1Title}</div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Approaches: <strong style="color: var(--text-primary);">Road A (North) + Road C (South)</strong></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem;">
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Approach</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;">${isUploaded ? phase1AppStr : '—'}</div>
+              </div>
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Flow (q₁)</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;">${isUploaded ? `${formatNum(q1, 1)} PCU/h` : '—'}</div>
+              </div>
+            </div>
+            <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.8rem; color: var(--text-secondary);">Phase 1 Critical Ratio (y₁):</span>
+              <span style="font-size: 1.1rem; font-weight: 800; color: var(--accent-primary);">${isUploaded ? String(parseFloat(y1.toFixed(4))) : '—'}</span>
+            </div>
+          </div>
+
+          <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.85rem; font-weight: 800; color: #fcd34d; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">${phase2Title}</div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Approaches: <strong style="color: var(--text-primary);">Road B (East) + Road D (West)</strong></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem;">
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Approach</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;">${isUploaded ? phase2AppStr : '—'}</div>
+              </div>
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Flow (q₂)</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;">${isUploaded ? `${formatNum(q2, 1)} PCU/h` : '—'}</div>
+              </div>
+            </div>
+            <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.8rem; color: var(--text-secondary);">Phase 2 Critical Ratio (y₂):</span>
+              <span style="font-size: 1.1rem; font-weight: 800; color: #fcd34d;">${isUploaded ? String(parseFloat(y2.toFixed(4))) : '—'}</span>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // ── SECTION 4: LOST TIME & WEBSTER ENGINE CALCULATIONS ──
     const sig = eng.signal || {};
     const amberTime = parseFloat(sig.amber || eng.amberTime || 3.0);
     const allRedTime = parseFloat(sig.allRed || eng.allRedTime || 2.0);
@@ -5211,82 +6729,94 @@ const FlowGuard = (function () {
     const existingCycle = parseFloat(sig.existingCycle || eng.cycleLength || 120.0);
 
     const lostTimePerPhase = (startupLost + clearanceLost) > 0 ? (startupLost + clearanceLost) : (amberTime + allRedTime);
-    const numPhases = 2; // Step 5 Phase Model evaluates 2 phases (Phase 1 N/S, Phase 2 E/W)
-    const totalLostTimeL = numPhases * lostTimePerPhase; // e.g. 2 * 4.0 = 8.0s
+    const totalLostTimeL = numPhases * lostTimePerPhase;
 
-    // Lost-time component breakdown per phase for timeline alignment
     const amberPhase = Math.round(amberTime * (lostTimePerPhase / Math.max(1, (amberTime + allRedTime))));
     const allRedPhase = Math.max(0, lostTimePerPhase - amberPhase);
 
     setText('step5WebsterLostTime', `${totalLostTimeL} s (${numPhases} × ${lostTimePerPhase}s/phase)`);
     setText('step5WebsterTotalY', isUploaded ? String(parseFloat(totalY.toFixed(4))) : '—');
 
+    const formulaBox = document.getElementById('step5Section4FormulaBox');
+    if (formulaBox) {
+      formulaBox.innerHTML = is4Phase
+        ? `<div>Y = y₁ + y₂ + y₃ + y₄</div><div>C₀ = (1.5L + 5) / (1 − Y)</div><div>G_eff = C₀ − L</div><div>g₁..g₄ = G_eff × (yᵢ / Y)</div>`
+        : `<div>Y = y₁ + y₂</div><div>C₀ = (1.5L + 5) / (1 − Y)</div><div>G_eff = C₀ − L</div><div>g₁ = G_eff × (y₁ / Y)</div><div>g₂ = G_eff × (y₂ / Y)</div>`;
+    }
+
     const warningBox = document.getElementById('step5WebsterWarningBox');
 
     let websterCycleC0 = null;
+    const configuredMaxCycle = parseFloat(sig.maxCycle || eng.maxCycle || 180.0);
+    let appliedCycle = null;
+    let isCycleConstrained = false;
     let gEff = null;
-    let g1 = null;
-    let g2 = null;
+    let g1 = null, g2 = null, g3 = null, g4 = null;
     let isWebsterValid = true;
     let warningMsg = '';
 
     if (isUploaded) {
       if (totalY >= 1.00) {
         isWebsterValid = false;
-        warningMsg = `⚠ ENGINEERING WARNING: Webster optimization not valid. Critical flow ratio Y = ${parseFloat(totalY.toFixed(4))} ≥ 1.00 (Intersection is over-saturated).`;
+        warningMsg = `⚠ WEBSTER CAPACITY LIMIT EXCEEDED: Critical flow ratio Y = ${parseFloat(totalY.toFixed(4))} ≥ 1.00. Intersection oversaturated — Webster optimization is not valid as a conventional unconstrained solution.`;
       } else if (totalY <= 0) {
         isWebsterValid = false;
         warningMsg = `⚠ ENGINEERING WARNING: Critical flow ratio Y = 0. Awaiting valid traffic demand.`;
       } else {
-        // Webster Formula C0 = (1.5 * L + 5) / (1 - Y)
-        let calcC0 = Math.round((1.5 * totalLostTimeL + 5) / (1 - totalY));
-        calcC0 = Math.max(40, Math.min(180, calcC0));
-        websterCycleC0 = calcC0;
+        const minCycleRequired = Math.max(40, totalLostTimeL + (numPhases * minGreenConfig));
+        websterCycleC0 = Math.round((1.5 * totalLostTimeL + 5) / (1 - totalY));
 
-        gEff = calcC0 - totalLostTimeL;
-
-        // Minimum green feasibility check: G_eff >= G_min1 + G_min2
-        if (gEff < (2 * minGreenConfig)) {
-          isWebsterValid = false;
-          warningMsg = `⚠ ENGINEERING WARNING: Available effective green time (G_eff = ${gEff}s) is insufficient for phase minimum greens (2 × ${minGreenConfig}s = ${2 * minGreenConfig}s).`;
+        if (websterCycleC0 <= configuredMaxCycle) {
+          appliedCycle = Math.max(minCycleRequired, websterCycleC0);
+          isCycleConstrained = false;
         } else {
-          // Proportionally allocate green splits: g_i = G_eff * (y_i / Y)
-          let prop1 = totalY > 0 ? (yPhase1 / totalY) : 0.5;
-          let calcG1 = Math.max(minGreenConfig, Math.round(prop1 * gEff));
-          calcG1 = Math.min(maxGreenConfig, calcG1);
+          appliedCycle = configuredMaxCycle;
+          isCycleConstrained = true;
+          warningMsg = `ℹ HIGH DEMAND: Theoretical Webster cycle (C₀ = ${websterCycleC0} s) exceeds configured maximum cycle (${configuredMaxCycle} s). Applied cycle constrained to ${appliedCycle} s.`;
+        }
 
-          let calcG2 = gEff - calcG1;
-          if (calcG2 < minGreenConfig) {
-            calcG2 = minGreenConfig;
-            calcG1 = Math.max(minGreenConfig, gEff - calcG2);
-          }
+        gEff = Math.max(10, appliedCycle - totalLostTimeL);
 
-          g1 = calcG1;
-          g2 = calcG2;
+        if (gEff < (numPhases * minGreenConfig)) {
+          isWebsterValid = false;
+          warningMsg = `⚠ ENGINEERING WARNING: Available effective green time (G_eff = ${gEff}s) is insufficient for phase minimum greens (${numPhases} × ${minGreenConfig}s = ${numPhases * minGreenConfig}s).`;
+        } else {
+          if (is4Phase) {
+            let p1 = totalY > 0 ? (y1 / totalY) : 0.25;
+            let p2 = totalY > 0 ? (y2 / totalY) : 0.25;
+            let p3 = totalY > 0 ? (y3 / totalY) : 0.25;
 
-          // Pedestrian crossing validation if enabled in Step 3
-          const ped = eng.pedestrian || {};
-          if (ped.clearanceEnabled) {
-            const minWalk = parseFloat(ped.minWalkTime || 7.0);
-            const walkSpeed = parseFloat(ped.walkingSpeed || 1.2);
+            let cg1 = Math.max(minGreenConfig, Math.round(p1 * gEff));
+            let cg2 = Math.max(minGreenConfig, Math.round(p2 * gEff));
+            let cg3 = Math.max(minGreenConfig, Math.round(p3 * gEff));
+            let cg4 = Math.max(minGreenConfig, gEff - (cg1 + cg2 + cg3));
 
-            const crosswalk1 = parseFloat((geom.approaches?.north?.crosswalkWidth) || 14.0);
-            const crosswalk2 = parseFloat((geom.approaches?.east?.crosswalkWidth) || 14.0);
+            const diffG = gEff - (cg1 + cg2 + cg3 + cg4);
+            cg4 += diffG;
 
-            const reqPed1 = Math.ceil(minWalk + (crosswalk1 / walkSpeed));
-            const reqPed2 = Math.ceil(minWalk + (crosswalk2 / walkSpeed));
+            g1 = cg1; g2 = cg2; g3 = cg3; g4 = cg4;
+          } else {
+            let prop1 = totalY > 0 ? (y1 / totalY) : 0.5;
+            let calcG1 = Math.max(minGreenConfig, Math.round(prop1 * gEff));
+            calcG1 = Math.min(maxGreenConfig, calcG1);
 
-            if (g1 < reqPed1) g1 = reqPed1;
-            if (g2 < reqPed2) g2 = reqPed2;
+            let calcG2 = gEff - calcG1;
+            if (calcG2 < minGreenConfig) {
+              calcG2 = minGreenConfig;
+              calcG1 = Math.max(minGreenConfig, gEff - calcG2);
+            }
+            g1 = calcG1; g2 = calcG2;
           }
         }
       }
     }
 
     if (warningBox) {
-      if (!isWebsterValid && isUploaded) {
+      if (warningMsg && isUploaded) {
         warningBox.style.display = 'block';
         warningBox.textContent = warningMsg;
+        warningBox.style.borderColor = isWebsterValid ? (isCycleConstrained ? 'rgba(245, 158, 11, 0.4)' : 'rgba(16, 185, 129, 0.4)') : 'rgba(239, 68, 68, 0.4)';
+        warningBox.style.color = isWebsterValid ? (isCycleConstrained ? '#fcd34d' : 'var(--success)') : '#ef4444';
       } else {
         warningBox.style.display = 'none';
       }
@@ -5295,70 +6825,193 @@ const FlowGuard = (function () {
     setText('step5WebsterCycleOpt', (isUploaded && isWebsterValid && websterCycleC0) ? `${websterCycleC0} s` : '—');
     setText('step5WebsterGeff', (isUploaded && isWebsterValid && gEff !== null) ? `${gEff} s` : '—');
 
-    // Section 5: Signal Timing Plan
-    setText('step5TimingSharedCycle', (isUploaded && isWebsterValid && websterCycleC0) ? `${websterCycleC0} s` : '—');
+    // ── SECTION 5: SIGNAL TIMING PLAN RENDER ──
+    setText('step5TimingSharedCycle', (isUploaded && isWebsterValid && appliedCycle) ? `${appliedCycle} s${isCycleConstrained ? ' (Constrained Max)' : ''}` : '—');
 
-    setText('step5P1Green', (isUploaded && isWebsterValid && g1 !== null) ? `${g1} s` : '—');
-    setText('step5P1Amber', `${amberPhase} s`);
-    setText('step5P1AllRed', `${allRedPhase} s`);
-    setText('step5P1EffGreen', (isUploaded && isWebsterValid && g1 !== null) ? `${g1} s` : '—');
+    const sec5Grid = document.getElementById('step5Section5Grid');
+    if (sec5Grid) {
+      if (is4Phase) {
+        sec5Grid.innerHTML = `
+          <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.85rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase; margin-bottom: 0.75rem;">${phase1Title}</div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Approach: Road A (North)</div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Green:</span> <strong style="color: var(--success);">${(isUploaded && isWebsterValid && g1 !== null) ? `${g1} s` : '—'}</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Amber:</span> <strong style="color: #fcd34d;">${amberPhase} s</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">All-Red:</span> <strong style="color: #ef4444;">${allRedPhase} s</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Effective Green:</span> <strong style="color: var(--text-primary);">${(isUploaded && isWebsterValid && g1 !== null) ? `${g1} s` : '—'}</strong></div>
+            </div>
+          </div>
 
-    setText('step5P2Green', (isUploaded && isWebsterValid && g2 !== null) ? `${g2} s` : '—');
-    setText('step5P2Amber', `${amberPhase} s`);
-    setText('step5P2AllRed', `${allRedPhase} s`);
-    setText('step5P2EffGreen', (isUploaded && isWebsterValid && g2 !== null) ? `${g2} s` : '—');
+          <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.85rem; font-weight: 800; color: #fcd34d; text-transform: uppercase; margin-bottom: 0.75rem;">${phase2Title}</div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Approach: Road B (East)</div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Green:</span> <strong style="color: var(--success);">${(isUploaded && isWebsterValid && g2 !== null) ? `${g2} s` : '—'}</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Amber:</span> <strong style="color: #fcd34d;">${amberPhase} s</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">All-Red:</span> <strong style="color: #ef4444;">${allRedPhase} s</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Effective Green:</span> <strong style="color: var(--text-primary);">${(isUploaded && isWebsterValid && g2 !== null) ? `${g2} s` : '—'}</strong></div>
+            </div>
+          </div>
 
-    // Cycle Timeline Bar Renderer (Sum of all 6 components MUST equal websterCycleC0 EXACTLY)
-    const timelineBar = document.getElementById('step5CycleTimelineBar');
+          <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.85rem; font-weight: 800; color: #34d399; text-transform: uppercase; margin-bottom: 0.75rem;">${phase3Title}</div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Approach: Road C (South)</div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Green:</span> <strong style="color: var(--success);">${(isUploaded && isWebsterValid && g3 !== null) ? `${g3} s` : '—'}</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Amber:</span> <strong style="color: #fcd34d;">${amberPhase} s</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">All-Red:</span> <strong style="color: #ef4444;">${allRedPhase} s</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Effective Green:</span> <strong style="color: var(--text-primary);">${(isUploaded && isWebsterValid && g3 !== null) ? `${g3} s` : '—'}</strong></div>
+            </div>
+          </div>
 
-    if (timelineBar) {
-      if (isUploaded && isWebsterValid && websterCycleC0 && g1 !== null && g2 !== null) {
-        timelineBar.innerHTML = `
-          <div style="flex: ${g1}; min-width: 90px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Phase 1 Green: ${g1}s">
-            <span style="font-size: 0.74rem; font-weight: 800; letter-spacing: 0.02em;">PHASE 1 GREEN</span>
-            <span style="font-size: 0.85rem; font-weight: 800;">${g1} s</span>
-          </div>
-          <div style="flex: ${amberPhase}; min-width: 65px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Amber: ${amberPhase}s">
-            <span style="font-size: 0.7rem; font-weight: 800;">AMBER</span>
-            <span style="font-size: 0.82rem; font-weight: 800;">${amberPhase} s</span>
-          </div>
-          <div style="flex: ${allRedPhase}; min-width: 65px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="All-Red: ${allRedPhase}s">
-            <span style="font-size: 0.7rem; font-weight: 800;">ALL-RED</span>
-            <span style="font-size: 0.82rem; font-weight: 800;">${allRedPhase} s</span>
-          </div>
-          <div style="flex: ${g2}; min-width: 90px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Phase 2 Green: ${g2}s">
-            <span style="font-size: 0.74rem; font-weight: 800; letter-spacing: 0.02em;">PHASE 2 GREEN</span>
-            <span style="font-size: 0.85rem; font-weight: 800;">${g2} s</span>
-          </div>
-          <div style="flex: ${amberPhase}; min-width: 65px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Amber: ${amberPhase}s">
-            <span style="font-size: 0.7rem; font-weight: 800;">AMBER</span>
-            <span style="font-size: 0.82rem; font-weight: 800;">${amberPhase} s</span>
-          </div>
-          <div style="flex: ${allRedPhase}; min-width: 65px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="All-Red: ${allRedPhase}s">
-            <span style="font-size: 0.7rem; font-weight: 800;">ALL-RED</span>
-            <span style="font-size: 0.82rem; font-weight: 800;">${allRedPhase} s</span>
+          <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.85rem; font-weight: 800; color: #a78bfa; text-transform: uppercase; margin-bottom: 0.75rem;">${phase4Title}</div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Approach: Road D (West)</div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Green:</span> <strong style="color: var(--success);">${(isUploaded && isWebsterValid && g4 !== null) ? `${g4} s` : '—'}</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Amber:</span> <strong style="color: #fcd34d;">${amberPhase} s</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">All-Red:</span> <strong style="color: #ef4444;">${allRedPhase} s</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Effective Green:</span> <strong style="color: var(--text-primary);">${(isUploaded && isWebsterValid && g4 !== null) ? `${g4} s` : '—'}</strong></div>
+            </div>
           </div>
         `;
       } else {
-        timelineBar.innerHTML = `
-          <div style="flex: 1; min-width: 80px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; display: flex; align-items: center; justify-content: center;">PHASE 1 GREEN</div>
-          <div style="min-width: 60px; background: rgba(245, 158, 11, 0.35); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;">AMBER</div>
-          <div style="min-width: 60px; background: rgba(239, 68, 68, 0.35); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;">ALL-RED</div>
-          <div style="flex: 1; min-width: 80px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; display: flex; align-items: center; justify-content: center;">PHASE 2 GREEN</div>
-          <div style="min-width: 60px; background: rgba(245, 158, 11, 0.35); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;">AMBER</div>
-          <div style="min-width: 60px; background: rgba(239, 68, 68, 0.35); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;">ALL-RED</div>
+        sec5Grid.innerHTML = `
+          <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.85rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase; margin-bottom: 0.75rem;">PHASE 1 — NORTH / SOUTH</div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Approaches: Road A + Road C</div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Green:</span> <strong style="color: var(--success);">${(isUploaded && isWebsterValid && g1 !== null) ? `${g1} s` : '—'}</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Amber:</span> <strong style="color: #fcd34d;">${amberPhase} s</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">All-Red:</span> <strong style="color: #ef4444;">${allRedPhase} s</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Effective Green:</span> <strong style="color: var(--text-primary);">${(isUploaded && isWebsterValid && g1 !== null) ? `${g1} s` : '—'}</strong></div>
+            </div>
+          </div>
+
+          <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.85rem; font-weight: 800; color: #fcd34d; text-transform: uppercase; margin-bottom: 0.75rem;">PHASE 2 — EAST / WEST</div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Approaches: Road B + Road D</div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Green:</span> <strong style="color: var(--success);">${(isUploaded && isWebsterValid && g2 !== null) ? `${g2} s` : '—'}</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Amber:</span> <strong style="color: #fcd34d;">${amberPhase} s</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">All-Red:</span> <strong style="color: #ef4444;">${allRedPhase} s</strong></div>
+              <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Effective Green:</span> <strong style="color: var(--text-primary);">${(isUploaded && isWebsterValid && g2 !== null) ? `${g2} s` : '—'}</strong></div>
+            </div>
+          </div>
         `;
       }
     }
 
-    // Section 6: Before vs After Simulation Table & Dynamic Critical Approach Mapping
+    // ── CYCLE TIMELINE BAR RENDERER ──
+    const timelineBar = document.getElementById('step5CycleTimelineBar');
+
+    if (timelineBar) {
+      if (isUploaded && isWebsterValid && websterCycleC0 && g1 !== null && g2 !== null) {
+        if (is4Phase && g3 !== null && g4 !== null) {
+          timelineBar.innerHTML = `
+            <div style="flex: ${g1}; min-width: 75px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Phase 1 Green (Road A): ${g1}s">
+              <span style="font-size: 0.7rem; font-weight: 800;">P1 ROAD A</span>
+              <span style="font-size: 0.8rem; font-weight: 800;">${g1} s</span>
+            </div>
+            <div style="flex: ${amberPhase}; min-width: 50px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Amber: ${amberPhase}s">
+              <span style="font-size: 0.65rem; font-weight: 800;">AMB</span>
+              <span style="font-size: 0.75rem; font-weight: 800;">${amberPhase} s</span>
+            </div>
+            <div style="flex: ${allRedPhase}; min-width: 50px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="All-Red: ${allRedPhase}s">
+              <span style="font-size: 0.65rem; font-weight: 800;">RED</span>
+              <span style="font-size: 0.75rem; font-weight: 800;">${allRedPhase} s</span>
+            </div>
+
+            <div style="flex: ${g2}; min-width: 75px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Phase 2 Green (Road B): ${g2}s">
+              <span style="font-size: 0.7rem; font-weight: 800;">P2 ROAD B</span>
+              <span style="font-size: 0.8rem; font-weight: 800;">${g2} s</span>
+            </div>
+            <div style="flex: ${amberPhase}; min-width: 50px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Amber: ${amberPhase}s">
+              <span style="font-size: 0.65rem; font-weight: 800;">AMB</span>
+              <span style="font-size: 0.75rem; font-weight: 800;">${amberPhase} s</span>
+            </div>
+            <div style="flex: ${allRedPhase}; min-width: 50px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="All-Red: ${allRedPhase}s">
+              <span style="font-size: 0.65rem; font-weight: 800;">RED</span>
+              <span style="font-size: 0.75rem; font-weight: 800;">${allRedPhase} s</span>
+            </div>
+
+            <div style="flex: ${g3}; min-width: 75px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Phase 3 Green (Road C): ${g3}s">
+              <span style="font-size: 0.7rem; font-weight: 800;">P3 ROAD C</span>
+              <span style="font-size: 0.8rem; font-weight: 800;">${g3} s</span>
+            </div>
+            <div style="flex: ${amberPhase}; min-width: 50px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Amber: ${amberPhase}s">
+              <span style="font-size: 0.65rem; font-weight: 800;">AMB</span>
+              <span style="font-size: 0.75rem; font-weight: 800;">${amberPhase} s</span>
+            </div>
+            <div style="flex: ${allRedPhase}; min-width: 50px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="All-Red: ${allRedPhase}s">
+              <span style="font-size: 0.65rem; font-weight: 800;">RED</span>
+              <span style="font-size: 0.75rem; font-weight: 800;">${allRedPhase} s</span>
+            </div>
+
+            <div style="flex: ${g4}; min-width: 75px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Phase 4 Green (Road D): ${g4}s">
+              <span style="font-size: 0.7rem; font-weight: 800;">P4 ROAD D</span>
+              <span style="font-size: 0.8rem; font-weight: 800;">${g4} s</span>
+            </div>
+            <div style="flex: ${amberPhase}; min-width: 50px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Amber: ${amberPhase}s">
+              <span style="font-size: 0.65rem; font-weight: 800;">AMB</span>
+              <span style="font-size: 0.75rem; font-weight: 800;">${amberPhase} s</span>
+            </div>
+            <div style="flex: ${allRedPhase}; min-width: 50px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="All-Red: ${allRedPhase}s">
+              <span style="font-size: 0.65rem; font-weight: 800;">RED</span>
+              <span style="font-size: 0.75rem; font-weight: 800;">${allRedPhase} s</span>
+            </div>
+          `;
+        } else {
+          timelineBar.innerHTML = `
+            <div style="flex: ${g1}; min-width: 90px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Phase 1 Green: ${g1}s">
+              <span style="font-size: 0.74rem; font-weight: 800; letter-spacing: 0.02em;">PHASE 1 GREEN</span>
+              <span style="font-size: 0.85rem; font-weight: 800;">${g1} s</span>
+            </div>
+            <div style="flex: ${amberPhase}; min-width: 65px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Amber: ${amberPhase}s">
+              <span style="font-size: 0.7rem; font-weight: 800;">AMBER</span>
+              <span style="font-size: 0.82rem; font-weight: 800;">${amberPhase} s</span>
+            </div>
+            <div style="flex: ${allRedPhase}; min-width: 65px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="All-Red: ${allRedPhase}s">
+              <span style="font-size: 0.7rem; font-weight: 800;">ALL-RED</span>
+              <span style="font-size: 0.82rem; font-weight: 800;">${allRedPhase} s</span>
+            </div>
+            <div style="flex: ${g2}; min-width: 90px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Phase 2 Green: ${g2}s">
+              <span style="font-size: 0.74rem; font-weight: 800; letter-spacing: 0.02em;">PHASE 2 GREEN</span>
+              <span style="font-size: 0.85rem; font-weight: 800;">${g2} s</span>
+            </div>
+            <div style="flex: ${amberPhase}; min-width: 65px; background: rgba(245, 158, 11, 0.3); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="Amber: ${amberPhase}s">
+              <span style="font-size: 0.7rem; font-weight: 800;">AMBER</span>
+              <span style="font-size: 0.82rem; font-weight: 800;">${amberPhase} s</span>
+            </div>
+            <div style="flex: ${allRedPhase}; min-width: 65px; background: rgba(239, 68, 68, 0.3); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px;" title="All-Red: ${allRedPhase}s">
+              <span style="font-size: 0.7rem; font-weight: 800;">ALL-RED</span>
+              <span style="font-size: 0.82rem; font-weight: 800;">${allRedPhase} s</span>
+            </div>
+          `;
+        }
+      } else {
+        timelineBar.innerHTML = is4Phase
+          ? `<div style="flex: 1; min-width: 60px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; display: flex; align-items: center; justify-content: center;">P1 ROAD A</div>
+             <div style="flex: 1; min-width: 60px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; display: flex; align-items: center; justify-content: center;">P2 ROAD B</div>
+             <div style="flex: 1; min-width: 60px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; display: flex; align-items: center; justify-content: center;">P3 ROAD C</div>
+             <div style="flex: 1; min-width: 60px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; display: flex; align-items: center; justify-content: center;">P4 ROAD D</div>`
+          : `<div style="flex: 1; min-width: 80px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; display: flex; align-items: center; justify-content: center;">PHASE 1 GREEN</div>
+             <div style="min-width: 60px; background: rgba(245, 158, 11, 0.35); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;">AMBER</div>
+             <div style="min-width: 60px; background: rgba(239, 68, 68, 0.35); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;">ALL-RED</div>
+             <div style="flex: 1; min-width: 80px; background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; display: flex; align-items: center; justify-content: center;">PHASE 2 GREEN</div>
+             <div style="min-width: 60px; background: rgba(245, 158, 11, 0.35); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;">AMBER</div>
+             <div style="min-width: 60px; background: rgba(239, 68, 68, 0.35); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center;">ALL-RED</div>`;
+      }
+    }
+
+    // ── SECTION 6: BEFORE VS AFTER SIMULATION TABLE ──
     const scopeBadge = document.getElementById('step5BeforeAfterScopeBadge');
     const scopeDetail = document.getElementById('step5BeforeAfterScopeDetail');
     const simTableBody = document.getElementById('step5BeforeAfterTableBody');
 
     const baselineMode = (eng.baseline && eng.baseline.mode) ? eng.baseline.mode : 'not_available';
 
-    // Map Step 4 winningKey dynamically to Road Designation, Direction & Critical Movement
     const roadDesignationMap = { north: 'Road A', east: 'Road B', south: 'Road C', west: 'Road D' };
     const roadDirectionMap = { north: 'Northbound', east: 'Eastbound', south: 'Southbound', west: 'Westbound' };
 
@@ -5390,10 +7043,126 @@ const FlowGuard = (function () {
       }
     }
 
-    const baseGreenFallbackStr = 'Not Available in current baseline';
+    const roadBaseline = (baselineMode === 'road_wise' && eng.baseline && eng.baseline.roads)
+      ? (eng.baseline.roads[critRoadDesignation] || {})
+      : {};
+
+    const baseP1Green = (eng.baseline && eng.baseline.phase1Green !== undefined) ? eng.baseline.phase1Green : null;
+    const baseP2Green = (eng.baseline && eng.baseline.phase2Green !== undefined) ? eng.baseline.phase2Green : null;
+
+    const isBaseGreenAvailable = (baseP1Green !== null && baseP2Green !== null);
+    const baseGreenStr = isBaseGreenAvailable ? `${baseP1Green} s / ${baseP2Green} s` : 'Baseline phase green times not provided';
+    const baseCycleStr = `${existingCycle} s`;
+    const baseDelayStr = roadBaseline.delay !== null && roadBaseline.delay !== undefined ? `${roadBaseline.delay.toFixed(1)} s/veh` : 'Not Available';
+    const baseQueueStr = roadBaseline.queue !== null && roadBaseline.queue !== undefined ? `${roadBaseline.queue} m` : 'Not Available';
+    const baseDOSStr = roadBaseline.degreeOfSaturation !== null && roadBaseline.degreeOfSaturation !== undefined ? String(roadBaseline.degreeOfSaturation) : 'Not Available';
+
+    let gCrit = g1;
+    if (is4Phase) {
+      if (winningKey === 'north') gCrit = g1;
+      else if (winningKey === 'east') gCrit = g2;
+      else if (winningKey === 'south') gCrit = g3;
+      else if (winningKey === 'west') gCrit = g4;
+    } else {
+      gCrit = (winningKey === 'north' || winningKey === 'south') ? g1 : g2;
+    }
+    const qCrit = winnerMetric ? winnerMetric.critFlowVal : 0;
+    const sCrit = winnerMetric ? winnerMetric.satFlow : 1800;
+
+    const capCrit = (sCrit > 0 && appliedCycle > 0 && gCrit > 0) ? sCrit * (gCrit / appliedCycle) : 0;
+    const xCrit = capCrit > 0 ? (qCrit / capCrit) : 0;
+    const isCritOversaturated = xCrit >= 1.0;
+
+    const calcPhaseDelay = (C, g, q, s, x) => {
+      if (!g || !C || !s || s <= 0 || (g / C) <= 0) return 60.0;
+      if (x >= 1.0) return 80.0;
+      const lambda = g / C;
+      const qSec = q / 3600;
+      if (qSec <= 0 || (1 - (lambda * x)) <= 0 || (1 - x) <= 0) return 40.0;
+
+      const term1 = (C * Math.pow(1 - lambda, 2)) / (2 * (1 - (lambda * x)));
+      const term2 = (Math.pow(x, 2)) / (2 * qSec * (1 - x));
+      const d = term1 + term2;
+      return isNaN(d) ? 35.0 : Math.max(2.0, Math.min(180.0, d));
+    };
+
+    const dCritProposed = parseFloat(calcPhaseDelay(appliedCycle, gCrit, qCrit, sCrit, xCrit).toFixed(1));
+
+    const qVehCrit = (appliedCycle && gCrit) ? (qCrit / 3600) * (appliedCycle - gCrit) : 0;
+    const qVehCritRounded = Math.round(qVehCrit);
+    const qMetersCritRounded = Math.round(qVehCrit * 6);
+
+    const getLOSCategory = (delayVal) => {
+      if (delayVal === null || delayVal === undefined || isNaN(delayVal)) return null;
+      if (delayVal <= 10) return 'A';
+      if (delayVal <= 20) return 'B';
+      if (delayVal <= 35) return 'C';
+      if (delayVal <= 55) return 'D';
+      if (delayVal <= 80) return 'E';
+      return 'F';
+    };
+
+    const baseLOSCat = (baselineMode === 'road_wise' && roadBaseline.delay !== null && roadBaseline.delay !== undefined)
+      ? getLOSCategory(roadBaseline.delay)
+      : null;
+    const baseLOSStr = baseLOSCat ? `LOS ${baseLOSCat}` : 'Not Available';
+
+    const propLOSCat = isCritOversaturated ? 'F' : getLOSCategory(dCritProposed);
+    const propLOSStr = propLOSCat ? `LOS ${propLOSCat}` : 'Not Available';
+
+    const losRank = { A: 1, B: 2, C: 3, D: 4, E: 5, F: 6 };
+    let losDiffStr = '—';
+    if (baselineMode === 'road_wise' && baseLOSCat && propLOSCat) {
+      const baseRank = losRank[baseLOSCat];
+      const propRank = losRank[propLOSCat];
+      if (propRank < baseRank) {
+        losDiffStr = `${baseLOSCat} → ${propLOSCat} (Improved)`;
+      } else if (propRank > baseRank) {
+        losDiffStr = `${baseLOSCat} → ${propLOSCat} (Worsened)`;
+      } else {
+        losDiffStr = 'No LOS change';
+      }
+    }
+
+    let delayDiffStr = '—';
+    if (baselineMode === 'road_wise' && roadBaseline.delay !== null && roadBaseline.delay !== undefined && !isCritOversaturated) {
+      const diff = dCritProposed - roadBaseline.delay;
+      if (roadBaseline.delay > 0) {
+        const pct = Math.abs(Math.round((diff / roadBaseline.delay) * 100));
+        delayDiffStr = diff < 0 ? `${diff.toFixed(1)} s/veh (${pct}% reduction)` : (diff > 0 ? `+${diff.toFixed(1)} s/veh (${pct}% increase)` : `0.0 s/veh (0% change)`);
+      } else {
+        delayDiffStr = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)} s/veh`;
+      }
+    }
+
+    let queueDiffStr = '—';
+    if (baselineMode === 'road_wise' && roadBaseline.queue !== null && roadBaseline.queue !== undefined) {
+      const diff = qMetersCritRounded - roadBaseline.queue;
+      if (roadBaseline.queue > 0) {
+        const pct = Math.abs(Math.round((diff / roadBaseline.queue) * 100));
+        queueDiffStr = diff < 0 ? `${diff} m (${pct}% reduction)` : (diff > 0 ? `+${diff} m (${pct}% increase)` : `0 m (0% change)`);
+      } else {
+        queueDiffStr = `${diff >= 0 ? '+' : ''}${diff} m`;
+      }
+    }
+
+    let dosDiffStr = '—';
+    if (baselineMode === 'road_wise' && roadBaseline.degreeOfSaturation !== null && roadBaseline.degreeOfSaturation !== undefined) {
+      const diff = xCrit - roadBaseline.degreeOfSaturation;
+      if (roadBaseline.degreeOfSaturation > 0) {
+        const pct = Math.abs(Math.round((diff / roadBaseline.degreeOfSaturation) * 100));
+        dosDiffStr = diff < 0 ? `${diff.toFixed(2)} (${pct}% reduction)` : (diff > 0 ? `+${diff.toFixed(2)} (${pct}% increase)` : `0.00 (0% change)`);
+      } else {
+        dosDiffStr = `${diff >= 0 ? '+' : ''}${diff.toFixed(2)}`;
+      }
+    }
+
+    const proposedGreenStr = isWebsterValid
+      ? (is4Phase ? `${g1} s / ${g2} s / ${g3} s / ${g4} s` : `${g1} s / ${g2} s`)
+      : 'N/A — Webster not valid';
 
     if (simTableBody) {
-      if (!isUploaded || !isWebsterValid || !websterCycleC0 || g1 === null || g2 === null) {
+      if (!isUploaded || !isWebsterValid || !appliedCycle || g1 === null || g2 === null) {
         simTableBody.innerHTML = `
           <tr style="border-bottom: 1px solid var(--border-color);">
             <td style="padding: 0.75rem 1rem; font-weight: 700;">Cycle Length (s)</td>
@@ -5402,8 +7171,8 @@ const FlowGuard = (function () {
             <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 0.75rem 1rem; font-weight: 700;">Effective Green Split (Phase 1 / Phase 2)</td>
-            <td style="padding: 0.75rem 1rem;">${baseGreenFallbackStr}</td>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Effective Green Split (${is4Phase ? 'Phases 1–4' : 'Phase 1 / Phase 2'})</td>
+            <td style="padding: 0.75rem 1rem;">${baseGreenStr}</td>
             <td style="padding: 0.75rem 1rem;">Not Available</td>
             <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">—</td>
           </tr>
@@ -5433,130 +7202,17 @@ const FlowGuard = (function () {
           </tr>
         `;
       } else {
-        // Compute proposed metrics for the identified winningKey critical approach using existing Webster formulas
-        const isPhase1Crit = (winningKey === 'north' || winningKey === 'south');
-        const gCrit = isPhase1Crit ? g1 : g2;
-        const qCrit = winnerMetric.critFlowVal;
-        const sCrit = winnerMetric.satFlow;
-
-        const capCrit = sCrit * (gCrit / websterCycleC0);
-        const xCrit = capCrit > 0 ? (qCrit / capCrit) : 0;
-        const isCritOversaturated = xCrit >= 1.0;
-
-        // Authoritative Webster 2-Term Delay Model calculation for critical approach
-        const calcPhaseDelay = (C, g, q, s, x) => {
-          if (!g || !C || !s || s <= 0 || (g / C) <= 0) return 60.0;
-          if (x >= 1.0) return 80.0;
-          const lambda = g / C;
-          const qSec = q / 3600;
-          if (qSec <= 0 || (1 - (lambda * x)) <= 0 || (1 - x) <= 0) return 40.0;
-
-          const term1 = (C * Math.pow(1 - lambda, 2)) / (2 * (1 - (lambda * x)));
-          const term2 = (Math.pow(x, 2)) / (2 * qSec * (1 - x));
-          const d = term1 + term2;
-          return isNaN(d) ? 35.0 : Math.max(2.0, Math.min(180.0, d));
-        };
-
-        const dCritProposed = parseFloat(calcPhaseDelay(websterCycleC0, gCrit, qCrit, sCrit, xCrit).toFixed(1));
-
-        // Authoritative Queue Calculation for critical approach: Q_veh = (q / 3600) * (C - g), Q_meters = Q_veh * 6
-        const qVehCrit = (qCrit / 3600) * (websterCycleC0 - gCrit);
-        const qVehCritRounded = Math.round(qVehCrit);
-        const qMetersCritRounded = Math.round(qVehCrit * 6);
-
-        // Authoritative LOS calculation from critical-approach delay
-        const getLOSCategory = (delayVal) => {
-          if (delayVal === null || delayVal === undefined || isNaN(delayVal)) return null;
-          if (delayVal <= 10) return 'A';
-          if (delayVal <= 20) return 'B';
-          if (delayVal <= 35) return 'C';
-          if (delayVal <= 55) return 'D';
-          if (delayVal <= 80) return 'E';
-          return 'F';
-        };
-
-        // Read baseline metrics for the critical road if Baseline Data Mode = road_wise
-        const roadBaseline = (baselineMode === 'road_wise' && eng.baseline && eng.baseline.roads)
-          ? (eng.baseline.roads[critRoadDesignation] || {})
-          : {};
-
-        const baseP1Green = (eng.baseline && eng.baseline.phase1Green !== undefined) ? eng.baseline.phase1Green : null;
-        const baseP2Green = (eng.baseline && eng.baseline.phase2Green !== undefined) ? eng.baseline.phase2Green : null;
-
-        const isBaseGreenAvailable = (baseP1Green !== null && baseP2Green !== null);
-        const baseGreenStr = isBaseGreenAvailable ? `${baseP1Green} s / ${baseP2Green} s` : 'Baseline phase green times not provided';
-        const baseCycleStr = `${existingCycle} s`;
-        const baseDelayStr = roadBaseline.delay !== null && roadBaseline.delay !== undefined ? `${roadBaseline.delay.toFixed(1)} s/veh` : 'Not Available';
-        const baseQueueStr = roadBaseline.queue !== null && roadBaseline.queue !== undefined ? `${roadBaseline.queue} m` : 'Not Available';
-        const baseDOSStr = roadBaseline.degreeOfSaturation !== null && roadBaseline.degreeOfSaturation !== undefined ? String(roadBaseline.degreeOfSaturation) : 'Not Available';
-
-        const baseLOSCat = (baselineMode === 'road_wise' && roadBaseline.delay !== null && roadBaseline.delay !== undefined)
-          ? getLOSCategory(roadBaseline.delay)
-          : null;
-        const baseLOSStr = baseLOSCat ? `LOS ${baseLOSCat}` : 'Not Available';
-
-        const propLOSCat = isCritOversaturated ? 'F' : getLOSCategory(dCritProposed);
-        const propLOSStr = propLOSCat ? `LOS ${propLOSCat}` : 'Not Available';
-
-        const losRank = { A: 1, B: 2, C: 3, D: 4, E: 5, F: 6 };
-        let losDiffStr = '—';
-        if (baselineMode === 'road_wise' && baseLOSCat && propLOSCat) {
-          const baseRank = losRank[baseLOSCat];
-          const propRank = losRank[propLOSCat];
-          if (propRank < baseRank) {
-            losDiffStr = `${baseLOSCat} → ${propLOSCat} (Improved)`;
-          } else if (propRank > baseRank) {
-            losDiffStr = `${baseLOSCat} → ${propLOSCat} (Worsened)`;
-          } else {
-            losDiffStr = 'No LOS change';
-          }
-        }
-
-        // Calculate Estimated Changes strictly when baseline is available
-        let delayDiffStr = '—';
-        if (baselineMode === 'road_wise' && roadBaseline.delay !== null && roadBaseline.delay !== undefined && !isCritOversaturated) {
-          const diff = dCritProposed - roadBaseline.delay;
-          if (roadBaseline.delay > 0) {
-            const pct = Math.abs(Math.round((diff / roadBaseline.delay) * 100));
-            delayDiffStr = diff < 0 ? `${diff.toFixed(1)} s/veh (${pct}% reduction)` : (diff > 0 ? `+${diff.toFixed(1)} s/veh (${pct}% increase)` : `0.0 s/veh (0% change)`);
-          } else {
-            delayDiffStr = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)} s/veh`;
-          }
-        }
-
-        let queueDiffStr = '—';
-        if (baselineMode === 'road_wise' && roadBaseline.queue !== null && roadBaseline.queue !== undefined) {
-          const diff = qMetersCritRounded - roadBaseline.queue;
-          if (roadBaseline.queue > 0) {
-            const pct = Math.abs(Math.round((diff / roadBaseline.queue) * 100));
-            queueDiffStr = diff < 0 ? `${diff} m (${pct}% reduction)` : (diff > 0 ? `+${diff} m (${pct}% increase)` : `0 m (0% change)`);
-          } else {
-            queueDiffStr = `${diff >= 0 ? '+' : ''}${diff} m`;
-          }
-        }
-
-        let dosDiffStr = '—';
-        if (baselineMode === 'road_wise' && roadBaseline.degreeOfSaturation !== null && roadBaseline.degreeOfSaturation !== undefined) {
-          const diff = xCrit - roadBaseline.degreeOfSaturation;
-          if (roadBaseline.degreeOfSaturation > 0) {
-            const pct = Math.abs(Math.round((diff / roadBaseline.degreeOfSaturation) * 100));
-            dosDiffStr = diff < 0 ? `${diff.toFixed(2)} (${pct}% reduction)` : (diff > 0 ? `+${diff.toFixed(2)} (${pct}% increase)` : `0.00 (0% change)`);
-          } else {
-            dosDiffStr = `${diff >= 0 ? '+' : ''}${diff.toFixed(2)}`;
-          }
-        }
-
         simTableBody.innerHTML = `
           <tr style="border-bottom: 1px solid var(--border-color);">
             <td style="padding: 0.75rem 1rem; font-weight: 700;">Cycle Length (s)</td>
             <td style="padding: 0.75rem 1rem;">${baseCycleStr}</td>
-            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${websterCycleC0} s</td>
-            <td style="padding: 0.75rem 1rem; color: var(--accent-primary);">${websterCycleC0 - existingCycle > 0 ? `+${websterCycleC0 - existingCycle}` : `${websterCycleC0 - existingCycle}`} s</td>
+            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${appliedCycle} s ${isCycleConstrained ? '(Max Limit)' : ''}</td>
+            <td style="padding: 0.75rem 1rem; color: var(--accent-primary);">${appliedCycle - existingCycle > 0 ? `+${appliedCycle - existingCycle}` : `${appliedCycle - existingCycle}`} s</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 0.75rem 1rem; font-weight: 700;">Effective Green Split (Phase 1 / Phase 2)</td>
+            <td style="padding: 0.75rem 1rem; font-weight: 700;">Effective Green Split (${is4Phase ? 'Phases 1–4' : 'Phase 1 / Phase 2'})</td>
             <td style="padding: 0.75rem 1rem; ${isBaseGreenAvailable ? 'color: var(--text-primary);' : 'color: var(--text-secondary); font-style: italic;'}">${baseGreenStr}</td>
-            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${g1} s / ${g2} s</td>
+            <td style="padding: 0.75rem 1rem; color: var(--success); font-weight: 700;">${proposedGreenStr}</td>
             <td style="padding: 0.75rem 1rem; color: var(--accent-primary);">${isBaseGreenAvailable ? 'Proportional (Rebalanced)' : 'Proportional'}</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border-color);">
@@ -5587,7 +7243,20 @@ const FlowGuard = (function () {
       }
     }
 
-    // Section 7: Recommendation Card
+    // ── SECTION 7: BOTTLENECK & RECOMMENDATION CARD RENDER ──
+    // Determine dynamic winning phase priority string
+    let winningPhaseStr = '';
+    if (is4Phase) {
+      if (winningKey === 'north') winningPhaseStr = 'Phase 1 (Road A / North)';
+      else if (winningKey === 'east') winningPhaseStr = 'Phase 2 (Road B / East)';
+      else if (winningKey === 'south') winningPhaseStr = 'Phase 3 (Road C / South)';
+      else winningPhaseStr = 'Phase 4 (Road D / West)';
+    } else {
+      winningPhaseStr = yPhase1 >= yPhase2 ? 'Phase 1 (North / South)' : 'Phase 2 (East / West)';
+    }
+
+    const recCard = document.getElementById('step5Section7RecCard');
+
     if (!isUploaded) {
       setText('step5RecBottleneck', '—');
       setText('step5RecPhase', '—');
@@ -5595,36 +7264,81 @@ const FlowGuard = (function () {
       setText('step5RecPeakIntervalVal', '—');
       setText('step5RecCritApproachVal', '—');
       setText('step5RecReason', 'Awaiting validated traffic dataset.');
-      setText('step5RecCycleVal', '—');
-      setText('step5RecP1Val', '—');
-      setText('step5RecP2Val', '—');
+      if (recCard) recCard.innerHTML = `<div><div style="font-size: 0.7rem; color: var(--text-secondary);">Shared Cycle</div><div style="font-size: 1.1rem; font-weight: 800; color: #10b981;">—</div></div>`;
       setText('step5RecAction', 'Awaiting analysis execution.');
     } else if (!isWebsterValid) {
       setText('step5RecBottleneck', `${winnerTitle} (${winnerMetric.critMoveStr})`);
-      setText('step5RecPhase', yPhase1 >= yPhase2 ? 'Phase 1 (N/S)' : 'Phase 2 (E/W)');
+      setText('step5RecPhase', winningPhaseStr);
       setText('step5RecFlowRatioVal', `y = ${winnerMetric.flowRatioYStr}`);
       setText('step5RecPeakIntervalVal', `${winnerMetric.peakIntervalStr}`);
       setText('step5RecCritApproachVal', `${winnerTitle} — ${winnerMetric.critMoveStr}`);
       setText('step5RecReason', warningMsg);
-      setText('step5RecCycleVal', '—');
-      setText('step5RecP1Val', '—');
-      setText('step5RecP2Val', '—');
+      if (recCard) recCard.innerHTML = `<div><div style="font-size: 0.7rem; color: var(--text-secondary);">Shared Cycle</div><div style="font-size: 1.1rem; font-weight: 800; color: #ef4444;">N/A (Oversaturated)</div></div>`;
       setText('step5RecAction', 'Critical flow ratio exceeds intersection capacity limit. Geometric or physical capacity expansion recommended prior to signal timing optimization.');
     } else {
       setText('step5RecBottleneck', `${winnerTitle} (${winnerMetric.critMoveStr})`);
-      const winningPhaseStr = yPhase1 >= yPhase2 ? 'Phase 1 (North / South)' : 'Phase 2 (East / West)';
       setText('step5RecPhase', winningPhaseStr);
       setText('step5RecFlowRatioVal', `y = ${winnerMetric.flowRatioYStr}`);
       setText('step5RecPeakIntervalVal', `${winnerMetric.peakIntervalStr}`);
       setText('step5RecCritApproachVal', `${winnerTitle} — ${winnerMetric.critMoveStr}`);
       setText('step5RecReason', `Approach ${winnerTitle} exhibits the highest critical flow ratio y = ${winnerMetric.flowRatioYStr} on the ${winnerMetric.critMoveStr} movement under peak interval ${winnerMetric.peakIntervalStr}. Primary critical demand is concentrated on ${winningPhaseStr}.`);
-      setText('step5RecCycleVal', `${websterCycleC0} s`);
-      setText('step5RecP1Val', `${g1} s`);
-      setText('step5RecP2Val', `${g2} s`);
-      setText('step5RecAction', `Implement proposed Webster offline signal timing plan: Shared Cycle C₀ = ${websterCycleC0}s, Phase 1 Green = ${g1}s, Phase 2 Green = ${g2}s. This rebalances phase green splits to match actual critical PCU demand.`);
+
+      if (recCard) {
+        if (is4Phase) {
+          recCard.innerHTML = `
+            <div>
+              <div style="font-size: 0.7rem; color: var(--text-secondary);">Shared Cycle</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #10b981;">${websterCycleC0} s</div>
+            </div>
+            <div>
+              <div style="font-size: 0.7rem; color: var(--text-secondary);">Phase 1 Green</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #38bdf8;">${g1} s</div>
+            </div>
+            <div>
+              <div style="font-size: 0.7rem; color: var(--text-secondary);">Phase 2 Green</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #fcd34d;">${g2} s</div>
+            </div>
+            <div>
+              <div style="font-size: 0.7rem; color: var(--text-secondary);">Phase 3 Green</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #34d399;">${g3} s</div>
+            </div>
+            <div>
+              <div style="font-size: 0.7rem; color: var(--text-secondary);">Phase 4 Green</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #a78bfa;">${g4} s</div>
+            </div>
+          `;
+        } else {
+          recCard.innerHTML = `
+            <div>
+              <div style="font-size: 0.7rem; color: var(--text-secondary);">Shared Cycle</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #10b981;">${websterCycleC0} s</div>
+            </div>
+            <div>
+              <div style="font-size: 0.7rem; color: var(--text-secondary);">Phase 1 Green</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #38bdf8;">${g1} s</div>
+            </div>
+            <div>
+              <div style="font-size: 0.7rem; color: var(--text-secondary);">Phase 2 Green</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #fcd34d;">${g2} s</div>
+            </div>
+          `;
+        }
+      }
+
+      setText('step5RecAction', is4Phase
+        ? `Implement proposed Webster offline signal timing plan: Shared Cycle C₀ = ${websterCycleC0}s, Phase 1 Green = ${g1}s, Phase 2 Green = ${g2}s, Phase 3 Green = ${g3}s, Phase 4 Green = ${g4}s. This rebalances phase green splits to match actual critical PCU demand.`
+        : `Implement proposed Webster offline signal timing plan: Shared Cycle C₀ = ${websterCycleC0}s, Phase 1 Green = ${g1}s, Phase 2 Green = ${g2}s. This rebalances phase green splits to match actual critical PCU demand.`);
     }
 
-    // Section 9: Final Status & Summary Box
+    // ── SECTION 8: ASSUMPTIONS & LIMITATIONS RENDER ──
+    const assumpItem = document.getElementById('step5AssumpPhaseModel');
+    if (assumpItem) {
+      assumpItem.textContent = is4Phase
+        ? 'Signal timing analysis uses a four-phase intersection model with independent approach phases.'
+        : 'Signal timing analysis uses a two-phase intersection model.';
+    }
+
+    // ── SECTION 9: FINAL STATUS & SUMMARY BOX RENDER ──
     const finalBadge = document.getElementById('step5FinalStatusBadge');
 
     const setCheck = (id, text, passed) => {
@@ -5635,14 +7349,14 @@ const FlowGuard = (function () {
       }
     };
 
-    const hasRun = isUploaded && isWebsterValid;
+    const hasRun = isUploaded;
 
     if (finalBadge) {
       if (hasRun) {
-        finalBadge.textContent = '✓ ANALYSIS COMPLETE';
-        finalBadge.style.background = 'rgba(16,185,129,0.15)';
-        finalBadge.style.color = 'var(--success)';
-        finalBadge.style.borderColor = 'rgba(16,185,129,0.3)';
+        finalBadge.textContent = isWebsterValid ? '✓ ANALYSIS COMPLETE' : '✓ ANALYSIS COMPLETE (OVERSATURATED)';
+        finalBadge.style.background = isWebsterValid ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
+        finalBadge.style.color = isWebsterValid ? 'var(--success)' : '#f87171';
+        finalBadge.style.borderColor = isWebsterValid ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)';
       } else {
         finalBadge.textContent = 'ANALYSIS INCOMPLETE';
         finalBadge.style.background = 'rgba(245,158,11,0.15)';
@@ -5653,19 +7367,67 @@ const FlowGuard = (function () {
 
     setCheck('step5Check1', 'Traffic demand analyzed', isUploaded);
     setCheck('step5Check2', 'Critical approaches identified', isUploaded);
-    setCheck('step5Check3', 'Webster optimization completed', hasRun);
-    setCheck('step5Check4', 'Signal timing plan generated', hasRun);
-    setCheck('step5Check5', 'Before/after simulation completed', hasRun);
-    setCheck('step5Check6', 'Recommendation generated', hasRun);
+    setCheck('step5Check3', isWebsterValid ? 'Webster optimization completed' : 'Webster optimization evaluated (Oversaturated)', isUploaded);
+    setCheck('step5Check4', isWebsterValid ? (is4Phase ? '4-phase signal timing plan generated' : '2-phase signal timing plan generated') : 'Signal timing plan evaluated (N/A)', isUploaded);
+    setCheck('step5Check5', 'Before/after simulation completed', isUploaded);
+    setCheck('step5Check6', 'Recommendation generated', isUploaded);
 
-    setText('step5SumCycle', hasRun ? `${websterCycleC0} s` : '—');
-    setText('step5SumP1Green', hasRun ? `${g1} s` : '—');
-    setText('step5SumP2Green', hasRun ? `${g2} s` : '—');
+    const sec9SummaryBox = document.getElementById('step5Section9SummaryBox');
+    if (sec9SummaryBox) {
+      if (isUploaded && isWebsterValid && websterCycleC0) {
+        if (is4Phase && g1 !== null && g2 !== null && g3 !== null && g4 !== null) {
+          sec9SummaryBox.innerHTML = `
+            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">RECOMMENDED CYCLE</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--success); margin-top: 0.1rem;">${websterCycleC0} s</div>
+
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color);">
+              <div>
+                <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase;">P1 GREEN</div>
+                <div style="font-size: 1.05rem; font-weight: 800; color: var(--accent-primary); margin-top: 0.1rem;">${g1} s</div>
+              </div>
+              <div>
+                <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase;">P2 GREEN</div>
+                <div style="font-size: 1.05rem; font-weight: 800; color: #fcd34d; margin-top: 0.1rem;">${g2} s</div>
+              </div>
+              <div>
+                <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase;">P3 GREEN</div>
+                <div style="font-size: 1.05rem; font-weight: 800; color: #34d399; margin-top: 0.1rem;">${g3} s</div>
+              </div>
+              <div>
+                <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase;">P4 GREEN</div>
+                <div style="font-size: 1.05rem; font-weight: 800; color: #a78bfa; margin-top: 0.1rem;">${g4} s</div>
+              </div>
+            </div>
+          `;
+        } else {
+          sec9SummaryBox.innerHTML = `
+            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">RECOMMENDED CYCLE</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--success); margin-top: 0.1rem;">${websterCycleC0} s</div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color);">
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">PHASE 1 GREEN</div>
+                <div style="font-size: 1.2rem; font-weight: 800; color: var(--accent-primary); margin-top: 0.1rem;">${g1} s</div>
+              </div>
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">PHASE 2 GREEN</div>
+                <div style="font-size: 1.2rem; font-weight: 800; color: #fcd34d; margin-top: 0.1rem;">${g2} s</div>
+              </div>
+            </div>
+          `;
+        }
+      } else {
+        sec9SummaryBox.innerHTML = `
+          <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">RECOMMENDED CYCLE</div>
+          <div style="font-size: 1.75rem; font-weight: 800; color: var(--text-secondary); margin-top: 0.1rem;">N/A</div>
+        `;
+      }
+    }
 
     // ── CANONICAL ANALYSIS RESULT SYNCHRONIZATION ──
     if (hasRun) {
-      const winningPhaseStr = yPhase1 >= yPhase2 ? 'Phase 1 (North / South)' : 'Phase 2 (East / West)';
       const currentResultObj = {
+        analysisCompleted: true,
         runId: `RUN-${new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14)}-${Math.floor(100 + Math.random() * 900)}`,
         timestamp: new Date().toISOString(),
         formattedDate: new Date().toLocaleString(),
@@ -5696,22 +7458,41 @@ const FlowGuard = (function () {
           criticalApproach: `${winnerTitle} (${winnerMetric.critMoveStr})`,
           criticalMovement: winnerMetric.critMoveStr,
           criticalFlowRatio: winnerMetric.flowRatioYStr,
-          phase1CritFlow: phase1CritFlowVal,
-          phase2CritFlow: phase2CritFlowVal,
-          yPhase1: parseFloat(yPhase1.toFixed(4)),
-          yPhase2: parseFloat(yPhase2.toFixed(4)),
+          phase1CritFlow: q1,
+          phase2CritFlow: q2,
+          phase3CritFlow: is4Phase ? q3 : null,
+          phase4CritFlow: is4Phase ? q4 : null,
+          yPhase1: parseFloat(y1.toFixed(4)),
+          yPhase2: parseFloat(y2.toFixed(4)),
+          yPhase3: is4Phase ? parseFloat(y3.toFixed(4)) : null,
+          yPhase4: is4Phase ? parseFloat(y4.toFixed(4)) : null,
           totalY: parseFloat(totalY.toFixed(4)),
-          isWebsterValid: true
+          phaseMode: phaseMode,
+          numPhases: numPhases,
+          isWebsterValid: isWebsterValid,
+          websterValid: isWebsterValid
         },
+        normalizedTrafficData: project.normalizedTrafficData || null,
         websterTiming: {
           websterCycleC0: websterCycleC0,
+          configuredMaxCycle: configuredMaxCycle,
+          appliedCycle: appliedCycle,
+          isConstrained: isCycleConstrained,
+          cycleStatusMsg: isCycleConstrained
+            ? 'Cycle constrained by configured maximum.'
+            : (isWebsterValid ? 'Webster cycle within configured limits.' : 'Intersection oversaturated'),
           g1: g1,
           g2: g2,
+          g3: is4Phase ? g3 : null,
+          g4: is4Phase ? g4 : null,
           amber: amberPhase,
           allRed: allRedPhase,
           totalLostTimeL: totalLostTimeL,
           gEff: gEff,
-          numPhases: numPhases
+          numPhases: numPhases,
+          phaseMode: phaseMode,
+          isWebsterValid: isWebsterValid,
+          websterValid: isWebsterValid
         },
         baselineTiming: {
           hasBaseline: (typeof baseP1Green !== 'undefined' && baseP1Green !== null && typeof baseP2Green !== 'undefined' && baseP2Green !== null),
@@ -5722,29 +7503,46 @@ const FlowGuard = (function () {
           allRed: allRedPhase
         },
         beforeAfterPerformance: {
-          baselineDelay: (typeof baseDelayStr !== 'undefined' ? baseDelayStr : '30.0 s/veh'),
-          proposedDelay: (typeof dCritProposed !== 'undefined' ? (isCritOversaturated ? 'Phase Failure' : `${dCritProposed} s/veh`) : '15.9 s/veh'),
-          delayChange: (typeof delayDiffStr !== 'undefined' ? delayDiffStr : '—'),
-          baselineQueue: (typeof baseQueueStr !== 'undefined' ? baseQueueStr : '120.0 m'),
-          proposedQueue: (typeof qMetersCritRounded !== 'undefined' ? `${qMetersCritRounded} m` : '65.0 m'),
-          queueChange: (typeof queueDiffStr !== 'undefined' ? queueDiffStr : '—'),
-          baselineDOS: (typeof baseDOSStr !== 'undefined' ? baseDOSStr : '0.92'),
-          proposedDOS: (typeof xCrit !== 'undefined' ? String(parseFloat(xCrit.toFixed(2))) : '0.68'),
-          dosChange: (typeof dosDiffStr !== 'undefined' ? dosDiffStr : '—'),
-          baselineLOS: (typeof baseLOSStr !== 'undefined' ? baseLOSStr : 'Not Available'),
-          proposedLOS: (typeof propLOSStr !== 'undefined' ? propLOSStr : 'Not Available'),
-          losChange: (typeof losDiffStr !== 'undefined' ? losDiffStr : '—')
+          criticalApproach: `${winnerTitle} (${winnerMetric.critMoveStr})`,
+          baselineCycle: baseCycleStr,
+          proposedCycle: isWebsterValid ? `${appliedCycle} s${isCycleConstrained ? ' (Max Limit)' : ''}` : 'N/A — Webster not valid',
+          cycleChange: isWebsterValid ? `${appliedCycle - existingCycle > 0 ? '+' : ''}${appliedCycle - existingCycle} s` : 'N/A',
+
+          baselineGreen: baseGreenStr,
+          proposedGreen: proposedGreenStr,
+          greenChange: isWebsterValid ? (isBaseGreenAvailable ? 'Proportional (Rebalanced)' : 'Proportional Split') : 'N/A',
+
+          baselineDelay: baseDelayStr,
+          proposedDelay: isWebsterValid ? (isCritOversaturated ? 'Phase Failure / Oversaturated' : `${dCritProposed} s/veh`) : 'N/A — Webster not valid',
+          delayChange: isWebsterValid ? delayDiffStr : 'N/A',
+
+          baselineQueue: baseQueueStr,
+          proposedQueue: isWebsterValid ? `≈ ${qVehCritRounded} vehicles (≈ ${qMetersCritRounded} m)` : 'N/A — Webster not valid',
+          queueChange: isWebsterValid ? queueDiffStr : 'N/A',
+
+          baselineDOS: baseDOSStr,
+          proposedDOS: isWebsterValid ? (isCritOversaturated ? `${parseFloat(xCrit.toFixed(2))} (Oversaturated)` : String(parseFloat(xCrit.toFixed(2)))) : 'N/A — Webster not valid',
+          dosChange: isWebsterValid ? (isCritOversaturated ? '⚠️ Phase Failure' : dosDiffStr) : 'N/A',
+
+          baselineLOS: baseLOSStr,
+          proposedLOS: isWebsterValid ? propLOSStr : 'N/A — Webster not valid',
+          losChange: isWebsterValid ? losDiffStr : 'N/A'
         },
         recommendations: {
           bottleneck: `${winnerTitle} (${winnerMetric.critMoveStr})`,
           winningPhase: winningPhaseStr,
           reason: `Approach ${winnerTitle} exhibits the highest critical flow ratio y = ${winnerMetric.flowRatioYStr} on the ${winnerMetric.critMoveStr} movement under peak interval ${winnerMetric.peakIntervalStr}. Primary critical demand is concentrated on ${winningPhaseStr}.`,
-          action: `Implement proposed Webster offline signal timing plan: Shared Cycle C₀ = ${websterCycleC0}s, Phase 1 Green = ${g1}s, Phase 2 Green = ${g2}s. This rebalances phase green splits to match actual critical PCU demand.`
+          action: isWebsterValid
+            ? (is4Phase
+                ? `Implement proposed Webster offline signal timing plan: Shared Cycle C₀ = ${websterCycleC0}s, Phase 1 Green = ${g1}s, Phase 2 Green = ${g2}s, Phase 3 Green = ${g3}s, Phase 4 Green = ${g4}s. This rebalances phase green splits to match actual critical PCU demand.`
+                : `Implement proposed Webster offline signal timing plan: Shared Cycle C₀ = ${websterCycleC0}s, Phase 1 Green = ${g1}s, Phase 2 Green = ${g2}s. This rebalances phase green splits to match actual critical PCU demand.`)
+            : `Webster optimization is not applicable because intersection is over-saturated (Y = ${parseFloat(totalY.toFixed(4))} ≥ 1.00). Further traffic engineering assessment, capacity improvement, phase redesign, or demand-management measures are required.`
         },
         assumptionsLimitations: [
           'Analysis conducted in accordance with IRC:93 (Signal Timing) and IRC:106 (PCU Equivalency) standards.',
           `Base saturation flow rate S₀ = ${baseSat} PCU/h/lane assuming standard carriageway dimensions.`,
-          'Minimum vehicular green constraint set to 7 seconds per phase.',
+          `Minimum vehicular green constraint set to ${minGreenConfig} seconds per phase.`,
+          is4Phase ? 'Signal timing analysis uses a four-phase intersection model with independent approach phases.' : 'Signal timing analysis uses a two-phase intersection model.',
           'Pedestrian clearance time evaluated per crosswalk width requirements.',
           'Offline fixed-time signal plan optimization based on peak surge factor.'
         ]
@@ -5759,11 +7557,100 @@ const FlowGuard = (function () {
     }
   }
 
+  let _isAnalysisRunning = false;
+
   /**
-   * Execute Step 5 Run Analysis Action
+   * Execute Step 5 Run Analysis Action (with visual engineering animation wrapper)
    */
-  function runStep5Analysis() {
-    renderStep5AnalysisDashboard();
+  async function runStep5Analysis() {
+    if (_isAnalysisRunning) return;
+    _isAnalysisRunning = true;
+
+    const primaryBtn = typeof document !== 'undefined' ? document.getElementById('btnRunStep5Analysis') : null;
+    const againBtn = typeof document !== 'undefined' ? document.getElementById('btnRunAgainStep5') : null;
+    const headerBadge = typeof document !== 'undefined' ? document.getElementById('step5HeaderBadge') : null;
+
+    const sec1Grid = typeof document !== 'undefined' ? document.getElementById('step5Section1Grid') : null;
+    const dashContainer = sec1Grid ? sec1Grid.parentElement : null;
+
+    const origPrimaryText = primaryBtn ? primaryBtn.textContent : '▶ RUN ANALYSIS';
+
+    const setButtonsState = (text, disabled, isSuccess) => {
+      [primaryBtn, againBtn].forEach((btn) => {
+        if (btn) {
+          btn.disabled = disabled;
+          btn.style.opacity = disabled ? '0.85' : '1';
+          btn.style.cursor = disabled ? 'not-allowed' : 'pointer';
+          btn.textContent = text;
+          if (isSuccess) {
+            btn.style.background = '#10b981';
+            btn.style.borderColor = '#059669';
+            btn.style.color = '#ffffff';
+          } else {
+            btn.style.background = '';
+            btn.style.borderColor = '';
+            btn.style.color = '';
+          }
+        }
+      });
+    };
+
+    const isTestEnv = typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test';
+    const delay = ms => new Promise(resolve => setTimeout(resolve, isTestEnv ? 0 : ms));
+
+    try {
+      const project = typeof loadProject === 'function' ? loadProject() : {};
+      const eng = (project && project.engineeringParameters) || {};
+      const phaseMode = eng.phaseMode || '2-phase';
+      const is4Phase = (phaseMode === '4-phase' || phaseMode === '4PHASE' || phaseMode === '4_phase' || eng.numPhases === 4);
+      const phaseSignalMsg = is4Phase ? 'CALCULATING 4-PHASE SIGNAL TIMING...' : 'CALCULATING 2-PHASE SIGNAL TIMING...';
+
+      if (dashContainer) dashContainer.classList.add('analysis-running-shimmer');
+
+      const stages = [
+        'VALIDATING INPUTS...',
+        'CALCULATING PCU DEMAND...',
+        'IDENTIFYING CRITICAL MOVEMENTS...',
+        phaseSignalMsg,
+        'VALIDATING SIGNAL PHASES...'
+      ];
+
+      for (const stageText of stages) {
+        setButtonsState(`⟳ ${stageText}`, true, false);
+        if (headerBadge) {
+          headerBadge.textContent = stageText;
+          headerBadge.style.background = 'rgba(56, 189, 248, 0.15)';
+          headerBadge.style.color = '#38bdf8';
+          headerBadge.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+        }
+        await delay(120);
+      }
+
+      // Execute authoritative Step 5 calculation engine & DOM render
+      renderStep5AnalysisDashboard();
+
+      if (dashContainer) dashContainer.classList.remove('analysis-running-shimmer');
+
+      // Show Analysis Complete success state
+      setButtonsState('✓ ANALYSIS COMPLETE', true, true);
+      if (headerBadge) {
+        headerBadge.textContent = '✓ ANALYSIS COMPLETE';
+        headerBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+        headerBadge.style.color = '#34d399';
+        headerBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+      }
+
+      await delay(1500);
+
+      // Restore button to normal state
+      setButtonsState(origPrimaryText, false, false);
+    } catch (err) {
+      console.error('[FlowGuard AI] Error running Step 5 analysis:', err);
+      if (dashContainer) dashContainer.classList.remove('analysis-running-shimmer');
+      setButtonsState(origPrimaryText, false, false);
+    } finally {
+      _isAnalysisRunning = false;
+    }
   }
 
   /**
@@ -6785,24 +8672,393 @@ const FlowGuard = (function () {
     updateProjectInspector();
   }
 
+  function getNormalizedTrafficData() {
+    const p = loadProject();
+    return p ? p.normalizedTrafficData : null;
+  }
+
+  /* ==========================================================================
+     LIVE 4-PHASE SIGNAL SIMULATION CONTROLLER MODULE (Visualization Only)
+     ========================================================================== */
+  const signalSimulation = (function () {
+    let simTimer = null;
+    let isRunning = false;
+    let simSpeed = 1; // 1x, 2x, 4x multiplier
+    let currentCycle = 1;
+    let elapsedCycleSec = 0;
+    let currentStepIndex = 0; // index in phaseSteps sequence
+    let stepTimeRemaining = 0;
+    let phaseSteps = [];
+    let timingData = null;
+
+    function setText(id, text) {
+      if (typeof document === 'undefined') return;
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    }
+
+    function getActiveTimingData() {
+      let res = null;
+      if (typeof getCurrentAnalysisResult === 'function') {
+        res = getCurrentAnalysisResult();
+      }
+      if (!res && typeof getProject === 'function') {
+        const proj = getProject();
+        if (proj && proj.lastAnalysisResult) {
+          res = proj.lastAnalysisResult;
+        }
+      }
+      if ((!res || !res.websterTiming) && typeof renderStep5AnalysisDashboard === 'function') {
+        try {
+          renderStep5AnalysisDashboard();
+          if (typeof getCurrentAnalysisResult === 'function') {
+            res = getCurrentAnalysisResult();
+          }
+        } catch (e) {}
+      }
+      return res;
+    }
+
+    function initTimingSteps() {
+      const res = getActiveTimingData();
+      const guardContainer = typeof document !== 'undefined' ? document.getElementById('simGuardContainer') : null;
+      const mainContent = typeof document !== 'undefined' ? document.getElementById('simMainContent') : null;
+      const badge = typeof document !== 'undefined' ? document.getElementById('simHeaderBadge') : null;
+      const btnStart = typeof document !== 'undefined' ? document.getElementById('btnSimStart') : null;
+
+      if (!res || !res.analysisCompleted || !res.websterTiming) {
+        // NO DATA STATE
+        if (guardContainer) guardContainer.style.display = 'block';
+        if (mainContent) mainContent.style.display = 'none';
+        if (badge) {
+          badge.textContent = 'NO DATA';
+          badge.style.background = 'rgba(239, 68, 68, 0.15)';
+          badge.style.color = '#ef4444';
+          badge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+        }
+        if (btnStart) {
+          btnStart.disabled = true;
+          btnStart.style.opacity = '0.5';
+          btnStart.style.cursor = 'not-allowed';
+        }
+        const title = typeof document !== 'undefined' ? document.getElementById('simGuardTitle') : null;
+        const desc = typeof document !== 'undefined' ? document.getElementById('simGuardDesc') : null;
+        if (title) title.textContent = 'NO 4-PHASE TIMING DATA';
+        if (desc) desc.textContent = 'Run a 4-phase Webster analysis to generate the signal simulation.';
+        timingData = null;
+        return false;
+      }
+
+      const wt = res.websterTiming;
+      const is4Phase = (wt.phaseMode === '4PHASE' || wt.phaseMode === '4-phase' || wt.numPhases === 4 || (wt.g3 !== null && wt.g4 !== null && typeof wt.g3 !== 'undefined'));
+
+      if (!is4Phase) {
+        // 2-PHASE MODE DETECTED (INACTIVE STATE)
+        if (guardContainer) guardContainer.style.display = 'block';
+        if (mainContent) mainContent.style.display = 'none';
+        if (badge) {
+          badge.textContent = '2-PHASE MODE (INACTIVE)';
+          badge.style.background = 'rgba(245, 158, 11, 0.15)';
+          badge.style.color = '#f59e0b';
+          badge.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+        }
+        if (btnStart) {
+          btnStart.disabled = true;
+          btnStart.style.opacity = '0.5';
+          btnStart.style.cursor = 'not-allowed';
+        }
+        const title = typeof document !== 'undefined' ? document.getElementById('simGuardTitle') : null;
+        const desc = typeof document !== 'undefined' ? document.getElementById('simGuardDesc') : null;
+        if (title) title.textContent = '2-PHASE MODE DETECTED';
+        if (desc) desc.textContent = 'Signal Simulation is available for 4-Phase analysis. Please configure a 4-phase mode in Engineering Parameters to enable live demonstration.';
+        timingData = null;
+        return false;
+      }
+
+      // 4-PHASE MODE ACTIVE
+      if (guardContainer) guardContainer.style.display = 'none';
+      if (mainContent) mainContent.style.display = 'flex';
+      if (badge) {
+        badge.textContent = '4-PHASE MODE';
+        badge.style.background = 'rgba(16, 185, 129, 0.15)';
+        badge.style.color = '#34d399';
+        badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+      }
+      if (btnStart) {
+        btnStart.disabled = false;
+        btnStart.style.opacity = '1';
+        btnStart.style.cursor = 'pointer';
+      }
+
+      const g1 = wt.g1 || 30;
+      const g2 = wt.g2 || 30;
+      const g3 = wt.g3 || 30;
+      const g4 = wt.g4 || 30;
+      const amber = wt.amber || 3;
+      const allRed = wt.allRed || 2;
+      const cycleLength = wt.appliedCycle || wt.websterCycleC0 || (g1 + g2 + g3 + g4 + 4 * amber + 4 * allRed);
+
+      timingData = { g1, g2, g3, g4, amber, allRed, cycleLength };
+
+      // Build the 12 phase transition steps for a full 4-phase cycle:
+      phaseSteps = [
+        { phaseNum: 1, phaseName: 'PHASE 1 — ROAD A / NORTH', roadKey: 'north', lightState: 'GREEN', duration: g1, nextName: 'PHASE 1 AMBER' },
+        { phaseNum: 1, phaseName: 'PHASE 1 — ROAD A / NORTH', roadKey: 'north', lightState: 'AMBER', duration: amber, nextName: 'ALL-RED CLEARANCE' },
+        { phaseNum: 1, phaseName: 'PHASE 1 — ALL-RED INTERSTAGE', roadKey: 'all', lightState: 'ALL-RED', duration: allRed, nextName: 'PHASE 2 — ROAD B / EAST' },
+
+        { phaseNum: 2, phaseName: 'PHASE 2 — ROAD B / EAST', roadKey: 'east', lightState: 'GREEN', duration: g2, nextName: 'PHASE 2 AMBER' },
+        { phaseNum: 2, phaseName: 'PHASE 2 — ROAD B / EAST', roadKey: 'east', lightState: 'AMBER', duration: amber, nextName: 'ALL-RED CLEARANCE' },
+        { phaseNum: 2, phaseName: 'PHASE 2 — ALL-RED INTERSTAGE', roadKey: 'all', lightState: 'ALL-RED', duration: allRed, nextName: 'PHASE 3 — ROAD C / SOUTH' },
+
+        { phaseNum: 3, phaseName: 'PHASE 3 — ROAD C / SOUTH', roadKey: 'south', lightState: 'GREEN', duration: g3, nextName: 'PHASE 3 AMBER' },
+        { phaseNum: 3, phaseName: 'PHASE 3 — ROAD C / SOUTH', roadKey: 'south', lightState: 'AMBER', duration: amber, nextName: 'ALL-RED CLEARANCE' },
+        { phaseNum: 3, phaseName: 'PHASE 3 — ALL-RED INTERSTAGE', roadKey: 'all', lightState: 'ALL-RED', duration: allRed, nextName: 'PHASE 4 — ROAD D / WEST' },
+
+        { phaseNum: 4, phaseName: 'PHASE 4 — ROAD D / WEST', roadKey: 'west', lightState: 'GREEN', duration: g4, nextName: 'PHASE 4 AMBER' },
+        { phaseNum: 4, phaseName: 'PHASE 4 — ROAD D / WEST', roadKey: 'west', lightState: 'AMBER', duration: amber, nextName: 'ALL-RED CLEARANCE' },
+        { phaseNum: 4, phaseName: 'PHASE 4 — ALL-RED INTERSTAGE', roadKey: 'all', lightState: 'ALL-RED', duration: allRed, nextName: 'PHASE 1 — ROAD A / NORTH' }
+      ];
+
+      updateStaticCardsAndTimeline();
+      return true;
+    }
+
+    function updateStaticCardsAndTimeline() {
+      if (!timingData || typeof document === 'undefined') return;
+      const { g1, g2, g3, g4, amber, allRed, cycleLength } = timingData;
+
+      setText('simHeaderCycleLength', `${cycleLength} s`);
+      setText('simP1Green', `${g1} s`); setText('simP1Amber', `${amber} s`); setText('simP1AllRed', `${allRed} s`);
+      setText('simP2Green', `${g2} s`); setText('simP2Amber', `${amber} s`); setText('simP2AllRed', `${allRed} s`);
+      setText('simP3Green', `${g3} s`); setText('simP3Amber', `${amber} s`); setText('simP3AllRed', `${allRed} s`);
+      setText('simP4Green', `${g4} s`); setText('simP4Amber', `${amber} s`); setText('simP4AllRed', `${allRed} s`);
+
+      setText('simTimelineMid', `Mid: ${Math.round(cycleLength / 2)}s`);
+      setText('simTimelineEnd', `${cycleLength}s`);
+
+      // Render Proportional Timeline Bar Segments
+      const container = document.getElementById('simTimelineBarContainer');
+      if (container) {
+        container.innerHTML = phaseSteps.map((step, idx) => {
+          const pct = ((step.duration / cycleLength) * 100).toFixed(2);
+          let bg = 'rgba(16, 185, 129, 0.7)';
+          if (step.lightState === 'AMBER') bg = 'rgba(245, 158, 11, 0.8)';
+          if (step.lightState === 'ALL-RED') bg = 'rgba(239, 68, 68, 0.8)';
+
+          return `<div id="simTimelineSeg_${idx}" class="sim-timeline-segment" style="width: ${pct}%; background: ${bg};" title="${step.phaseName} (${step.lightState}: ${step.duration}s)">
+            ${step.duration >= 10 ? `P${step.phaseNum}` : ''}
+          </div>`;
+        }).join('');
+      }
+    }
+
+    function renderCurrentStepUI() {
+      if (!phaseSteps || phaseSteps.length === 0 || typeof document === 'undefined') return;
+      const step = phaseSteps[currentStepIndex];
+
+      // Header & Status Updates
+      setText('simHeaderCurrentPhase', `P${step.phaseNum} — ${step.lightState}`);
+      setText('simHeaderTimeRemaining', `${stepTimeRemaining} s`);
+      setText('simStatusPhase', step.phaseName);
+      setText('simStatusRemaining', `${stepTimeRemaining} s`);
+      setText('simStatusElapsed', `Cycle ${currentCycle} (${elapsedCycleSec} / ${timingData ? timingData.cycleLength : 180} s)`);
+      setText('simStatusNext', step.nextName);
+
+      // Signal state badge styling
+      const sigBadge = document.getElementById('simStatusSignal');
+      if (sigBadge) {
+        sigBadge.textContent = step.lightState;
+        if (step.lightState === 'GREEN') {
+          sigBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+          sigBadge.style.color = '#34d399';
+          sigBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+        } else if (step.lightState === 'AMBER') {
+          sigBadge.style.background = 'rgba(245, 158, 11, 0.2)';
+          sigBadge.style.color = '#fcd34d';
+          sigBadge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+        } else {
+          sigBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+          sigBadge.style.color = '#f87171';
+          sigBadge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+        }
+      }
+
+      const phaseInd = document.getElementById('simActivePhaseIndicator');
+      if (phaseInd) phaseInd.textContent = `PHASE ${step.phaseNum}`;
+
+      // Signal Light Illuminations
+      const roads = ['North', 'East', 'South', 'West'];
+      roads.forEach(r => {
+        const red = document.getElementById(`light${r}Red`);
+        const amber = document.getElementById(`light${r}Amber`);
+        const green = document.getElementById(`light${r}Green`);
+
+        if (red) red.className = 'sim-light light-red';
+        if (amber) amber.className = 'sim-light light-amber';
+        if (green) green.className = 'sim-light light-green';
+      });
+
+      if (step.lightState === 'ALL-RED') {
+        roads.forEach(r => {
+          const red = document.getElementById(`light${r}Red`);
+          if (red) red.className = 'sim-light light-red active-red';
+        });
+      } else {
+        const activeRoadTitle = step.roadKey.charAt(0).toUpperCase() + step.roadKey.slice(1);
+        const otherRoads = roads.filter(r => r.toLowerCase() !== step.roadKey);
+
+        // Inactive roads set to RED
+        otherRoads.forEach(r => {
+          const red = document.getElementById(`light${r}Red`);
+          if (red) red.className = 'sim-light light-red active-red';
+        });
+
+        // Active road set to GREEN or AMBER
+        if (step.lightState === 'GREEN') {
+          const green = document.getElementById(`light${activeRoadTitle}Green`);
+          if (green) green.className = 'sim-light light-green active-green';
+        } else if (step.lightState === 'AMBER') {
+          const amber = document.getElementById(`light${activeRoadTitle}Amber`);
+          if (amber) amber.className = 'sim-light light-amber active-amber';
+        }
+      }
+
+      // Active Phase Card Highlight
+      for (let p = 1; p <= 4; p++) {
+        const card = document.getElementById(`simPhaseCard${p}`);
+        if (card) {
+          if (p === step.phaseNum) card.classList.add('active-phase');
+          else card.classList.remove('active-phase');
+        }
+      }
+
+      // Timeline Segment Highlight
+      phaseSteps.forEach((_, idx) => {
+        const seg = document.getElementById(`simTimelineSeg_${idx}`);
+        if (seg) {
+          if (idx === currentStepIndex) seg.classList.add('active-segment');
+          else seg.classList.remove('active-segment');
+        }
+      });
+    }
+
+    function tick() {
+      if (!isRunning) return;
+
+      if (stepTimeRemaining > 1) {
+        stepTimeRemaining--;
+        elapsedCycleSec++;
+      } else {
+        // Advance to next step
+        currentStepIndex = (currentStepIndex + 1) % phaseSteps.length;
+        if (currentStepIndex === 0) {
+          currentCycle++;
+          elapsedCycleSec = 0;
+        } else {
+          elapsedCycleSec++;
+        }
+        stepTimeRemaining = phaseSteps[currentStepIndex].duration;
+      }
+
+      renderCurrentStepUI();
+    }
+
+    function start() {
+      if (!timingData && !initTimingSteps()) return;
+      if (isRunning) return;
+
+      isRunning = true;
+      if (simTimer) clearInterval(simTimer);
+      simTimer = setInterval(tick, 1000 / simSpeed);
+
+      const btnStart = typeof document !== 'undefined' ? document.getElementById('btnSimStart') : null;
+      if (btnStart) btnStart.style.opacity = '0.5';
+    }
+
+    function pause() {
+      isRunning = false;
+      if (simTimer) {
+        clearInterval(simTimer);
+        simTimer = null;
+      }
+      const btnStart = typeof document !== 'undefined' ? document.getElementById('btnSimStart') : null;
+      if (btnStart) btnStart.style.opacity = '1';
+    }
+
+    function reset() {
+      pause();
+      currentCycle = 1;
+      elapsedCycleSec = 0;
+      currentStepIndex = 0;
+
+      if (initTimingSteps() && phaseSteps.length > 0) {
+        stepTimeRemaining = phaseSteps[0].duration;
+        renderCurrentStepUI();
+      }
+    }
+
+    function setSpeed(speed) {
+      simSpeed = parseInt(speed, 10) || 1;
+      if (typeof document !== 'undefined') {
+        document.querySelectorAll('.sim-speed-btn').forEach(btn => {
+          if (parseInt(btn.getAttribute('data-speed'), 10) === simSpeed) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+      }
+
+      if (isRunning) {
+        pause();
+        start();
+      }
+    }
+
+    function updateUI() {
+      reset();
+    }
+
+    return {
+      initTimingSteps: initTimingSteps,
+      updateUI: updateUI,
+      start: start,
+      pause: pause,
+      reset: reset,
+      setSpeed: setSpeed,
+      getIsRunning: function () { return isRunning; },
+      getSimSpeed: function () { return simSpeed; },
+      getCurrentCycle: function () { return currentCycle; },
+      getCurrentStepIndex: function () { return currentStepIndex; },
+      getTimingData: function () { return timingData; }
+    };
+  })();
+
   return {
     APPROACHES,
     getProject: loadProject,
     saveProject: saveProject,
+    loadProject: loadProject,
     recomputeProjectData: recomputeProjectData,
-    exportProjectJSON: exportProjectJSON,
-    importProjectJSON: importProjectJSON,
+    exportProjectJSON: function() { return JSON.stringify(loadProject()); },
+    importProjectJSON: function(jsonStr) { try { const p = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr; saveProject(p); return { success: true, project: p }; } catch(e){ return { success: false, error: e.message }; } },
     getState,
     saveState,
-    saveCSVRecords,
-    getCSVRecords,
     resetToDefaults,
-    clearDataset,
     reloadFromStorage,
-    formatNum,
-    validateInput,
-    getActiveApproachKeys,
+    initGeometryUI,
+    saveGeometryAndProceed,
+    resetGeometryDefaults,
+    toggleCustomWidth,
+    toggleCustomLaneConfig,
+    parseLaneConfigCount,
+    validateApproachLanes,
+    validateApproachGeometry,
+    determineApproachKey,
+    normalizeMovementKey,
+    normalizeTimeIntervalKey,
     getConfigLabel,
+    getActiveApproachKeys,
     getMovementDestination,
     isMovementValid,
     validateApproachInputs,
@@ -6832,6 +9088,7 @@ const FlowGuard = (function () {
     renderStep5AnalysisDashboard,
     runStep5Analysis,
     initAnalysisExecutionUI,
+    renderStep6ResultsAndReports: renderEngineeringDashboard,
     resetAnalysisStages,
     runFullAnalysisPipeline,
     renderAnalysisStagesGrid,
@@ -6840,23 +9097,17 @@ const FlowGuard = (function () {
     initAppEvents,
     initProjectInspector,
     updateProjectInspector,
-    initGeometryUI,
-    saveGeometryAndProceed,
-    resetGeometryDefaults,
-    toggleCustomWidth,
-    toggleCustomLaneConfig,
-    parseLaneConfigCount,
-    validateApproachLanes,
-    validateApproachGeometry,
     CENTRAL_VEHICLE_TYPE_MAP,
     resolveVehicleCategoryAndPCU,
     getCurrentAnalysisResult,
     saveCurrentAnalysisResult,
     clearCurrentAnalysisResult,
+    getNormalizedTrafficData,
     exportTrafficDataCSV,
     switchMainView,
     handleHashRouting,
-    initMainViewRouting
+    initMainViewRouting,
+    signalSimulation: signalSimulation
   };
 })();
 
@@ -6864,14 +9115,23 @@ function switchMainView(viewName) {
   if (typeof document === 'undefined') return;
   const landingView = document.getElementById('flowguard-landing-view');
   const analyzerView = document.getElementById('traffic-analyzer-view');
+  const simulationView = document.getElementById('signal-simulation-view');
+
   const navLanding = document.getElementById('navLinkLanding');
   const navAnalyzer = document.getElementById('navLinkAnalyzer');
+  const navSimulation = document.getElementById('navLinkSimulation');
+
+  if (landingView) landingView.style.display = 'none';
+  if (analyzerView) analyzerView.style.display = 'none';
+  if (simulationView) simulationView.style.display = 'none';
+
+  if (navLanding) navLanding.classList.remove('active');
+  if (navAnalyzer) navAnalyzer.classList.remove('active');
+  if (navSimulation) navSimulation.classList.remove('active');
 
   if (viewName === 'analyzer') {
     const isAlreadyAnalyzer = analyzerView && analyzerView.style.display === 'flex';
-    if (landingView) landingView.style.display = 'none';
     if (analyzerView) analyzerView.style.display = 'flex';
-    if (navLanding) navLanding.classList.remove('active');
     if (navAnalyzer) navAnalyzer.classList.add('active');
 
     // Only sync initial wizard step if entering analyzer view for the first time
@@ -6879,11 +9139,15 @@ function switchMainView(viewName) {
       const currentStep = (typeof getState === 'function' && getState().wizardStep) ? getState().wizardStep : 1;
       setWizardStep(currentStep);
     }
+  } else if (viewName === 'simulation') {
+    if (simulationView) simulationView.style.display = 'flex';
+    if (navSimulation) navSimulation.classList.add('active');
+    if (FlowGuard && FlowGuard.signalSimulation && typeof FlowGuard.signalSimulation.updateUI === 'function') {
+      FlowGuard.signalSimulation.updateUI();
+    }
   } else {
     if (landingView) landingView.style.display = 'block';
-    if (analyzerView) analyzerView.style.display = 'none';
     if (navLanding) navLanding.classList.add('active');
-    if (navAnalyzer) navAnalyzer.classList.remove('active');
   }
 }
 
@@ -6892,6 +9156,8 @@ function handleHashRouting() {
   const hash = window.location.hash ? window.location.hash.toLowerCase() : '';
   if (hash === '#analyzer' || hash === '#analysis' || hash === '#traffic-analysis') {
     switchMainView('analyzer');
+  } else if (hash === '#simulation' || hash === '#signal-simulation' || hash === '#simulator') {
+    switchMainView('simulation');
   } else {
     switchMainView('landing');
   }
@@ -6908,10 +9174,11 @@ if (typeof window !== 'undefined') {
   if (typeof window.FlowGuard2D !== 'undefined') {
     window.FlowGuard.simulation2D = window.FlowGuard2D;
   }
-  window.FlowGuard.switchMainView = switchMainView;
-  window.FlowGuard.handleHashRouting = handleHashRouting;
-  window.FlowGuard.initMainViewRouting = initMainViewRouting;
-  window.switchMainView = switchMainView;
+  window.FlowGuard.signalSimulation = FlowGuard.signalSimulation;
+  window.FlowGuard.switchMainView = FlowGuard.switchMainView;
+  window.FlowGuard.handleHashRouting = FlowGuard.handleHashRouting;
+  window.FlowGuard.initMainViewRouting = FlowGuard.initMainViewRouting;
+  window.switchMainView = FlowGuard.switchMainView;
   window.getProject = FlowGuard.getProject;
   window.saveProject = FlowGuard.saveProject;
   window.exportProjectJSON = FlowGuard.exportProjectJSON;
@@ -6946,7 +9213,7 @@ if (typeof window !== 'undefined') {
   window.renderAnalysisStagesGrid = FlowGuard.renderAnalysisStagesGrid;
   window.initAppEvents = FlowGuard.initAppEvents;
   window.initProjectInspector = FlowGuard.initProjectInspector;
-  window.updateProjectInspector = FlowGuard.updateProjectInspector;
+  updateProjectInspector = FlowGuard.updateProjectInspector;
   window.clearDataset = FlowGuard.clearDataset;
   window.CENTRAL_VEHICLE_TYPE_MAP = FlowGuard.CENTRAL_VEHICLE_TYPE_MAP;
   window.resolveVehicleCategoryAndPCU = FlowGuard.resolveVehicleCategoryAndPCU;
@@ -6954,6 +9221,9 @@ if (typeof window !== 'undefined') {
   FlowGuard.initProjectInspector();
   initMainViewRouting();
 }
-if (typeof module !== 'undefined' && module.exports) { module.exports = FlowGuard; }
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = FlowGuard;
+}
 
 

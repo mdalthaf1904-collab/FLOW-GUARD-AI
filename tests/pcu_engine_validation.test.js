@@ -63,8 +63,9 @@ describe('FlowGuard AI - Centralized PCU Calculation Engine & Validation', () =>
     // Task 4: Hourly Demand = Road Total PCU * (60 / surveyDuration)
     expect(north.hourlyDemand).toEqual(north.totalPCU * 4);
 
-    // Task 5: Critical Lane Readiness y = q / S using displayed q (hourlyDemand)
-    const expectedY = parseFloat((north.hourlyDemand / north.satFlow).toFixed(4));
+    // Task 5: Critical Lane Readiness y = q / S using critical flow q
+    const critQ = north.websterInputs ? north.websterInputs.criticalFlow : north.hourlyDemand;
+    const expectedY = parseFloat((critQ / north.satFlow).toFixed(4));
     expect(north.flowRatioY).toEqual(expectedY);
   });
 

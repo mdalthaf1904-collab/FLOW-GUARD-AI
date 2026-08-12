@@ -99,4 +99,31 @@ describe('FlowGuard AI - Unified Project Store Architecture', () => {
     expect(proj.processedTraffic.totalPCUDemand).toBeGreaterThan(0);
   });
 
+  test('Step 3 Phase Configuration supports 2-phase and 4-phase modes', () => {
+    const proj = FlowGuard.getProject();
+    
+    // Default mode should be 2-phase
+    expect(proj.engineeringParameters.phaseMode || '2-phase').toEqual('2-phase');
+
+    // Mutate to 4-phase mode
+    proj.engineeringParameters.phaseMode = '4-phase';
+    proj.engineeringParameters.signal = proj.engineeringParameters.signal || {};
+    proj.engineeringParameters.signal.phaseCount = 4;
+    proj.engineeringParameters.phaseConfiguration = [
+      { phase: 1, roads: ['A'], direction: 'Northbound', name: 'PHASE 1 — NORTHBOUND' },
+      { phase: 2, roads: ['B'], direction: 'Eastbound', name: 'PHASE 2 — EASTBOUND' },
+      { phase: 3, roads: ['C'], direction: 'Southbound', name: 'PHASE 3 — SOUTHBOUND' },
+      { phase: 4, roads: ['D'], direction: 'Westbound', name: 'PHASE 4 — WESTBOUND' }
+    ];
+
+    FlowGuard.saveProject(proj);
+
+    const savedState = FlowGuard.getState();
+    expect(savedState.project.engineeringParameters.phaseMode).toEqual('4-phase');
+    expect(savedState.project.engineeringParameters.signal.phaseCount).toEqual(4);
+    expect(savedState.project.engineeringParameters.phaseConfiguration).toHaveLength(4);
+    expect(savedState.project.engineeringParameters.phaseConfiguration[0].direction).toEqual('Northbound');
+    expect(savedState.project.engineeringParameters.phaseConfiguration[3].direction).toEqual('Westbound');
+  });
+
 });

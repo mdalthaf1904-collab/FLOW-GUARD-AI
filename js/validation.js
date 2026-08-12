@@ -6,6 +6,8 @@
 const ValidationEngine = (function () {
   'use strict';
 
+  const AnalysisEngine = (typeof global !== 'undefined' && global.AnalysisEngine) ? global.AnalysisEngine : ((typeof window !== 'undefined' && window.AnalysisEngine) ? window.AnalysisEngine : require('./analysis'));
+
   const DEFAULT_INTERSECTION = {
     cycleLength: 120,
     yellowTime: 3,

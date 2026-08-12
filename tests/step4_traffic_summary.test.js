@@ -108,7 +108,7 @@ describe('Step 4 Traffic Summary & Engineering Dashboard Unit & Integration Test
     expect(northRoad.websterInputs.satFlow).toEqual(5400);
 
     // Critical flow q_north = 900 PCU/h (since surveyDuration = 60)
-    expect(northRoad.websterInputs.criticalFlow).toEqual(300); // 900 / 3 lanes
+    expect(northRoad.websterInputs.criticalFlow).toEqual(900); // 900 PCU/h critical flow
     expect(northRoad.websterInputs.flowRatioY).toEqual(0.1667); // 900 / 5400 = 0.1667
   });
 
@@ -335,6 +335,53 @@ describe('Step 4 Traffic Summary & Engineering Dashboard Unit & Integration Test
     expect(pt.north.movementPCU.throughPCU).toBe(1118.9);
     expect(pt.north.movementPCU.rightPCU).toBe(0);
     expect(pt.north.movementPCU.totalPCU).toBe(1118.9);
+  });
+
+  test('13. Step 4 Intersection / Phase Summary dynamically aggregates 2-phase vs 4-phase metrics', () => {
+    const proj = FlowGuard.getProject();
+    proj.dataset = {
+      uploaded: true,
+      records: [
+        { timeWindow: '08:00–08:15', key: 'north', road: 'Road A', movement: 'Through', vehicleType: 'Cars', count: 700, rawPCU: 700 },
+        { timeWindow: '08:00–08:15', key: 'east', road: 'Road B', movement: 'Through', vehicleType: 'Cars', count: 600, rawPCU: 600 },
+        { timeWindow: '08:00–08:15', key: 'south', road: 'Road C', movement: 'Through', vehicleType: 'Cars', count: 800, rawPCU: 800 },
+        { timeWindow: '08:00–08:15', key: 'west', road: 'Road D', movement: 'Through', vehicleType: 'Cars', count: 500, rawPCU: 500 }
+      ]
+    };
+
+    // Test 2-Phase Mode
+    proj.engineeringParameters.phaseMode = '2-phase';
+    proj.engineeringParameters.signal = proj.engineeringParameters.signal || {};
+    proj.engineeringParameters.signal.phaseCount = 2;
+    FlowGuard.saveProject(proj);
+    FlowGuard.recomputeProjectData(proj);
+
+    let normData = FlowGuard.getNormalizedTrafficData();
+    expect(normData.phaseAnalysis.phaseMode).toEqual('2-phase');
+    expect(normData.phaseAnalysis.numPhases).toEqual(2);
+
+    const y2Phase1 = normData.phaseAnalysis.phase1.flowRatioY;
+    const y2Phase2 = normData.phaseAnalysis.phase2.flowRatioY;
+    expect(normData.phaseAnalysis.totalY).toBeCloseTo(y2Phase1 + y2Phase2, 4);
+
+    // Switch to 4-Phase Mode
+    proj.engineeringParameters.phaseMode = '4-phase';
+    proj.engineeringParameters.signal.phaseCount = 4;
+    FlowGuard.saveProject(proj);
+    FlowGuard.recomputeProjectData(proj);
+
+    normData = FlowGuard.getNormalizedTrafficData();
+    expect(normData.phaseAnalysis.phaseMode).toEqual('4-phase');
+    expect(normData.phaseAnalysis.numPhases).toEqual(4);
+
+    const y4Phase1 = normData.phaseAnalysis.phase1.flowRatioY;
+    const y4Phase2 = normData.phaseAnalysis.phase2.flowRatioY;
+    const y4Phase3 = normData.phaseAnalysis.phase3.flowRatioY;
+    const y4Phase4 = normData.phaseAnalysis.phase4.flowRatioY;
+
+    const expected4Total = parseFloat((y4Phase1 + y4Phase2 + y4Phase3 + y4Phase4).toFixed(4));
+    expect(normData.phaseAnalysis.totalY).toEqual(expected4Total);
+    expect(normData.phaseAnalysis.totalY).toBeGreaterThan(normData.phaseAnalysis.phase1.flowRatioY);
   });
 
 });

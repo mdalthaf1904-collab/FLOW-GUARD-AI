@@ -259,6 +259,45 @@ describe('Step 5: Run Analysis Engine', () => {
     expect(proj.lastAnalysisResult).toBeDefined();
     expect(proj.lastAnalysisResult.runId).toBe('RUN-TEST-001');
   });
+
+  test('12. High Demand Webster Cycle Limit (Y = 0.9262, L = 16s): computes C0 ~ 393s, applies configured 180s max limit, and verifies constrained status', () => {
+    const Y = 0.9262;
+    const L = 16; // 4 phases * 4s
+    const configuredMaxCycle = 180;
+
+    const C0 = Math.round((1.5 * L + 5) / (1 - Y));
+    expect(C0).toBe(393); // Unconstrained theoretical Webster cycle
+
+    const appliedCycle = Math.min(C0, configuredMaxCycle);
+    expect(appliedCycle).toBe(180); // Applied cycle constrained to 180s
+
+    const isConstrained = C0 > configuredMaxCycle;
+    expect(isConstrained).toBe(true);
+
+    const gEff = appliedCycle - L;
+    expect(gEff).toBe(164); // Applied effective green using 180s cycle
+
+    // Verify calculateWebsterEngine handles high demand correctly
+    const mockApproaches = {
+      north: { flow: 1400, lanes: 2 }, // sat = 3680, y = 0.3804
+      east: { flow: 1000, lanes: 2 },  // sat = 3680, y = 0.2717
+      south: { flow: 700, lanes: 2 },   // sat = 3680, y = 0.1902
+      west: { flow: 300, lanes: 2 }    // sat = 3680, y = 0.0815
+    };
+
+    const res = FlowGuard.calculateWebsterEngine(mockApproaches);
+    expect(res.websterCycleC0).toBeGreaterThan(180);
+    expect(res.appliedCycle).toBe(180);
+    expect(res.isConstrained).toBe(true);
+    expect(res.effectiveGreenTotal).toBe(180 - res.totalLostTimeL);
+  });
+
+  test('13. runStep5Analysis execution wrapper executes analysis cleanly', async () => {
+    expect(typeof FlowGuard.runStep5Analysis).toBe('function');
+    const p = FlowGuard.runStep5Analysis();
+    expect(p).toBeDefined();
+    await p;
+  });
 });
 
 

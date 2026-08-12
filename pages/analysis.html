@@ -137,7 +137,7 @@
         <!-- STEP 1 SECTION: INTERSECTION GEOMETRY -->
         <section id="wizard-section-1" class="wizard-section-panel" style="display: block; margin-bottom: 2rem;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem;">
-            <h2 class="section-header-title" style="font-size: 1.05rem; margin-bottom: 0;">1. INTERSECTION GEOMETRY</h2>
+            <h2 class="section-header-title" style="font-size: 1.05rem; margin-bottom: 0;">INTERSECTION GEOMETRY</h2>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
               <span class="badge"
                 style="background: rgba(16,185,129,0.12); color: var(--success); border: 1px solid rgba(16,185,129,0.3); font-size: 0.72rem; font-weight: 700;">✓
@@ -311,7 +311,7 @@
         <!-- STEP 2 SECTION: TRAFFIC INPUT MODE -->
         <section id="wizard-section-2" class="wizard-section-panel" style="display: none;">
           <div style="margin-bottom: 1.25rem;">
-            <h2 class="section-header-title" style="font-size: 1.05rem; margin-bottom: 0.2rem;">Historical Dataset Upload</h2>
+            <h2 class="section-header-title" style="font-size: 1.05rem; margin-bottom: 0.2rem;">TRAFFIC INPUT MODE</h2>
             <p style="font-size: 0.82rem; color: var(--text-secondary);">Upload your historical traffic survey dataset (.csv, .xlsx, .xls) for automated traffic analysis.</p>
           </div>
 
@@ -371,7 +371,7 @@
 
           <div class="eng-panels-grid">
 
-            <!-- 1. SIGNAL CONTROL PARAMETERS CARD -->
+            <!-- SECTION A — SIGNAL CONTROL PARAMETERS CARD -->
             <div class="eng-panel-card">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
@@ -425,8 +425,35 @@
               </div>
             </div>
 
-            <!-- 1B. BASELINE / EXISTING SIGNAL TIMING CARD -->
+            <!-- SECTION B — BASE SATURATION FLOW CARD -->
             <div class="eng-panel-card">
+              <div class="eng-panel-header">
+                <div class="eng-panel-title-group">
+                  <div class="eng-panel-icon">📊</div>
+                  <div>
+                    <div class="eng-panel-title">SECTION B — BASE SATURATION FLOW</div>
+                    <div class="eng-panel-subtitle">Base saturation flow rate S₀ per lane</div>
+                  </div>
+                </div>
+                <span class="badge" id="satFlowSourceBadge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">Inherited from Step 1</span>
+              </div>
+
+              <div class="control-field-group" style="margin-bottom: 0.75rem;">
+                <label class="control-field-label">Base Saturation Flow S₀ (PCU/h/lane)</label>
+                <input type="number" id="engBaseSatFlow" class="control-field-select" value="1800" min="500" max="3000" step="50">
+                <span class="input-val-check" id="valCheckSatFlow" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&gt; 0 PCU/h/ln)</span>
+              </div>
+
+              <div style="background: rgba(15,23,42,0.6); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.78rem; color: var(--accent-primary); font-weight: 600;">Default engineering assumption</div>
+                <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.25rem; line-height: 1.4;">
+                  Standard base saturation flow rate S₀ per lane. Inherits Step 1 geometry values if available, or allows manual override. Saturation flow calculations occur in Step 4.
+                </p>
+              </div>
+            </div>
+
+            <!-- SECTION C — BASELINE / EXISTING SIGNAL TIMING CARD (FULL WIDTH) -->
+            <div class="eng-panel-card full-width">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">🚥</div>
@@ -444,14 +471,40 @@
                   <input type="number" id="engExistingCycle" class="control-field-select" value="120" min="20" max="300" step="5">
                 </div>
 
-                <div class="control-field-group">
-                  <label class="control-field-label">Phase 1 — North / South Green (s)</label>
-                  <input type="number" id="engBaselineP1Green" class="control-field-select" placeholder="e.g. 60" min="1" max="200" step="1">
+                <!-- 2-PHASE BASELINE INPUTS -->
+                <div id="baseline2PhaseGreensContainer" style="display: contents;">
+                  <div class="control-field-group">
+                    <label class="control-field-label">Phase 1 — North / South Green (s)</label>
+                    <input type="number" id="engBaselineP1Green" class="control-field-select" placeholder="e.g. 60" min="1" max="200" step="1">
+                  </div>
+
+                  <div class="control-field-group">
+                    <label class="control-field-label">Phase 2 — East / West Green (s)</label>
+                    <input type="number" id="engBaselineP2Green" class="control-field-select" placeholder="e.g. 52" min="1" max="200" step="1">
+                  </div>
                 </div>
 
-                <div class="control-field-group">
-                  <label class="control-field-label">Phase 2 — East / West Green (s)</label>
-                  <input type="number" id="engBaselineP2Green" class="control-field-select" placeholder="e.g. 52" min="1" max="200" step="1">
+                <!-- 4-PHASE BASELINE INPUTS -->
+                <div id="baseline4PhaseGreensContainer" style="display: none; grid-column: span 2; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                  <div class="control-field-group">
+                    <label class="control-field-label">Phase 1 — Road A / North Green (s)</label>
+                    <input type="number" id="engBaselineP1Green4" class="control-field-select" placeholder="e.g. 25" min="1" max="200" step="1">
+                  </div>
+
+                  <div class="control-field-group">
+                    <label class="control-field-label">Phase 2 — Road B / East Green (s)</label>
+                    <input type="number" id="engBaselineP2Green4" class="control-field-select" placeholder="e.g. 30" min="1" max="200" step="1">
+                  </div>
+
+                  <div class="control-field-group">
+                    <label class="control-field-label">Phase 3 — Road C / South Green (s)</label>
+                    <input type="number" id="engBaselineP3Green" class="control-field-select" placeholder="e.g. 35" min="1" max="200" step="1">
+                  </div>
+
+                  <div class="control-field-group">
+                    <label class="control-field-label">Phase 4 — Road D / West Green (s)</label>
+                    <input type="number" id="engBaselineP4Green" class="control-field-select" placeholder="e.g. 20" min="1" max="200" step="1">
+                  </div>
                 </div>
 
                 <div class="control-field-group">
@@ -476,40 +529,13 @@
               </div>
             </div>
 
-            <!-- 2. BASE SATURATION FLOW CARD -->
-            <div class="eng-panel-card">
-              <div class="eng-panel-header">
-                <div class="eng-panel-title-group">
-                  <div class="eng-panel-icon">📊</div>
-                  <div>
-                    <div class="eng-panel-title">BASE SATURATION FLOW</div>
-                    <div class="eng-panel-subtitle">Base saturation flow rate S₀ per lane</div>
-                  </div>
-                </div>
-                <span class="badge" id="satFlowSourceBadge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">Inherited from Step 1</span>
-              </div>
-
-              <div class="control-field-group" style="margin-bottom: 0.75rem;">
-                <label class="control-field-label">Base Saturation Flow S₀ (PCU/h/lane)</label>
-                <input type="number" id="engBaseSatFlow" class="control-field-select" value="1800" min="500" max="3000" step="50">
-                <span class="input-val-check" id="valCheckSatFlow" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&gt; 0 PCU/h/ln)</span>
-              </div>
-
-              <div style="background: rgba(15,23,42,0.6); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.78rem; color: var(--accent-primary); font-weight: 600;">Default engineering assumption</div>
-                <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.25rem; line-height: 1.4;">
-                  Standard base saturation flow rate S₀ per lane. Inherits Step 1 geometry values if available, or allows manual override. Saturation flow calculations occur in Step 4.
-                </p>
-              </div>
-            </div>
-
-            <!-- 3. PCU EQUIVALENCE FACTORS CARD (FULL WIDTH) -->
+            <!-- SECTION D — PCU EQUIVALENCE FACTORS CARD (FULL WIDTH) -->
             <div class="eng-panel-card full-width">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">🚗</div>
                   <div>
-                    <div class="eng-panel-title">PCU EQUIVALENCE FACTORS</div>
+                    <div class="eng-panel-title">SECTION D — PCU EQUIVALENCE FACTORS</div>
                     <div class="eng-panel-subtitle">Passenger Car Unit equivalence factors for raw vehicle count conversion in Step 4</div>
                   </div>
                 </div>
@@ -582,13 +608,13 @@
               </p>
             </div>
 
-            <!-- 4. PHASE STRUCTURE CARD -->
+            <!-- SECTION E — INTERSECTION PHASE CONFIGURATION CARD -->
             <div class="eng-panel-card">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">🚦</div>
                   <div>
-                    <div class="eng-panel-title">INTERSECTION PHASE CONFIGURATION</div>
+                    <div class="eng-panel-title">SECTION E — INTERSECTION PHASE CONFIGURATION</div>
                     <div class="eng-panel-subtitle">Signal phase approach mapping for 4-road intersection</div>
                   </div>
                 </div>
@@ -623,13 +649,13 @@
               </p>
             </div>
 
-            <!-- 5. PEDESTRIAN & SAFETY PARAMETERS CARD -->
+            <!-- SECTION F — PEDESTRIAN & SAFETY PARAMETERS CARD -->
             <div class="eng-panel-card">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">🚶</div>
                   <div>
-                    <div class="eng-panel-title">PEDESTRIAN &amp; SAFETY PARAMETERS</div>
+                    <div class="eng-panel-title">SECTION F — PEDESTRIAN &amp; SAFETY PARAMETERS</div>
                     <div class="eng-panel-subtitle">Walk interval &amp; safety clearance inputs</div>
                   </div>
                 </div>
@@ -671,13 +697,13 @@
               </p>
             </div>
 
-            <!-- 6. BASELINE / OBSERVED PERFORMANCE CARD (FULL WIDTH) -->
+            <!-- SECTION G — BASELINE / OBSERVED PERFORMANCE CARD (FULL WIDTH) -->
             <div class="eng-panel-card full-width">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">📉</div>
                   <div>
-                    <div class="eng-panel-title">BASELINE / OBSERVED PERFORMANCE</div>
+                    <div class="eng-panel-title">SECTION G — BASELINE / OBSERVED PERFORMANCE</div>
                     <div class="eng-panel-subtitle">Optional existing-condition observed metrics for BEFORE vs AFTER evaluation</div>
                   </div>
                 </div>
@@ -872,7 +898,7 @@
         <!-- STEP 4 SECTION: TRAFFIC SUMMARY ENGINEERING DASHBOARD -->
         <section id="wizard-section-4" class="wizard-section-panel" style="display: none;">
           <div style="margin-bottom: 1.5rem;">
-            <h2 class="section-header-title" style="font-size: 1.05rem;">4. TRAFFIC SUMMARY &amp; ENGINEERING DASHBOARD</h2>
+            <h2 class="section-header-title" style="font-size: 1.05rem;">TRAFFIC SUMMARY &amp; ENGINEERING DASHBOARD</h2>
             <p style="font-size: 0.82rem; color: var(--text-secondary);">Centralized pre-analysis engineering dashboard summarizing carriageway geometry (Step 1), validated raw traffic dataset (Step 2), and engineering parameters (Step 3) prior to Webster optimization.</p>
           </div>
 
@@ -1005,7 +1031,7 @@
             <div class="summary-dash-title-group">
               <div class="summary-dash-icon">⚡</div>
               <div>
-                <div class="summary-dash-title">5. RUN ANALYSIS</div>
+                <div class="summary-dash-title">RUN ANALYSIS PIPELINE</div>
                 <div class="summary-dash-subtitle">Offline signal-timing recommendation from validated historical traffic data</div>
               </div>
             </div>
@@ -1027,6 +1053,28 @@
               <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Optimization Method</div>
               <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.2rem;">Webster Method (IRC:93)</div>
             </div>
+          </div>
+          
+          <div id="step5DashboardContent" style="margin-top: 1.5rem;"></div>
+
+          <!-- Step 5 Bottom Action Buttons -->
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+            <button class="btn-ghost-reset" id="btnStep5Back" onclick="FlowGuard.setWizardStep(4)">← BACK TO TRAFFIC SUMMARY</button>
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;" id="step5BottomActionGroup">
+              <button class="btn-secondary-save" id="btnDownloadReportStep5" onclick="FlowGuard.generateEngineeringReport()">🖨 Download Report</button>
+              <button class="btn-primary-cyan" id="btnRunAgainStep5" onclick="FlowGuard.runStep5Analysis()">▶ Run Analysis Again</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- STEP 6 SECTION: RESULTS & REPORTS -->
+      <section id="wizard-section-6" class="wizard-section-panel" style="display: none;">
+        <div
+          style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 class="section-header-title" style="font-size: 1.05rem;">RESULTS &amp; ENGINEERING REPORTS</h2>
           </div>
         </div>
 

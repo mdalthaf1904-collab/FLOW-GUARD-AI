@@ -42,6 +42,7 @@
     <ul class="nav-links">
       <li><a href="#landing" id="navLinkLanding" class="nav-link active" onclick="if(window.FlowGuard) FlowGuard.switchMainView('landing');">FlowGuard AI</a></li>
       <li><a href="#analyzer" id="navLinkAnalyzer" class="nav-link" onclick="if(window.FlowGuard) FlowGuard.switchMainView('analyzer');">Traffic Analysis</a></li>
+      <li><a href="#simulation" id="navLinkSimulation" class="nav-link" onclick="if(window.FlowGuard) FlowGuard.switchMainView('simulation');">Signal Simulation</a></li>
     </ul>
 
     <div class="top-navbar-right-info">
@@ -430,7 +431,7 @@
       <!-- STEP 1 SECTION: INTERSECTION GEOMETRY SETUP -->
       <section id="wizard-section-1" class="wizard-section-panel" style="display: block;">
         <div style="margin-bottom: 1.5rem;">
-          <h2 class="section-header-title" style="font-size: 1.05rem;">1. INTERSECTION GEOMETRY &amp; PHYSICAL SETUP</h2>
+          <h2 class="section-header-title" style="font-size: 1.05rem;">INTERSECTION GEOMETRY &amp; PHYSICAL SETUP</h2>
           <p style="font-size: 0.82rem; color: var(--text-secondary);">Define physical carriageway geometry, incoming lanes, lane width, speed limits, and approach configurations prior to traffic data ingestion.</p>
         </div>
 
@@ -899,7 +900,7 @@
       <section id="wizard-section-2" class="wizard-section-panel" style="display: none;">
         <div style="margin-bottom: 1.25rem;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2 class="section-header-title" style="font-size: 1.05rem; margin-bottom: 0.2rem;">2. TRAFFIC INPUT MODE — HISTORICAL DATASET UPLOAD</h2>
+            <h2 class="section-header-title" style="font-size: 1.05rem; margin-bottom: 0.2rem;">TRAFFIC INPUT MODE — HISTORICAL DATASET UPLOAD</h2>
             <span class="badge" id="step2StatusBadge" style="background: rgba(148,163,184,0.12); color: var(--text-secondary); border: 1px solid var(--border-color);">Awaiting Dataset</span>
           </div>
           <p style="font-size: 0.82rem; color: var(--text-secondary);">Upload your historical traffic survey dataset (.xlsx, .xls, .csv) with sheet 'Traffic_Input' to ingest survey records.</p>
@@ -958,13 +959,13 @@
       <!-- STEP 3 SECTION: ENGINEERING PARAMETERS -->
       <section id="wizard-section-3" class="wizard-section-panel" style="display: none;">
         <div style="margin-bottom: 1.5rem;">
-          <h2 class="section-header-title" style="font-size: 1.05rem;">3. ENGINEERING PARAMETERS &amp; DESIGN ASSUMPTIONS</h2>
+          <h2 class="section-header-title" style="font-size: 1.05rem;">ENGINEERING PARAMETERS &amp; DESIGN ASSUMPTIONS</h2>
           <p style="font-size: 0.82rem; color: var(--text-secondary);">Configure signal control parameters, saturation flow, PCU factors, phase structure, pedestrian safety, and baseline performance before Traffic Summary.</p>
         </div>
 
           <div class="eng-panels-grid">
 
-            <!-- 1. SIGNAL CONTROL PARAMETERS CARD -->
+            <!-- SECTION A — SIGNAL CONTROL PARAMETERS CARD -->
             <div class="eng-panel-card">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
@@ -1018,8 +1019,35 @@
               </div>
             </div>
 
-            <!-- 1B. BASELINE / EXISTING SIGNAL TIMING CARD -->
+            <!-- SECTION B — BASE SATURATION FLOW CARD -->
             <div class="eng-panel-card">
+              <div class="eng-panel-header">
+                <div class="eng-panel-title-group">
+                  <div class="eng-panel-icon">📊</div>
+                  <div>
+                    <div class="eng-panel-title">SECTION B — BASE SATURATION FLOW</div>
+                    <div class="eng-panel-subtitle">Base saturation flow rate S₀ per lane</div>
+                  </div>
+                </div>
+                <span class="badge" id="satFlowSourceBadge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">Inherited from Step 1</span>
+              </div>
+
+              <div class="control-field-group" style="margin-bottom: 0.75rem;">
+                <label class="control-field-label">Base Saturation Flow S₀ (PCU/h/lane)</label>
+                <input type="number" id="engBaseSatFlow" class="control-field-select" value="1800" min="500" max="3000" step="50">
+                <span class="input-val-check" id="valCheckSatFlow" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&gt; 0 PCU/h/ln)</span>
+              </div>
+
+              <div style="background: rgba(15,23,42,0.6); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.78rem; color: var(--accent-primary); font-weight: 600;">Default engineering assumption</div>
+                <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.25rem; line-height: 1.4;">
+                  Standard base saturation flow rate S₀ per lane. Inherits Step 1 geometry values if available, or allows manual override. Saturation flow calculations occur in Step 4.
+                </p>
+              </div>
+            </div>
+
+            <!-- SECTION C — BASELINE / EXISTING SIGNAL TIMING CARD (FULL WIDTH) -->
+            <div class="eng-panel-card full-width">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">🚥</div>
@@ -1037,14 +1065,40 @@
                   <input type="number" id="engExistingCycle" class="control-field-select" value="120" min="20" max="300" step="5">
                 </div>
 
-                <div class="control-field-group">
-                  <label class="control-field-label">Phase 1 — North / South Green (s)</label>
-                  <input type="number" id="engBaselineP1Green" class="control-field-select" placeholder="e.g. 60" min="1" max="200" step="1">
+                <!-- 2-PHASE BASELINE INPUTS -->
+                <div id="baseline2PhaseGreensContainer" style="display: contents;">
+                  <div class="control-field-group">
+                    <label class="control-field-label">Phase 1 — North / South Green (s)</label>
+                    <input type="number" id="engBaselineP1Green" class="control-field-select" placeholder="e.g. 60" min="1" max="200" step="1">
+                  </div>
+
+                  <div class="control-field-group">
+                    <label class="control-field-label">Phase 2 — East / West Green (s)</label>
+                    <input type="number" id="engBaselineP2Green" class="control-field-select" placeholder="e.g. 52" min="1" max="200" step="1">
+                  </div>
                 </div>
 
-                <div class="control-field-group">
-                  <label class="control-field-label">Phase 2 — East / West Green (s)</label>
-                  <input type="number" id="engBaselineP2Green" class="control-field-select" placeholder="e.g. 52" min="1" max="200" step="1">
+                <!-- 4-PHASE BASELINE INPUTS -->
+                <div id="baseline4PhaseGreensContainer" style="display: none; grid-column: span 2; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                  <div class="control-field-group">
+                    <label class="control-field-label">Phase 1 — Road A / North Green (s)</label>
+                    <input type="number" id="engBaselineP1Green4" class="control-field-select" placeholder="e.g. 25" min="1" max="200" step="1">
+                  </div>
+
+                  <div class="control-field-group">
+                    <label class="control-field-label">Phase 2 — Road B / East Green (s)</label>
+                    <input type="number" id="engBaselineP2Green4" class="control-field-select" placeholder="e.g. 30" min="1" max="200" step="1">
+                  </div>
+
+                  <div class="control-field-group">
+                    <label class="control-field-label">Phase 3 — Road C / South Green (s)</label>
+                    <input type="number" id="engBaselineP3Green" class="control-field-select" placeholder="e.g. 35" min="1" max="200" step="1">
+                  </div>
+
+                  <div class="control-field-group">
+                    <label class="control-field-label">Phase 4 — Road D / West Green (s)</label>
+                    <input type="number" id="engBaselineP4Green" class="control-field-select" placeholder="e.g. 20" min="1" max="200" step="1">
+                  </div>
                 </div>
 
                 <div class="control-field-group">
@@ -1069,40 +1123,13 @@
               </div>
             </div>
 
-            <!-- 2. BASE SATURATION FLOW CARD -->
-            <div class="eng-panel-card">
-              <div class="eng-panel-header">
-                <div class="eng-panel-title-group">
-                  <div class="eng-panel-icon">📊</div>
-                  <div>
-                    <div class="eng-panel-title">BASE SATURATION FLOW</div>
-                    <div class="eng-panel-subtitle">Base saturation flow rate S₀ per lane</div>
-                  </div>
-                </div>
-                <span class="badge" id="satFlowSourceBadge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">Inherited from Step 1</span>
-              </div>
-
-              <div class="control-field-group" style="margin-bottom: 0.75rem;">
-                <label class="control-field-label">Base Saturation Flow S₀ (PCU/h/lane)</label>
-                <input type="number" id="engBaseSatFlow" class="control-field-select" value="1800" min="500" max="3000" step="50">
-                <span class="input-val-check" id="valCheckSatFlow" style="font-size:0.7rem; color:var(--success); font-weight:700;">✓ Valid (&gt; 0 PCU/h/ln)</span>
-              </div>
-
-              <div style="background: rgba(15,23,42,0.6); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.78rem; color: var(--accent-primary); font-weight: 600;">Default engineering assumption</div>
-                <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.25rem; line-height: 1.4;">
-                  Standard base saturation flow rate S₀ per lane. Inherits Step 1 geometry values if available, or allows manual override. Saturation flow calculations occur in Step 4.
-                </p>
-              </div>
-            </div>
-
-            <!-- 3. PCU EQUIVALENCE FACTORS CARD (FULL WIDTH) -->
+            <!-- SECTION D — PCU EQUIVALENCE FACTORS CARD (FULL WIDTH) -->
             <div class="eng-panel-card full-width">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">🚗</div>
                   <div>
-                    <div class="eng-panel-title">PCU EQUIVALENCE FACTORS</div>
+                    <div class="eng-panel-title">SECTION D — PCU EQUIVALENCE FACTORS</div>
                     <div class="eng-panel-subtitle">Passenger Car Unit equivalence factors for raw vehicle count conversion in Step 4</div>
                   </div>
                 </div>
@@ -1175,20 +1202,34 @@
               </p>
             </div>
 
-            <!-- 4. PHASE STRUCTURE CARD -->
+            <!-- SECTION E — INTERSECTION PHASE CONFIGURATION CARD -->
             <div class="eng-panel-card">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">🚦</div>
                   <div>
-                    <div class="eng-panel-title">INTERSECTION PHASE CONFIGURATION</div>
+                    <div class="eng-panel-title">SECTION E — INTERSECTION PHASE CONFIGURATION</div>
                     <div class="eng-panel-subtitle">Signal phase approach mapping for 4-road intersection</div>
                   </div>
                 </div>
                 <span class="badge badge-low" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Phase Assignment Only</span>
               </div>
 
-              <div style="display: flex; flex-direction: column; gap: 0.85rem; margin-top: 0.25rem;">
+              <!-- PHASE MODE SELECTOR -->
+              <div style="margin-bottom: 0.85rem; background: rgba(15, 23, 42, 0.6); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+                <label class="control-field-label" style="margin-bottom: 0; font-size: 0.85rem; font-weight: 700;">Signal Phase Mode</label>
+                <div style="display: flex; gap: 1.25rem; align-items: center;">
+                  <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer; color: var(--text-primary); font-weight: 600;">
+                    <input type="radio" name="phaseMode" id="phaseMode2" value="2-phase" checked style="accent-color: var(--accent-primary);"> 2-PHASE SIGNAL
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; cursor: pointer; color: var(--text-primary); font-weight: 600;">
+                    <input type="radio" name="phaseMode" id="phaseMode4" value="4-phase" style="accent-color: var(--accent-primary);"> 4-PHASE SIGNAL
+                  </label>
+                </div>
+              </div>
+
+              <!-- 2-PHASE CONTAINER -->
+              <div id="phase2CardsContainer" style="display: flex; flex-direction: column; gap: 0.85rem;">
                 <div style="background: rgba(15,23,42,0.7); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.85rem;">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
                     <strong style="color: var(--accent-primary); font-size: 0.88rem;">PHASE 1 — NORTH / SOUTH</strong>
@@ -1211,18 +1252,62 @@
                   </div>
                 </div>
               </div>
+
+              <!-- 4-PHASE CONTAINER -->
+              <div id="phase4CardsContainer" style="display: none; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.85rem;">
+                <div style="background: rgba(15,23,42,0.7); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.85rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                    <strong style="color: var(--accent-primary); font-size: 0.88rem;">PHASE 1 — NORTHBOUND</strong>
+                    <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">Configured</span>
+                  </div>
+                  <div style="font-size: 0.82rem; color: var(--text-primary);">
+                    <span>• Road A — Northbound</span>
+                  </div>
+                </div>
+
+                <div style="background: rgba(15,23,42,0.7); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.85rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                    <strong style="color: #fcd34d; font-size: 0.88rem;">PHASE 2 — EASTBOUND</strong>
+                    <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">Configured</span>
+                  </div>
+                  <div style="font-size: 0.82rem; color: var(--text-primary);">
+                    <span>• Road B — Eastbound</span>
+                  </div>
+                </div>
+
+                <div style="background: rgba(15,23,42,0.7); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.85rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                    <strong style="color: #38bdf8; font-size: 0.88rem;">PHASE 3 — SOUTHBOUND</strong>
+                    <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">Configured</span>
+                  </div>
+                  <div style="font-size: 0.82rem; color: var(--text-primary);">
+                    <span>• Road C — Southbound</span>
+                  </div>
+                </div>
+
+                <div style="background: rgba(15,23,42,0.7); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.85rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                    <strong style="color: #a78bfa; font-size: 0.88rem;">PHASE 4 — WESTBOUND</strong>
+                    <span class="badge" style="background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3);">Configured</span>
+                  </div>
+                  <div style="font-size: 0.82rem; color: var(--text-primary);">
+                    <span>• Road D — Westbound</span>
+                  </div>
+                </div>
+              </div>
+
               <p style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 0.25rem;">
                 Note: Defines signal phase approach grouping. Critical flow ratios are computed in Step 4.
               </p>
             </div>
 
-            <!-- 5. PEDESTRIAN & SAFETY PARAMETERS CARD -->
+            <!-- SECTION F — PEDESTRIAN & SAFETY PARAMETERS CARD -->
             <div class="eng-panel-card">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">🚶</div>
                   <div>
-                    <div class="eng-panel-title">PEDESTRIAN &amp; SAFETY PARAMETERS</div>
+                    <div class="eng-panel-title">SECTION F — PEDESTRIAN &amp; SAFETY PARAMETERS</div>
                     <div class="eng-panel-subtitle">Walk interval &amp; safety clearance inputs</div>
                   </div>
                 </div>
@@ -1264,13 +1349,13 @@
               </p>
             </div>
 
-            <!-- 6. BASELINE / OBSERVED PERFORMANCE CARD (FULL WIDTH) -->
+            <!-- SECTION G — BASELINE / OBSERVED PERFORMANCE CARD (FULL WIDTH) -->
             <div class="eng-panel-card full-width">
               <div class="eng-panel-header">
                 <div class="eng-panel-title-group">
                   <div class="eng-panel-icon">📉</div>
                   <div>
-                    <div class="eng-panel-title">BASELINE / OBSERVED PERFORMANCE</div>
+                    <div class="eng-panel-title">SECTION G — BASELINE / OBSERVED PERFORMANCE</div>
                     <div class="eng-panel-subtitle">Optional existing-condition observed metrics for BEFORE vs AFTER evaluation</div>
                   </div>
                 </div>
@@ -1400,6 +1485,14 @@
                   <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Phase 2</div>
                   <div style="font-size: 1.05rem; font-weight: 700; color: #fcd34d; margin-top: 0.2rem;" id="summaryPhase2Val">Road B + Road D (E/W)</div>
                 </div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); display: none;" id="summaryPhase3Container">
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Phase 3</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: #38bdf8; margin-top: 0.2rem;" id="summaryPhase3Val">Road C (Southbound)</div>
+                </div>
+                <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); display: none;" id="summaryPhase4Container">
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Phase 4</div>
+                  <div style="font-size: 1.05rem; font-weight: 700; color: #a78bfa; margin-top: 0.2rem;" id="summaryPhase4Val">Road D (Westbound)</div>
+                </div>
 
                 <!-- ROW 2 -->
                 <div style="background: rgba(30,41,59,0.6); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
@@ -1463,7 +1556,7 @@
       <!-- STEP 4 SECTION: TRAFFIC SUMMARY ENGINEERING DASHBOARD -->
       <section id="wizard-section-4" class="wizard-section-panel" style="display: none;">
         <div style="margin-bottom: 1.5rem;">
-          <h2 class="section-header-title" style="font-size: 1.05rem;">4. TRAFFIC SUMMARY &amp; ENGINEERING DASHBOARD</h2>
+          <h2 class="section-header-title" style="font-size: 1.05rem;">TRAFFIC SUMMARY &amp; ENGINEERING DASHBOARD</h2>
           <p style="font-size: 0.82rem; color: var(--text-secondary);">Centralized pre-analysis engineering dashboard summarizing carriageway geometry (Step 1), validated raw traffic dataset (Step 2), and engineering parameters (Step 3) prior to Webster optimization.</p>
         </div>
 
@@ -1548,33 +1641,49 @@
                 <div class="summary-dash-icon">⚡</div>
                 <div>
                   <div class="summary-dash-title">3. Intersection / Phase Summary</div>
-                  <div class="summary-dash-subtitle">Pre-analysis flow ratio aggregation for Phase 1 (N/S) &amp; Phase 2 (E/W)</div>
+                  <div class="summary-dash-subtitle" id="sumDashPhaseSubtitle">Pre-analysis flow ratio aggregation for Phase 1 (N/S) &amp; Phase 2 (E/W)</div>
                 </div>
               </div>
               <span class="badge badge-low">Phase Summary</span>
             </div>
 
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
-              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.72rem; color: var(--accent-primary); text-transform: uppercase; font-weight: 700;">Phase 1 (Road A + Road C)</div>
+              <div class="summary-metric-box" id="phase1CardBox" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.72rem; color: var(--accent-primary); text-transform: uppercase; font-weight: 700;" id="phase1CardTitle">PHASE 1 (ROAD A + ROAD C)</div>
                 <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.3rem;">Critical Movement: <strong style="color: var(--text-primary);" id="phase1CritMove">--</strong></div>
                 <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Critical Flow (q₁): <strong style="color: var(--text-primary);" id="phase1CritFlow">None</strong></div>
                 <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Saturation Flow (s₁): <strong style="color: var(--text-primary);" id="phase1SatFlow">Awaiting Data</strong></div>
                 <div style="font-size: 0.95rem; font-weight: 800; color: var(--accent-primary); margin-top: 0.4rem;">Phase 1 Ratio (y₁): <span id="phase1FlowRatioY">--</span></div>
               </div>
 
-              <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                <div style="font-size: 0.72rem; color: #fcd34d; text-transform: uppercase; font-weight: 700;">Phase 2 (Road B + Road D)</div>
+              <div class="summary-metric-box" id="phase2CardBox" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.72rem; color: #fcd34d; text-transform: uppercase; font-weight: 700;" id="phase2CardTitle">PHASE 2 (ROAD B + ROAD D)</div>
                 <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.3rem;">Critical Movement: <strong style="color: var(--text-primary);" id="phase2CritMove">--</strong></div>
                 <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Critical Flow (q₂): <strong style="color: var(--text-primary);" id="phase2CritFlow">None</strong></div>
                 <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Saturation Flow (s₂): <strong style="color: var(--text-primary);" id="phase2SatFlow">Awaiting Data</strong></div>
                 <div style="font-size: 0.95rem; font-weight: 800; color: #fcd34d; margin-top: 0.4rem;">Phase 2 Ratio (y₂): <span id="phase2FlowRatioY">--</span></div>
               </div>
 
+              <div class="summary-metric-box" id="phase3CardBox" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); display: none;">
+                <div style="font-size: 0.72rem; color: #34d399; text-transform: uppercase; font-weight: 700;" id="phase3CardTitle">PHASE 3 — ROAD C</div>
+                <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.3rem;">Critical Movement: <strong style="color: var(--text-primary);" id="phase3CritMove">--</strong></div>
+                <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Critical Flow (q₃): <strong style="color: var(--text-primary);" id="phase3CritFlow">None</strong></div>
+                <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Saturation Flow (s₃): <strong style="color: var(--text-primary);" id="phase3SatFlow">Awaiting Data</strong></div>
+                <div style="font-size: 0.95rem; font-weight: 800; color: #34d399; margin-top: 0.4rem;">Phase 3 Ratio (y₃): <span id="phase3FlowRatioY">--</span></div>
+              </div>
+
+              <div class="summary-metric-box" id="phase4CardBox" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); display: none;">
+                <div style="font-size: 0.72rem; color: #a78bfa; text-transform: uppercase; font-weight: 700;" id="phase4CardTitle">PHASE 4 — ROAD D</div>
+                <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.3rem;">Critical Movement: <strong style="color: var(--text-primary);" id="phase4CritMove">--</strong></div>
+                <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Critical Flow (q₄): <strong style="color: var(--text-primary);" id="phase4CritFlow">None</strong></div>
+                <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem;">Saturation Flow (s₄): <strong style="color: var(--text-primary);" id="phase4SatFlow">Awaiting Data</strong></div>
+                <div style="font-size: 0.95rem; font-weight: 800; color: #a78bfa; margin-top: 0.4rem;">Phase 4 Ratio (y₄): <span id="phase4FlowRatioY">--</span></div>
+              </div>
+
               <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
                 <div style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase;">Intersection Total Flow Ratio</div>
                 <div style="font-size: 1.25rem; font-weight: 800; color: var(--success); margin-top: 0.3rem;" id="sumDashTotalFlowRatioY">--</div>
-                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem;">Sum of Configured Phase Ratios (Y = y₁ + y₂)</div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem;" id="sumDashTotalYFormula">Sum of Configured Phase Ratios (Y = y₁ + y₂)</div>
               </div>
 
               <div class="summary-metric-box" style="background: rgba(15,23,42,0.6); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
@@ -1596,8 +1705,8 @@
             <div class="summary-dash-title-group">
               <div class="summary-dash-icon">⚡</div>
               <div>
-                <div class="summary-dash-title">5. RUN ANALYSIS</div>
-                <div class="summary-dash-subtitle">Offline signal-timing recommendation from validated historical traffic data</div>
+                <div class="summary-dash-title">RUN ANALYSIS PIPELINE</div>
+                <div class="summary-dash-subtitle" id="step5HeaderSubtitle">Execute Webster optimum cycle calculation &amp; signal validation for a 2-phase signal model.</div>
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
@@ -1722,52 +1831,14 @@
               <div class="summary-dash-icon">🔀</div>
               <div>
                 <div class="summary-dash-title">SECTION 3 — INTERSECTION PHASE MODEL</div>
-                <div class="summary-dash-subtitle">Two-phase signal model aggregating Phase 1 (N/S) &amp; Phase 2 (E/W) critical flow ratios</div>
+                <div class="summary-dash-subtitle" id="step5Section3Subtitle">Two-phase signal model aggregating Phase 1 (N/S) &amp; Phase 2 (E/W) critical flow ratios</div>
               </div>
             </div>
-            <span class="badge badge-low">Two-Phase Model</span>
+            <span class="badge badge-low" id="step5Section3Badge">Two-Phase Model</span>
           </div>
 
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
-            <!-- Phase 1 Card -->
-            <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
-              <div style="font-size: 0.85rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">PHASE 1 — NORTH / SOUTH</div>
-              <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Approaches: <strong style="color: var(--text-primary);">Road A (North) + Road C (South)</strong></div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem;">
-                <div>
-                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Approach</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;" id="step5Phase1CritApp">—</div>
-                </div>
-                <div>
-                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Flow (q₁)</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;" id="step5Phase1CritFlow">—</div>
-                </div>
-              </div>
-              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 0.8rem; color: var(--text-secondary);">Phase 1 Critical Ratio (y₁):</span>
-                <span style="font-size: 1.1rem; font-weight: 800; color: var(--accent-primary);" id="step5Phase1RatioY">—</span>
-              </div>
-            </div>
-
-            <!-- Phase 2 Card -->
-            <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
-              <div style="font-size: 0.85rem; font-weight: 800; color: #fcd34d; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">PHASE 2 — EAST / WEST</div>
-              <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Approaches: <strong style="color: var(--text-primary);">Road B (East) + Road D (West)</strong></div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem;">
-                <div>
-                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Approach</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;" id="step5Phase2CritApp">—</div>
-                </div>
-                <div>
-                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Critical Flow (q₂)</div>
-                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 0.1rem;" id="step5Phase2CritFlow">—</div>
-                </div>
-              </div>
-              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 0.8rem; color: var(--text-secondary);">Phase 2 Critical Ratio (y₂):</span>
-                <span style="font-size: 1.1rem; font-weight: 800; color: #fcd34d;" id="step5Phase2RatioY">—</span>
-              </div>
-            </div>
+          <div id="step5Section3Grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem;">
+            <!-- Dynamically populated by renderStep5AnalysisDashboard() -->
           </div>
         </div>
 
@@ -1809,7 +1880,7 @@
           </div>
 
           <!-- Formula references box -->
-          <div style="background: rgba(15,23,42,0.4); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-secondary); display: flex; flex-wrap: wrap; gap: 1.5rem;">
+          <div id="step5Section4FormulaBox" style="background: rgba(15,23,42,0.4); padding: 0.85rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-secondary); display: flex; flex-wrap: wrap; gap: 1.5rem;">
             <div>Y = y₁ + y₂</div>
             <div>C₀ = (1.5L + 5) / (1 − Y)</div>
             <div>G_eff = C₀ − L</div>
@@ -1835,30 +1906,8 @@
             Shared Cycle Length: <strong style="color: var(--success); font-size: 1.1rem;" id="step5TimingSharedCycle">—</strong>
           </div>
 
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
-            <!-- Phase 1 Timing Card -->
-            <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
-              <div style="font-size: 0.85rem; font-weight: 800; color: var(--accent-primary); text-transform: uppercase; margin-bottom: 0.75rem;">PHASE 1 — NORTH / SOUTH</div>
-              <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Approaches: Road A + Road C</div>
-              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
-                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Green:</span> <strong style="color: var(--success);" id="step5P1Green">—</strong></div>
-                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Amber:</span> <strong style="color: #fcd34d;" id="step5P1Amber">—</strong></div>
-                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">All-Red:</span> <strong style="color: #ef4444;" id="step5P1AllRed">—</strong></div>
-                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Effective Green:</span> <strong style="color: var(--text-primary);" id="step5P1EffGreen">—</strong></div>
-              </div>
-            </div>
-
-            <!-- Phase 2 Timing Card -->
-            <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
-              <div style="font-size: 0.85rem; font-weight: 800; color: #fcd34d; text-transform: uppercase; margin-bottom: 0.75rem;">PHASE 2 — EAST / WEST</div>
-              <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Approaches: Road B + Road D</div>
-              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
-                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Green:</span> <strong style="color: var(--success);" id="step5P2Green">—</strong></div>
-                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Amber:</span> <strong style="color: #fcd34d;" id="step5P2Amber">—</strong></div>
-                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">All-Red:</span> <strong style="color: #ef4444;" id="step5P2AllRed">—</strong></div>
-                <div><span style="font-size: 0.72rem; color: var(--text-secondary);">Effective Green:</span> <strong style="color: var(--text-primary);" id="step5P2EffGreen">—</strong></div>
-              </div>
-            </div>
+          <div id="step5Section5Grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+            <!-- Dynamically populated by renderStep5AnalysisDashboard() -->
           </div>
 
           <!-- Dynamic Cycle Timeline Bar -->
@@ -1969,19 +2018,8 @@
               <div style="font-size: 0.75rem; font-weight: 800; color: #10b981; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.75rem;">3. RECOMMENDED SIGNAL ACTION</div>
 
               <!-- Recommendation Values Card -->
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin-bottom: 0.85rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.08); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25);">
-                <div>
-                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Shared Cycle</div>
-                  <div style="font-size: 1.1rem; font-weight: 800; color: #10b981;" id="step5RecCycleVal">—</div>
-                </div>
-                <div>
-                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Phase 1 Green</div>
-                  <div style="font-size: 1.1rem; font-weight: 800; color: #38bdf8;" id="step5RecP1Val">—</div>
-                </div>
-                <div>
-                  <div style="font-size: 0.7rem; color: var(--text-secondary);">Phase 2 Green</div>
-                  <div style="font-size: 1.1rem; font-weight: 800; color: #fcd34d;" id="step5RecP2Val">—</div>
-                </div>
+              <div id="step5Section7RecCard" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin-bottom: 0.85rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.08); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25);">
+                <!-- Dynamically populated by renderStep5AnalysisDashboard() -->
               </div>
 
               <div style="font-size: 0.88rem; color: var(--text-primary); line-height: 1.6;" id="step5RecAction">Awaiting analysis execution.</div>
@@ -2006,6 +2044,7 @@
           </div>
 
           <ul style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.7; padding-left: 1.25rem; margin: 0;">
+            <li id="step5AssumpPhaseModel">Signal timing analysis uses a two-phase intersection model.</li>
             <li>Analysis uses historical traffic data ingested and validated in Step 2.</li>
             <li>Webster method is used for preliminary isolated-intersection signal timing optimization.</li>
             <li>Traffic demand is assumed representative of the analyzed survey period.</li>
@@ -2045,7 +2084,7 @@
             </div>
 
             <!-- Prominent Summary Box -->
-            <div style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 6px; border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: center;">
+            <div id="step5Section9SummaryBox" style="background: rgba(15,23,42,0.6); padding: 1.25rem; border-radius: 6px; border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: center;">
               <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">RECOMMENDED CYCLE</div>
               <div style="font-size: 1.75rem; font-weight: 800; color: var(--success); margin-top: 0.1rem;" id="step5SumCycle">—</div>
 
@@ -2078,7 +2117,7 @@
       <section id="wizard-section-6" class="wizard-section-panel" style="display: none;">
         <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
           <div>
-            <h2 class="section-header-title" style="font-size: 1.05rem;">6. RESULTS &amp; ENGINEERING REPORTS</h2>
+            <h2 class="section-header-title" style="font-size: 1.05rem;">RESULTS &amp; ENGINEERING REPORTS</h2>
             <p style="font-size: 0.82rem; color: var(--text-secondary);">Comprehensive engineering report with optimized signal timings, capacity &amp; v/c analysis, LOS assessment, and printable PDF report generator.</p>
           </div>
           <button class="btn-primary-cyan" onclick="FlowGuard.generateEngineeringReport()">🖨 Print PDF Engineering Report</button>
@@ -2114,6 +2153,252 @@
       </button>
     </div>
   </footer>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SIGNAL SIMULATION VIEW — LIVE 4-PHASE SIGNAL DEMONSTRATION
+       ═══════════════════════════════════════════════════════════ -->
+  <div id="signal-simulation-view" style="display: none; flex-direction: column; width: 100%; max-width: 1400px; margin: 0 auto; padding: 1.5rem 1.5rem 4rem 1.5rem; gap: 1.5rem;">
+
+    <!-- 1. MAIN HEADER -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem 1.5rem;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+          <h1 style="font-size: 1.6rem; font-weight: 800; color: #ffffff; margin: 0; letter-spacing: -0.02em;">SIGNAL SIMULATION</h1>
+          <span id="simHeaderBadge" class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.75rem; font-weight: 800; padding: 0.25rem 0.65rem; border-radius: 6px;">4-PHASE MODE</span>
+        </div>
+        <div style="font-size: 0.88rem; color: #94a3b8; margin-top: 0.35rem;">Live 4-Phase Signal Demonstration — Visualizing FlowGuard AI Calculated Signal Timing</div>
+      </div>
+
+      <!-- Header Counters -->
+      <div style="display: flex; gap: 1.25rem; flex-wrap: wrap; align-items: center; font-size: 0.85rem;">
+        <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border-color); padding: 0.5rem 0.85rem; border-radius: 8px;">
+          <span style="color: #94a3b8; font-size: 0.72rem; display: block; text-transform: uppercase; font-weight: 700;">CYCLE LENGTH</span>
+          <strong id="simHeaderCycleLength" style="color: #38bdf8; font-size: 1.1rem; font-weight: 800;">—</strong>
+        </div>
+        <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border-color); padding: 0.5rem 0.85rem; border-radius: 8px;">
+          <span style="color: #94a3b8; font-size: 0.72rem; display: block; text-transform: uppercase; font-weight: 700;">CURRENT PHASE</span>
+          <strong id="simHeaderCurrentPhase" style="color: #ffffff; font-size: 1.1rem; font-weight: 800;">—</strong>
+        </div>
+        <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border-color); padding: 0.5rem 0.85rem; border-radius: 8px;">
+          <span style="color: #94a3b8; font-size: 0.72rem; display: block; text-transform: uppercase; font-weight: 700;">TIME REMAINING</span>
+          <strong id="simHeaderTimeRemaining" style="color: #34d399; font-size: 1.1rem; font-weight: 800;">—</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. INACTIVE / NO DATA GUARD CONTAINER (Hidden when 4-Phase active) -->
+    <div id="simGuardContainer" class="card" style="display: none; padding: 2rem; background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-color); border-radius: 12px; text-align: center;">
+      <div id="simGuardIcon" style="font-size: 2.5rem; margin-bottom: 0.75rem;">⚠️</div>
+      <h2 id="simGuardTitle" style="font-size: 1.25rem; font-weight: 800; color: #ffffff; margin-bottom: 0.5rem;">NO 4-PHASE TIMING DATA</h2>
+      <p id="simGuardDesc" style="font-size: 0.9rem; color: #94a3b8; max-width: 600px; margin: 0 auto 1.25rem auto; line-height: 1.5;">Run a 4-phase Webster analysis to generate the signal simulation.</p>
+      <button id="simGuardBtn" onclick="FlowGuard.switchMainView('analyzer'); FlowGuard.setWizardStep(5);" class="btn-primary-cyan" style="padding: 0.75rem 1.5rem; font-weight: 800; border-radius: 8px; cursor: pointer;">
+        GO TO RUN ANALYSIS &rarr;
+      </button>
+    </div>
+
+    <!-- 3. SIMULATION MAIN CONTENT (Shown when 4-Phase data active) -->
+    <div id="simMainContent" style="display: flex; flex-direction: column; gap: 1.5rem;">
+
+      <!-- CONTROLS & LIVE STATUS HEADER -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem; align-items: stretch;">
+
+        <!-- Control Panel -->
+        <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 12px; display: flex; flex-direction: column; justify-content: space-between;">
+          <div style="font-size: 0.75rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">SIMULATION CONTROLS</div>
+
+          <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem;">
+            <button id="btnSimStart" onclick="FlowGuard.signalSimulation.start()" style="flex: 1; min-width: 140px; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); padding: 0.75rem 1rem; font-weight: 800; font-size: 0.88rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; transition: all 0.2s;">
+              &#9654; START SIMULATION
+            </button>
+            <button id="btnSimPause" onclick="FlowGuard.signalSimulation.pause()" style="flex: 1; min-width: 100px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); padding: 0.75rem 1rem; font-weight: 800; font-size: 0.88rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; transition: all 0.2s;">
+              &#2408; PAUSE
+            </button>
+            <button id="btnSimReset" onclick="FlowGuard.signalSimulation.reset()" style="flex: 1; min-width: 100px; background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.4); padding: 0.75rem 1rem; font-weight: 800; font-size: 0.88rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; transition: all 0.2s;">
+              &#8635; RESET
+            </button>
+          </div>
+
+          <!-- Speed Controls -->
+          <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(30, 41, 59, 0.5); padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <span style="font-size: 0.78rem; font-weight: 700; color: #94a3b8;">SIMULATION SPEED:</span>
+            <div style="display: flex; gap: 0.4rem;">
+              <button class="sim-speed-btn active" data-speed="1" onclick="FlowGuard.signalSimulation.setSpeed(1)">1&times;</button>
+              <button class="sim-speed-btn" data-speed="2" onclick="FlowGuard.signalSimulation.setSpeed(2)">2&times;</button>
+              <button class="sim-speed-btn" data-speed="4" onclick="FlowGuard.signalSimulation.setSpeed(4)">4&times;</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Status Card -->
+        <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 12px; display: flex; flex-direction: column; justify-content: space-between;">
+          <div style="font-size: 0.75rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">CURRENT SIGNAL STATUS</div>
+
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; font-size: 0.82rem;">
+            <div>
+              <span style="color: #94a3b8; font-size: 0.72rem; display: block; text-transform: uppercase;">ACTIVE PHASE</span>
+              <strong id="simStatusPhase" style="color: #ffffff; font-size: 0.95rem;">PHASE 1 — ROAD A / NORTH</strong>
+            </div>
+            <div>
+              <span style="color: #94a3b8; font-size: 0.72rem; display: block; text-transform: uppercase;">SIGNAL STATE</span>
+              <span id="simStatusSignal" style="font-size: 0.85rem; font-weight: 800; padding: 0.15rem 0.55rem; border-radius: 4px; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); display: inline-block;">GREEN</span>
+            </div>
+            <div>
+              <span style="color: #94a3b8; font-size: 0.72rem; display: block; text-transform: uppercase;">REMAINING TIME</span>
+              <strong id="simStatusRemaining" style="color: #34d399; font-size: 1.1rem;">47 s</strong>
+            </div>
+            <div>
+              <span style="color: #94a3b8; font-size: 0.72rem; display: block; text-transform: uppercase;">CYCLE / ELAPSED</span>
+              <strong id="simStatusElapsed" style="color: #38bdf8; font-size: 0.95rem;">Cycle 1 (0 / 180 s)</strong>
+            </div>
+          </div>
+
+          <div style="margin-top: 0.65rem; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.76rem; color: #94a3b8;">
+            Next Phase: <strong id="simStatusNext" style="color: #cbd5e1;">PHASE 2 — ROAD B / EAST</strong>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 4-WAY INTERSECTION VISUALIZATION -->
+      <div class="card" style="padding: 1.5rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 12px;">
+        <div style="font-size: 0.75rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; text-align: center;">
+          2D ENGINEERING INTERSECTION SIGNAL VISUALIZATION
+        </div>
+
+        <!-- Intersection Grid Container -->
+        <div class="sim-intersection-grid">
+
+          <!-- ROAD A — NORTH (TOP) -->
+          <div class="sim-road-approach approach-north">
+            <div class="sim-road-label">ROAD A — NORTHBOUND</div>
+            <div class="sim-signal-head" id="signalHeadNorth">
+              <div class="sim-signal-title">ROAD A</div>
+              <div class="sim-light light-red" id="lightNorthRed">RED</div>
+              <div class="sim-light light-amber" id="lightNorthAmber">AMBER</div>
+              <div class="sim-light light-green" id="lightNorthGreen">GREEN</div>
+            </div>
+            <div class="sim-road-arrow">&darr;</div>
+          </div>
+
+          <!-- ROAD D — WEST (LEFT) -->
+          <div class="sim-road-approach approach-west">
+            <div class="sim-road-label">ROAD D — WESTBOUND</div>
+            <div class="sim-signal-head" id="signalHeadWest">
+              <div class="sim-signal-title">ROAD D</div>
+              <div class="sim-light light-red" id="lightWestRed">RED</div>
+              <div class="sim-light light-amber" id="lightWestAmber">AMBER</div>
+              <div class="sim-light light-green" id="lightWestGreen">GREEN</div>
+            </div>
+            <div class="sim-road-arrow">&rarr;</div>
+          </div>
+
+          <!-- CENTER INTERSECTION JUNCTION -->
+          <div class="sim-intersection-center">
+            <div style="font-size: 0.7rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; text-align: center;">
+              4-WAY<br>JUNCTION
+            </div>
+            <div id="simActivePhaseIndicator" style="margin-top: 0.35rem; font-size: 0.65rem; font-weight: 800; padding: 0.2rem 0.4rem; border-radius: 4px; background: rgba(56,189,248,0.15); color: #38bdf8; text-align: center;">
+              PHASE 1
+            </div>
+          </div>
+
+          <!-- ROAD B — EAST (RIGHT) -->
+          <div class="sim-road-approach approach-east">
+            <div class="sim-road-arrow">&larr;</div>
+            <div class="sim-signal-head" id="signalHeadEast">
+              <div class="sim-signal-title">ROAD B</div>
+              <div class="sim-light light-red" id="lightEastRed">RED</div>
+              <div class="sim-light light-amber" id="lightEastAmber">AMBER</div>
+              <div class="sim-light light-green" id="lightEastGreen">GREEN</div>
+            </div>
+          </div>
+
+          <!-- ROAD C — SOUTH (BOTTOM) -->
+          <div class="sim-road-approach approach-south">
+            <div class="sim-road-arrow">&uarr;</div>
+            <div class="sim-signal-head" id="signalHeadSouth">
+              <div class="sim-signal-title">ROAD C</div>
+              <div class="sim-light light-red" id="lightSouthRed">RED</div>
+              <div class="sim-light light-amber" id="lightSouthAmber">AMBER</div>
+              <div class="sim-light light-green" id="lightSouthGreen">GREEN</div>
+            </div>
+            <div class="sim-road-label">ROAD C — SOUTHBOUND</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 4 TIMING CARDS -->
+      <div>
+        <div style="font-size: 0.75rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">
+          CALCULATED 4-PHASE TIMING BREAKDOWN
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+          <div class="card sim-phase-card" id="simPhaseCard1" style="padding: 1.1rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 10px;">
+            <div style="font-size: 0.82rem; font-weight: 800; color: #38bdf8; margin-bottom: 0.4rem;">PHASE 1 — ROAD A / NORTH</div>
+            <div style="display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.8rem;">
+              <div>Green: <strong id="simP1Green" style="color: #34d399;">—</strong></div>
+              <div>Amber: <strong id="simP1Amber" style="color: #f59e0b;">—</strong></div>
+              <div>All-Red: <strong id="simP1AllRed" style="color: #ef4444;">—</strong></div>
+            </div>
+          </div>
+
+          <div class="card sim-phase-card" id="simPhaseCard2" style="padding: 1.1rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 10px;">
+            <div style="font-size: 0.82rem; font-weight: 800; color: #f59e0b; margin-bottom: 0.4rem;">PHASE 2 — ROAD B / EAST</div>
+            <div style="display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.8rem;">
+              <div>Green: <strong id="simP2Green" style="color: #34d399;">—</strong></div>
+              <div>Amber: <strong id="simP2Amber" style="color: #f59e0b;">—</strong></div>
+              <div>All-Red: <strong id="simP2AllRed" style="color: #ef4444;">—</strong></div>
+            </div>
+          </div>
+
+          <div class="card sim-phase-card" id="simPhaseCard3" style="padding: 1.1rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 10px;">
+            <div style="font-size: 0.82rem; font-weight: 800; color: #34d399; margin-bottom: 0.4rem;">PHASE 3 — ROAD C / SOUTH</div>
+            <div style="display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.8rem;">
+              <div>Green: <strong id="simP3Green" style="color: #34d399;">—</strong></div>
+              <div>Amber: <strong id="simP3Amber" style="color: #f59e0b;">—</strong></div>
+              <div>All-Red: <strong id="simP3AllRed" style="color: #ef4444;">—</strong></div>
+            </div>
+          </div>
+
+          <div class="card sim-phase-card" id="simPhaseCard4" style="padding: 1.1rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(167, 139, 250, 0.35); border-radius: 10px;">
+            <div style="font-size: 0.82rem; font-weight: 800; color: #a78bfa; margin-bottom: 0.4rem;">PHASE 4 — ROAD D / WEST</div>
+            <div style="display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.8rem;">
+              <div>Green: <strong id="simP4Green" style="color: #34d399;">—</strong></div>
+              <div>Amber: <strong id="simP4Amber" style="color: #f59e0b;">—</strong></div>
+              <div>All-Red: <strong id="simP4AllRed" style="color: #ef4444;">—</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROPORTIONAL CYCLE TIMELINE -->
+      <div class="card" style="padding: 1.25rem; background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 12px;">
+        <div style="font-size: 0.75rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.85rem;">
+          PROPORTIONAL CYCLE TIMELINE BAR
+        </div>
+
+        <div id="simTimelineBarContainer" class="sim-timeline-container" style="display: flex; width: 100%; height: 36px; border-radius: 8px; overflow: hidden; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color);">
+          <!-- Dynamic segments injected by JS -->
+        </div>
+
+        <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #94a3b8; margin-top: 0.5rem;">
+          <span>0s</span>
+          <span id="simTimelineMid">Cycle Midpoint</span>
+          <span id="simTimelineEnd">180s</span>
+        </div>
+      </div>
+
+      <!-- SAFETY DISCLAIMER -->
+      <div style="font-size: 0.78rem; color: #94a3b8; font-style: italic; text-align: center; background: rgba(30, 41, 59, 0.4); padding: 0.65rem 1rem; border-radius: 8px; border: 1px dashed var(--border-color);">
+        ⚠️ Simulation only — timing values are derived from the configured FlowGuard AI analysis and require engineering validation before field implementation.
+      </div>
+
+    </div>
+
+  </div>
 
   <!-- ═══════════════════════════════════════════════════════════
        PROJECT INSPECTOR — DEVELOPER MODE ONLY

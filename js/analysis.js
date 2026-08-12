@@ -9,7 +9,8 @@ const AnalysisEngine = (function () {
   function analyzeApproaches(approaches, intersectionConfig, configType = '4CROSS', inputMode = 'TURNING_MOVEMENTS') {
     const C = parseFloat(intersectionConfig.cycleLength) || 120;
     const satPerLane = parseFloat(intersectionConfig.saturationFlow) || 1800; // PCU/hr/lane
-    const activeKeys = FlowGuard.getActiveApproachKeys(configType);
+    const FlowGuardRef = (typeof FlowGuard !== 'undefined' ? FlowGuard : (typeof global !== 'undefined' && global.FlowGuard ? global.FlowGuard : (typeof window !== 'undefined' && window.FlowGuard ? window.FlowGuard : require('./app'))));
+    const activeKeys = FlowGuardRef.getActiveApproachKeys(configType);
 
     const processedApproaches = {};
     let totalDemand = 0;
